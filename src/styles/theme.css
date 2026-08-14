@@ -13,7 +13,7 @@
  * unreferenced — constraint 2 ("no light theme, no toggle") and this
  * project's own standing "no dormant code" rule (CLAUDE.md, "Delivery
  * style") both rule out keeping a second, unreachable theme alive in the
- * codebase. `admin/app/layout.tsx` keeps `data-theme="dark"` on `<html>`
+ * codebase. `frontends/apps/admin/app/layout.tsx` keeps `data-theme="dark"` on `<html>`
  * regardless — harmless, and documents intent even with only one theme
  * registered.
  *

@@ -7,7 +7,7 @@ import { cn } from "../../lib/cn";
 
 /**
  * The console's information architecture (console-redesign.md §4), as data.
- * `@vsms/ui` owns the shape; `admin/app/nav-groups.ts` owns the actual
+ * `@vsms/ui` owns the shape; `frontends/apps/admin/app/nav-groups.ts` owns the actual
  * content (routes, groupings, icons) — this file never hardcodes a route.
  */
 export interface NavItem {
@@ -32,7 +32,7 @@ export interface SideNavProps {
   footerItems: NavItem[];
   /** Current pathname, for active-row highlighting. Plain string, not a
    * `next/navigation` call — this package has no dependency on Next.js, so
-   * the caller (`admin/app/console-shell.tsx`) resolves it via
+   * the caller (`frontends/apps/admin/app/console-shell.tsx`) resolves it via
    * `usePathname()` and passes it down. */
   currentPath: string;
   /** App-specific account/sign-out markup (§4's footer "Signed in as
@@ -187,7 +187,7 @@ function GroupSection({ group, currentPath }: { group: NavGroup; currentPath: st
  * The console's side navigation (console-redesign.md §4, §6.2). A pure
  * structural/layout component — routing, session data, and the drawer's
  * own off-canvas/persistent CSS split all live at the call site
- * (`admin/app/console-shell.tsx`, D7): this component only ever decides
+ * (`frontends/apps/admin/app/console-shell.tsx`, D7): this component only ever decides
  * "flat top item → grouped middle → de-emphasized footer" composition and
  * the label/icon-only/accordion treatment per breakpoint.
  *

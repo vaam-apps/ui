@@ -6,9 +6,9 @@ import { Button } from "../primitives/button";
 import { Textarea } from "../primitives/textarea";
 
 /**
- * Mirrors `@vsms/gateway`'s real `PreviewResult` (`packages/gateway/src/client.ts`,
- * transcribed from `schema/schema.cstack`'s `PreviewResult` type, verified
- * live against `crates/sms-api/src/procedures.rs::preview`). Defined
+ * Mirrors `@vsms/gateway`'s real `PreviewResult` (`frontends/packages/gateway/src/client.ts`,
+ * transcribed from `schemas/vsms.cstack`'s `PreviewResult` type, verified
+ * live against `backends/crates/sms-api/src/procedures.rs::preview`). Defined
  * locally, as a deliberate subset, rather than imported — `@vsms/ui` has
  * zero internal dependencies (T6 package rule), so it cannot depend on
  * `@vsms/gateway`'s types. Callers may pass the full `PreviewResult`
@@ -19,7 +19,7 @@ import { Textarea } from "../primitives/textarea";
  * codepoint offsets.** An earlier revision of this component (and the
  * architecture plan it was drafted from) assumed per-occurrence
  * `{ offset, length }` flags — that was written before anyone read the
- * real wire type. `crates/sms-api/src/procedures.rs::distinct_offending`
+ * real wire type. `backends/crates/sms-api/src/procedures.rs::distinct_offending`
  * collapses every occurrence to its first appearance, so twenty copies of
  * `ç` arrive as one entry. Highlighting therefore matches characters
  * against `value` directly (below), not positions.

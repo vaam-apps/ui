@@ -1,6 +1,6 @@
 // @vsms/ui — daisyUI styling + Radix behaviour, source-only (no build step).
 // See src/styles/theme.css for the token layer; import it once from
-// admin/app/globals.css.
+// frontends/apps/admin/app/globals.css.
 
 export * from "./components/bespoke/encoding-preview";
 // Bespoke

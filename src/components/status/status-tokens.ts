@@ -12,7 +12,7 @@
  * Job states (`job_state_transitions`: pending/running/succeeded/failed/
  * dead/cancelled) deliberately are NOT mapped here yet. The design doc
  * marks that mapping `OPEN` pending exactly this schema read (done — see
- * `schema/migrations/postgres/0002_bootstrap/up.sql`), but assigns the
+ * `backends/migrations/postgres/0002_bootstrap/up.sql`), but assigns the
  * actual glyph/hue judgement calls to its own follow-up task (§8, B3) —
  * notably, a job's `failed` is *retryable* (`failed -> pending` is a legal
  * edge) and is therefore not equivalent to a message's terminal `failed`,
@@ -215,7 +215,7 @@ export function isTerminalMessageState(state: MessageState): boolean {
 
 /**
  * #56: the follow-up this file's own module doc named — `job_state_
- * transitions` (`schema/migrations/postgres/0002_bootstrap/up.sql`),
+ * transitions` (`backends/migrations/postgres/0002_bootstrap/up.sql`),
  * verbatim: `pending`, `running`, `succeeded`, `failed`, `dead`,
  * `cancelled`. `dead` replaces what would otherwise be a second
  * `failed`-shaped terminal state — see [`JOB_STATUS_META`]'s own comment
@@ -323,7 +323,7 @@ export function isTerminalJobState(state: JobState): boolean {
 }
 
 /**
- * #55: `attempt_state_transitions` (`schema/migrations/postgres/
+ * #55: `attempt_state_transitions` (`backends/migrations/postgres/
  * 0002_bootstrap/up.sql`), verbatim — `pending`, `delivering`, `succeeded`,
  * `failed`, `dead`. Same "not equivalent to `MessageState` even where a
  * name matches" caution `JOB_STATUS_META`'s own doc gives: `failed` here is
