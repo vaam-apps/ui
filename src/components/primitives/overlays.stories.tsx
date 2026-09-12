@@ -120,16 +120,22 @@ export const DialogWithLongTitle: Story = {
 };
 
 /**
- * WP5 stories brief: a body taller than the viewport. **Finding, reported
- * rather than fixed (out of this brief's scope — changing dialog geometry
- * is a bigger decision than a stories pass covers):** `DialogPanel` (in
- * `dialog.tsx`) has no `max-h` and no `overflow-y`, so a body this tall
- * pushes `DialogFooter` off the bottom of the panel with no scrollbar
- * anywhere — the footer (and its only way to close the dialog via a
- * button) is genuinely unreachable, not merely below the fold. Resize this
- * story's viewport short to see it clip.
+ * WP5 stories brief: a body taller than the viewport.
+ *
+ * This story originally documented an unfixed finding — `DialogPanel` had
+ * no `max-h`/`overflow-y`, so a body this tall pushed `DialogFooter` off
+ * the bottom with no scrollbar anywhere, making the footer (and its only
+ * close button) genuinely unreachable. `dialog.tsx` has since been fixed
+ * (see `DialogContent`'s own module doc there for the mechanism: a bounded
+ * `max-h-[85vh]` panel, an internal `overflow-y-auto` wrapper around
+ * `children`, and `DialogHeader`/`DialogFooter` made `sticky` so they stay
+ * pinned to the visible panel while the body between them scrolls) and
+ * re-verified live in Storybook. This story now asserts that positively:
+ * with 30 rows of body content, the header and footer stay in place and
+ * the close button and "Close" action are reachable at every scroll
+ * position.
  */
-export const DialogWithTallBody: Story = {
+export const DialogWithScrollingBody: Story = {
   render: () => (
     <Dialog>
       <DialogTrigger as={Button}>Open tall dialog</DialogTrigger>

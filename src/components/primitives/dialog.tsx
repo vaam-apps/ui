@@ -253,7 +253,18 @@ export function DialogContent({ className, children, ...props }: ComponentPropsW
  * title is long enough to wrap. `pr-8` (32px) puts the header's own right
  * edge safely past the button's 32px-inset extent, with room to spare.
  *
- * `sticky top-0`: see `DialogContent`'s module doc for the full mechanism
+ * `sticky -top-6`, not `top-0` — and the `-6` is load-bearing. A sticky
+ * offset is measured from the scrollport's **content** edge, and the
+ * wrapper `DialogContent` renders `children` into is `p-6`. So `top-0`
+ * pins the header 24px *below* the top of the visible scroll area,
+ * leaving a 24px band above it in which the scrolled body stays visible
+ * and slides past — the exact artefact the edge-extension below exists to
+ * prevent, reintroduced on the one side that matters most. Measured
+ * rather than reasoned about: with `top-0` the scrollport's own top was
+ * 55px and the stuck header's was 79px; `-top-6` puts it at 55px, flush.
+ * `DialogFooter` carries the mirrored `-bottom-6` for the same reason.
+ *
+ * See `DialogContent`'s module doc for the full mechanism
  * — this, not `DialogContent`, is what keeps the header at the top of the
  * *visible* panel while a tall body scrolls underneath it, since
  * `DialogContent` has no way to single header/body/footer out of its flat
@@ -271,7 +282,7 @@ export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLD
   return (
     <div
       className={cn(
-        "-mx-6 -mt-6 sticky top-0 z-10 mb-4 flex flex-col gap-1 bg-surface-2 px-6 pt-6 pr-8",
+        "-mx-6 -mt-6 sticky -top-6 z-10 mb-4 flex flex-col gap-1 bg-surface-2 px-6 pt-6 pr-8",
         className,
       )}
       {...props}
@@ -292,7 +303,7 @@ export function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLD
   return (
     <div
       className={cn(
-        "-mx-6 -mb-6 sticky bottom-0 z-10 mt-6 flex items-center justify-end gap-2 bg-surface-2 px-6 pt-2 pb-6",
+        "-mx-6 -mb-6 sticky -bottom-6 z-10 mt-6 flex items-center justify-end gap-2 bg-surface-2 px-6 pt-2 pb-6",
         className,
       )}
       {...props}
