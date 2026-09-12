@@ -28,19 +28,17 @@ import { describe, expect, it } from "vitest";
  * separation among candidates that already cleared the bar — rather than
  * picked and then spot-checked.
  *
- * # What it does not check
+ * # The case that is easy to miss
  *
  * A **loud** status pill paints its foreground over `--state-*-bg`
- * composited on a surface, not over the bare surface. This file checks
- * the bare surfaces, which is the dominant case and the one the
- * `--subtle-foreground` failure lived in. `StatusPill` already documents
- * the composited case and handles it by switching text tier when loud —
- * see its own comment. Extending this to composited grounds is worth
- * doing and is not done here.
- *
- * Large-text exceptions are deliberately not modelled. Every token below
- * is used at 11–14px somewhere in the library, so the normal-text bar is
- * the right one for all of them.
+ * composited on a surface, not over the bare surface. That used to be a
+ * stated limitation here — "extending this to composited grounds is worth
+ * doing and is not done" — and it is done: the third `describe` block
+ * below composites each loud fill over each surface and checks the label
+ * against the result. It caught `expired` at 4.27:1 and `danger` at
+ * 4.36:1, both of which cleared the bar on a bare surface, and neither of
+ * which any story renders. The note is kept as history rather than
+ * deleted, because the gap it describes is the reason the block exists.
  */
 
 /**
@@ -232,6 +230,60 @@ describe("every theme declares a full set of surfaces and foregrounds", () => {
       "--muted-foreground",
       "--subtle-foreground",
     ]);
+  });
+});
+
+/**
+ * The dark tokens must be reachable with no `data-theme` attribute.
+ *
+ * daisyUI's `dark` carries `default: true`, so its own `base-*` tokens
+ * apply to a bare `<html>`. Everything this stylesheet adds — the
+ * surfaces, the edges, the three text tiers, every state hue — was
+ * declared only under `[data-theme="dark"]`, so on a page with no
+ * attribute the daisyUI half resolved and this half did not.
+ *
+ * Measured before fixing: `--color-base-100` came back `#0a0b0d` while
+ * `--muted-foreground`, `--edge` and `--subtle-foreground` came back
+ * empty. Every `text-muted-foreground` and `border-edge` on that page
+ * computed to nothing, and the README explicitly promised the opposite.
+ *
+ * `theme-tokens.test.ts` could not catch it and still cannot: it asks
+ * whether a token is *declared*, and these were. The gap is
+ * reachability, so it gets its own check here.
+ *
+ * Asserted on the selector rather than by rendering, because rendering
+ * needs a browser and this suite deliberately has none — the sibling
+ * Playwright suite in `e2e/` is where a computed-value version of this
+ * belongs.
+ */
+describe("the dark theme applies without a data-theme attribute", () => {
+  /** The declaration block's own selector list, comments already stripped. */
+  const selector = (() => {
+    const at = THEME_CSS.indexOf('[data-theme="dark"]');
+    expect(at, 'no `[data-theme="dark"]` block in theme.css').toBeGreaterThan(-1);
+    const lineStart = THEME_CSS.lastIndexOf("}", at) + 1;
+    return THEME_CSS.slice(lineStart, THEME_CSS.indexOf("{", at)).trim();
+  })();
+
+  it("names :root alongside the attribute", () => {
+    expect(
+      selector,
+      "The dark block must match a bare `<html>`. daisyUI's own `default: true` " +
+        "makes its tokens apply there, so dropping `:root` here leaves a page " +
+        "where half the theme resolves and half computes to nothing — silently.",
+    ).toContain(":root");
+  });
+
+  it("still matches the explicit attribute", () => {
+    expect(selector).toContain('[data-theme="dark"]');
+  });
+
+  it("does not let :root swallow the light theme", () => {
+    // Equal specificity (0,1,0) each, so source order decides: the light
+    // block has to come later in the file than this one.
+    expect(THEME_CSS.indexOf('[data-theme="light"]')).toBeGreaterThan(
+      THEME_CSS.indexOf('[data-theme="dark"]'),
+    );
   });
 });
 

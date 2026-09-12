@@ -11,3 +11,7 @@ storybook-static/
 # (`vcs.useIgnoreFile`), so an untracked local config was failing the
 # repo's own lint gate for reasons no commit could explain.
 .claude/
+
+# Playwright, on failure only (see playwright.config.ts).
+playwright-report/
+test-results/

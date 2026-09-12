@@ -1,0 +1,281 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+<Meta title="Docs/Testing and releasing" />
+
+# Testing and releasing
+
+Every gate in this package exists because something specific got through.
+None of them were added speculatively, and several were added after a
+*passing test* had already covered the thing that was broken. That is the
+recurring lesson and it is worth stating before the list:
+
+> **A green test is evidence about the assertion, not about the
+> behaviour.** Several checks here were written because an existing test
+> named the right thing and asserted the wrong one.
+
+Two measured examples, both from this repository:
+
+- A class-string assertion confirmed `btn-circle` survived `cn()`'s
+  merge, and was green while the button painted a **12px** radius. The
+  base string's `rounded-field` is an unlayered Tailwind utility and
+  daisyUI emits `.btn-circle` a sublayer deeper, so the utility won. A
+  class-string assertion cannot see that and would have passed forever.
+  The test now asserts the class that actually decides the paint.
+- `contrast.test.ts` stayed **green with the entire light theme
+  deleted**. Every case iterated the themes it had parsed, so a missing
+  theme was not a failing theme — it was an absent one, and absence was
+  never asserted. One theme still produced 44 cases, comfortably over the
+  old `> 20` floor.
+
+## The gates, and what each is for
+
+Run them all with `pnpm test`. CI runs lint, typecheck, tests, the
+package build and a tarball check, builds the Storybook, and runs the
+Playwright suite in a real browser.
+
+### `src/lib/contrast.test.ts` — a declared token that is illegible
+
+Parses `theme.css` and measures every foreground against every surface in
+both themes, including translucent state fills composited over the
+surface beneath them.
+
+It exists because `--subtle-foreground` was `#6b727d` — **4.06:1** on the
+page, **3.40:1** on a hovered row, against a 4.5:1 bar, across 38 usages
+all at 11–12px. It shipped for months. Adding a light theme would have
+multiplied that: measured against white, all eight status foregrounds
+landed between **1.4:1 and 2.6:1**. So this gate was written first and
+the light palette was searched against it.
+
+It asserts the theme roster and the three text tiers **by name**, for the
+reason above.
+
+### `src/lib/a11y.test.tsx` — a control that renders and is unreachable
+
+Mounts each component with `createRoot` inside `act` and runs axe on it.
+Client render, not server markup — Headless UI wires `aria-labelledby` in
+an effect, so the static version reported violations across most of the
+library that a browser showed were not real.
+
+`color-contrast` is disabled explicitly rather than silently returning
+nothing, because jsdom has no CSS; that half is the sibling gate's job.
+Two self-check cases assert axe is still live. The accessibility page has
+the full account, including the `landmark-unique` trade in the `SideNav`
+block.
+
+### `src/lib/story-coverage.test.ts` — an export nobody ever looks at
+
+Fails when an exported component is mentioned by no story file.
+
+The gallery used to live in a consuming application, as a hand-written
+route whose own doc claimed it rendered every export. An audit found
+**thirteen** it had never mounted, three of them carrying live rendering
+bugs nobody had seen. Colocating stories with components made that drift
+visible in the same diff; this makes it a build failure, because "added a
+component, forgot the story" is one file and passes every other check.
+
+It is coarse on purpose — "does this identifier appear in any story file"
+rather than "is it actually mounted". Exemptions live in the file as a
+short list with reasons, and **a stale exemption fails too**, so an entry
+cannot quietly cover for a deleted export.
+
+### `src/lib/cn.test.ts` — a class deleted on the way out
+
+Pins the merge behaviour, including the case that motivated registering
+the theme's own scales: stock `tailwind-merge` classifies an unrecognised
+`text-*` value as a colour, so a custom font size sitting beside a colour
+is silently deleted, and `text-caption text-state-danger-fg` rendered at
+the browser default. It also pins the counter-intuitive case —
+`btn-primary` and `btn-outline` are orthogonal in daisyUI 5, because
+`.btn-outline` *reads* the variable `.btn-primary` sets — and the radius
+case above.
+
+### `src/lib/theme-tokens.test.ts` — a token that was never declared
+
+Scans the components for `bg-` / `text-` / `border-` tokens this
+stylesheet owns and fails if one is not declared. Tailwind generates
+nothing for an unknown token and says nothing about it.
+
+That has happened twice: `--color-surface-1` / `--color-surface-2` (every
+dialog, popover and tooltip rendered transparent for months) and
+`--state-warning-*`. Both were found by reading, long after shipping.
+
+It strips comments before scanning, which is not tidiness — prose in a
+doc comment reading `bg-state-<tone>-bg` is read by a naive scan as a
+reference to a token literally named `state-`.
+
+### `calendar.render.test.tsx` — a valid key with a class that matches nothing
+
+Its sibling `calendar.test.ts` checks that every `classNames` key is a
+real react-day-picker element. Necessary, and not sufficient: every key
+was valid, every class string was valid CSS, and **none of the selection
+styling matched anything**, because it was written against a DOM shape
+react-day-picker does not produce — `aria-selected` on the day button (it
+is on the `<td>`) and `data-range-middle` attributes that do not exist.
+Neither `tsc` nor the key test can see that. A render can.
+
+What it still cannot see is whether a class resolves to a *visible*
+colour: the same hunt found `bg-state-neutral-bg` on the range interior,
+a real token that resolves to `transparent`.
+
+### `form-field.render.test.tsx` — a doc comment asserting something false
+
+Pins what each control actually emits when `FormField` wires it to its
+hint and error. `tsc` cannot check it — `cloneElement` on an
+`isValidElement<P>` cast type-checks whatever you claim — and axe cannot
+see it, because an unassociated `<p>` is valid HTML. So the first version
+of that feature shipped with a doc comment asserting it worked for
+controls where it did not.
+
+One row pins a **limitation** rather than a feature: Headless UI's
+`ListboxButton` owns `aria-describedby`, so a hint cannot reach a
+`Select`. If an upgrade changes that, the test fails and says so.
+
+### `side-nav.portal.test.tsx` — an invariant that escapes the host
+
+Pins that the floating rails portal to `document.body` even inside a
+transformed ancestor, that the two rails' breakpoint gates are
+complements, and that every shape carries the `Primary` landmark. The
+a11y gate cannot make the landmark-count check: it audits the
+component's own host node, and the portal escapes it.
+
+It also replaces a citation with a test. `side-nav.tsx` cited a
+measurement from a scratch test that had been deleted; this file is that
+citation made real, so the claim fails with the code rather than
+outliving it.
+
+### `table.scroll.test.tsx` — the branch jsdom can never reach
+
+`Table` becomes a focusable, named region only once it measures itself as
+overflowing, via `ResizeObserver`. jsdom has no layout and no
+`ResizeObserver`, so the a11y fixture always renders the *other* branch —
+correctly, which means the branch a keyboard user depends on was the one
+branch with no coverage. The two missing pieces are stubbed narrowly and
+only here.
+
+What it pins is the pairing, which is easy to get wrong in either
+direction: `aria-label` on a roleless `<div>` names nothing (that was the
+shipped bug), `role="region"` without a name is also wrong and not a
+lesser wrong, a `tabIndex` with no visible focus state trades one problem
+for another, and a table that fits must gain no tab stop at all.
+
+### `stamp-changelog.test.ts` — a release nobody described
+
+`changelog: false` means nothing generates `CHANGELOG.md` and nothing
+checks it, so `scripts/stamp-changelog.mjs` is the only thing standing
+between "released" and "released with nothing said about it".
+
+Its **refusals** are the interesting half and are where this file spends
+its cases: an empty unreleased section, whitespace that only looks like
+an entry, a missing `## Unreleased` heading, a version the changelog
+already documents, and a string that is not a version. A rename is easy
+to get right; refusing to rename an empty section is the behaviour that
+has to survive someone editing the script in a hurry to unblock a
+release. It also runs against the real `CHANGELOG.md`, because the
+parsing is only worth anything if it matches the document's actual shape.
+
+## Releasing
+
+Two halves, owned by different things on purpose.
+
+### The version number is changesets
+
+Alongside a change, in the same PR:
+
+```sh
+pnpm changeset
+```
+
+Pick `patch` / `minor` / `major` and write one line. That line is for
+whoever decides the next release, not for users — `CHANGELOG.md` is where
+users are addressed, and its entry is written under `## Unreleased` as
+the work happens.
+
+Changesets' own changelog generator is **off** (`changelog: false`), and
+changesets does not publish. Both are deliberate.
+
+The generated changelog would be one-line summaries with commit hashes.
+This file is prose: it explains what broke, what the obvious fix would
+have been and why it was wrong, and what a consumer has to change.
+Several entries are the only written record of a measurement — the
+contrast ratios a palette was searched against, the geometry of a
+skeleton layer, the scrollport offsets behind a sticky header. A
+generator cannot produce that and pointing one at the same file would
+either overwrite it or interleave two registers in one document. The cost
+is that writing the changelog is a manual step nothing enforces, which is
+the trade, taken knowingly.
+
+### Releasing is one button
+
+Run the **`Version`** workflow from the Actions tab. It consumes the
+pending changesets, bumps the manifest, stamps `## Unreleased` with the
+version it produced, commits, tags, and hands the tag to `release.yml`.
+Its `dry_run` input does all of that and pushes nothing.
+
+**It refuses to release when `## Unreleased` is empty**, and that refusal
+is the reason the workflow exists rather than a `sed` in a release step:
+nothing generates the changelog and nothing checks it, so the failure it
+trades for prose is a published version nobody described — most likely at
+exactly the moment someone is in a hurry.
+
+By hand, the same thing:
+
+```sh
+pnpm changeset:status              # what is pending, and what version it produces
+pnpm bump                          # changeset version
+node scripts/stamp-changelog.mjs 0.1.3
+```
+
+### Publishing is a tag
+
+Tag `vX.Y.Z` matching `package.json`. `.github/workflows/release.yml`
+runs lint, typecheck, tests and the build, validates the tarball, and
+publishes to npm through **Trusted Publishing (OIDC)** — `pnpm publish`
+with `id-token: write` and no `NODE_AUTH_TOKEN`, because there is no npm
+token in this repository at all. It refuses a tag that disagrees with the
+manifest, and refuses to run on anything but a `v*` tag ref.
+
+### Why the tag push is followed by an explicit dispatch
+
+This is the part that looks like a bug if you do not know it.
+
+`version.yml` pushes the tag and then **dispatches** `release.yml` at
+that ref, rather than relying on the tag push to trigger
+`on: push: tags`. That trigger does not fire: GitHub suppresses workflow
+runs from events raised by the default `GITHUB_TOKEN`, with
+`workflow_dispatch` and `repository_dispatch` as the only documented
+exceptions. The obvious implementation — push `v0.1.3`, let `release.yml`
+notice — silently does nothing.
+
+Both alternatives cost something real:
+
+- **A stored personal access token** would trigger the tag normally, and
+  this repository deliberately has no publishing credential. That is the
+  entire point of Trusted Publishing.
+- **Making `release.yml` a reusable `workflow_call`** would change the
+  OIDC claim npm matches its trusted publisher against — and that breaks
+  only at publish time, which is the worst place to find out.
+
+Dispatching leaves `release.yml` identical from npm's point of view.
+`release.yml` therefore carries a `workflow_dispatch` trigger and a guard
+that it is running on a `v*` tag ref at all; dispatched on `main` it
+would otherwise report `tag vmain disagrees with package.json`, which is
+true and reads like the wrong problem.
+
+### The one publish that workflow cannot do
+
+npm attaches a trusted publisher to an **existing** package, so there is
+nothing to configure until the name exists. The first publish is by hand:
+
+```sh
+npm login
+pnpm install
+pnpm publish --access public
+```
+
+Then add the trusted publisher on npmjs.com against this repository and
+the `release.yml` workflow filename. Every later tag publishes
+tokenlessly.
+
+`.changeset/README.md` has the full reasoning for `changelog: false`, for
+why there is no `changesets/action` bot, and for the dispatch; the
+README's Releasing section is the short form.

@@ -1,4 +1,5 @@
 import type { Preview } from "@storybook/react-vite";
+import { themes } from "storybook/theming";
 import "./preview.css";
 
 /**
@@ -59,6 +60,16 @@ const preview: Preview = {
     // The theme paints its own background; Storybook's would sit on top of
     // it and make every surface token read wrong.
     backgrounds: { disable: true },
+    // Dark docs chrome, because this is a dark-first library and the
+    // default is not. Without it a documentation page frames dark
+    // component demos in a light page — the demos read as islands, and
+    // the contrast between chrome and content is the first thing a reader
+    // notices about a page whose subject is contrast.
+    //
+    // This themes the Storybook *chrome* only (prose, tables, code
+    // blocks). What the components themselves resolve is the library's
+    // own `data-theme`, which the toolbar below still switches.
+    docs: { theme: themes.dark },
     a11y: { config: { rules: [{ id: "color-contrast", enabled: true }] } },
   },
   decorators: [

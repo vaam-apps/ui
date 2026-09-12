@@ -17,6 +17,12 @@ import { Button } from "../components/primitives/button";
 import { Card, CardBody, CardHeader } from "../components/primitives/card";
 import { CheckboxField } from "../components/primitives/checkbox";
 import { ChipSelect } from "../components/primitives/chip-select";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "../components/primitives/dropdown-menu";
 import { FormField } from "../components/primitives/form-field";
 import { InlineConfirm } from "../components/primitives/inline-confirm";
 import { Input } from "../components/primitives/input";
@@ -415,6 +421,156 @@ describe("the audit itself is wired up", () => {
   it("reports an unlabelled control", async () => {
     const violations = await audit(<button type="button" />);
     expect(violations.map((v) => v.id)).toContain("button-name");
+  });
+});
+
+/**
+ * A checkable menu row must say whether it is checked.
+ *
+ * It used to claim `role="menuitemcheckbox"` and `aria-checked`, and
+ * neither reached the DOM in a usable form: Headless UI's `MenuItem`
+ * owns `role` and renders `menuitem` regardless, while `aria-checked`
+ * survived onto a role that does not permit it. The state was therefore
+ * carried by a checkmark glyph and nothing else, in a component whose
+ * source read as though ARIA handled it.
+ *
+ * This pins the replacement — the state is in the accessible name — and
+ * pins it by *effect* rather than by mechanism, so a future version of
+ * Headless UI that does honour the role can be adopted by changing the
+ * component and leaving these cases alone.
+ */
+describe("DropdownMenuCheckboxItem announces its state", () => {
+  const menu = (checked: boolean) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger>Columns</DropdownMenuTrigger>
+      <DropdownMenuContent static>
+        <DropdownMenuCheckboxItem checked={checked}>Delivered</DropdownMenuCheckboxItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  // `DropdownMenuContent` sets an `anchor`, and Headless UI renders an
+  // anchored `MenuItems` in a portal — so the rows are NOT inside the
+  // mount host. Querying `host` here finds nothing and every assertion
+  // below would pass vacuously, which is the same trap the `SideNav`
+  // block documents for its rails.
+  it("puts the state in the name when checked", async () => {
+    await mount(menu(true), () => {
+      const row = document.querySelector('[role="menuitem"], [role="menuitemcheckbox"]');
+      expect(row, "no menu row found — did the portal target change?").not.toBeNull();
+      expect(row?.textContent).toContain("Delivered");
+      expect(row?.textContent).toContain("checked");
+    });
+  });
+
+  it("distinguishes unchecked from checked", async () => {
+    await mount(menu(false), () => {
+      const row = document.querySelector('[role="menuitem"], [role="menuitemcheckbox"]');
+      expect(row).not.toBeNull();
+      expect(row?.textContent).toContain("not checked");
+    });
+  });
+
+  it("declares no ARIA state its role does not permit", async () => {
+    await mount(menu(true), () => {
+      const row = document.querySelector('[role="menuitem"]');
+      // `aria-checked` is not allowed on `role="menuitem"`. If a future
+      // change gets the role honoured, this assertion is the one to
+      // revisit — and it will fail loudly rather than drift.
+      if (row !== null) {
+        expect(row.getAttribute("aria-checked")).toBeNull();
+      }
+    });
+  });
+});
+
+/**
+ * An option's name must be its label, not its label plus its description.
+ *
+ * axe cannot see this one either, for the same reason it could not see
+ * `StatusPill`'s: every rule is satisfied. The radio has a role, the role
+ * has a non-empty name, the name is derived from content. It is simply
+ * the **wrong** content — both spans render inside the `role="radio"`
+ * element, so content naming concatenates them and the shipped fixture's
+ * option was named `"ApproveThe provider accepted it."`. A screen-reader
+ * user hears the whole description again on every arrow press through the
+ * group, and there is no rule for "this name is longer than it should
+ * be".
+ *
+ * Headless UI's `Label`/`Description` do not help nested inside a
+ * `Radio` — measured, both `aria-labelledby` and `aria-describedby` came
+ * back `null`, because a `Radio` is not a `Field`. `ChipSelect` is
+ * correct only because it wraps each option in a real `<Field>`.
+ *
+ * So `radio-group.tsx` sets both ids explicitly, and this pins the
+ * result rather than the mechanism it happens to use: the name is the
+ * label alone, and the description is reachable as a description.
+ */
+describe("RadioGroup names an option by its label alone", () => {
+  const OPTIONS = [
+    { value: "approve", label: "Approve", description: "The provider accepted it." },
+    { value: "reject", label: "Reject" },
+  ];
+
+  it("does not fold the description into the accessible name", async () => {
+    await mount(
+      <RadioGroup
+        aria-label="Registration outcome"
+        value="approve"
+        onValueChange={() => undefined}
+        options={OPTIONS}
+      />,
+      (host) => {
+        const radio = host.querySelector('[role="radio"]');
+        const labelledBy = radio?.getAttribute("aria-labelledby");
+        expect(
+          labelledBy,
+          "the option must be named by an element, not by its own content",
+        ).toBeTruthy();
+
+        const label = labelledBy ? host.querySelector(`#${CSS.escape(labelledBy)}`) : null;
+        expect(label, `aria-labelledby="${labelledBy}" resolves to nothing`).not.toBeNull();
+        expect(label?.textContent).toBe("Approve");
+        // The failure this exists for: the description riding along.
+        expect(label?.textContent).not.toContain("provider accepted");
+      },
+    );
+  });
+
+  it("exposes the description as a description", async () => {
+    await mount(
+      <RadioGroup
+        aria-label="Registration outcome"
+        value="approve"
+        onValueChange={() => undefined}
+        options={OPTIONS}
+      />,
+      (host) => {
+        const radio = host.querySelector('[role="radio"]');
+        const describedBy = radio?.getAttribute("aria-describedby");
+        expect(describedBy).toBeTruthy();
+        const description = describedBy ? host.querySelector(`#${CSS.escape(describedBy)}`) : null;
+        expect(description?.textContent).toBe("The provider accepted it.");
+      },
+    );
+  });
+
+  it("omits aria-describedby entirely when an option has no description", async () => {
+    await mount(
+      <RadioGroup
+        aria-label="Registration outcome"
+        value="approve"
+        onValueChange={() => undefined}
+        options={OPTIONS}
+      />,
+      (host) => {
+        // A dangling `aria-describedby` pointing at an element that was
+        // never rendered is worse than none: it resolves to nothing and
+        // AT announces nothing, with no way to tell from the markup.
+        const second = host.querySelectorAll('[role="radio"]')[1];
+        expect(second?.getAttribute("aria-describedby")).toBeNull();
+      },
+    );
   });
 });
 

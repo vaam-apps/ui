@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 import { Button } from "./button";
 import {
   CommandMenu,
@@ -63,6 +64,24 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Every overlay in this file is portalled out of `canvasElement` —
+ * Headless UI's `Dialog` and `MenuItems` (the latter because
+ * `DropdownMenuContent` passes `anchor`, which implies a portal) both
+ * mount under `document.body`. So the play functions below open the thing
+ * from the canvas and then look for it in `document.body`. Scoping the
+ * *second* half to `canvasElement` is the way to write an interaction
+ * test that finds nothing and reports success, which is worse than not
+ * having written it.
+ */
+const body = () => within(document.body);
+
+/**
+ * The play function covers the two things a dialog is *for*, neither of
+ * which is visible in a screenshot: it is modal (focus goes inside on
+ * open and cannot Tab its way out), and Escape is a real dismissal that
+ * puts focus back where the reader left it.
+ */
 export const DialogStory: Story = {
   name: "Dialog",
   render: () => (
@@ -84,6 +103,50 @@ export const DialogStory: Story = {
       </DialogContent>
     </Dialog>
   ),
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByRole("button", { name: "Open dialog" });
+
+    await step("Nothing is open to begin with", async () => {
+      await expect(body().queryByRole("dialog")).toBeNull();
+    });
+
+    await step("The trigger opens a modal dialog named by its own title", async () => {
+      await userEvent.click(trigger);
+      const dialog = await body().findByRole("dialog", { name: "Rotate the signing secret?" });
+      await expect(dialog).toHaveAttribute("aria-modal", "true");
+    });
+
+    await step("Focus moves into the dialog", async () => {
+      const dialog = body().getByRole("dialog");
+      await waitFor(async () => {
+        await expect(dialog.contains(document.activeElement)).toBe(true);
+      });
+    });
+
+    await step("…and Tab cannot get out of it — six presses, still inside", async () => {
+      const dialog = body().getByRole("dialog");
+      for (let press = 0; press < 6; press++) {
+        await userEvent.tab();
+        await expect(dialog.contains(document.activeElement)).toBe(true);
+      }
+    });
+
+    await step("All three ways out are present: Cancel, Rotate, and the close button", async () => {
+      const dialog = within(body().getByRole("dialog"));
+      await expect(dialog.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+      await expect(dialog.getByRole("button", { name: "Rotate" })).toBeInTheDocument();
+      await expect(dialog.getByRole("button", { name: "Close" })).toBeInTheDocument();
+    });
+
+    await step("Escape closes it and returns focus to the trigger", async () => {
+      await userEvent.keyboard("{Escape}");
+      await waitFor(async () => {
+        await expect(body().queryByRole("dialog")).toBeNull();
+      });
+      await expect(trigger).toHaveFocus();
+    });
+  },
 };
 
 /**
@@ -277,6 +340,13 @@ export const PlainDrawer: Story = {
  * `SideNav`'s tiny-screen rail is the caller that needed this: it shows
  * four destinations and puts the rest here, and the ones here must not
  * be worse links for having landed fifth.
+ *
+ * Since the two menus render identically, the play function is the only
+ * place the difference is stated in a way that can fail: it opens both
+ * and asserts the element *names* — `BUTTON` in the commands menu, `A`
+ * with a real `href` in the destinations one. Rewrite
+ * `DropdownMenuLinkItem` back to `as="button"` and this story goes red
+ * while the screenshot stays pixel-identical.
  */
 export const CommandsVersusDestinations: Story = {
   render: () => (
@@ -311,8 +381,68 @@ export const CommandsVersusDestinations: Story = {
       </DropdownMenu>
     </div>
   ),
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step("The commands menu is made of buttons — things that happen", async () => {
+      await userEvent.click(canvas.getByRole("button", { name: "Commands" }));
+      const menu = await body().findByRole("menu");
+      const rows = within(menu).getAllByRole("menuitem");
+      await expect(rows.map((row) => row.tagName)).toEqual(["BUTTON", "BUTTON"]);
+      await expect(rows.map((row) => row.textContent)).toEqual(["Replay", "Copy id"]);
+      await userEvent.keyboard("{Escape}");
+      await waitFor(async () => {
+        await expect(body().queryByRole("menu")).toBeNull();
+      });
+    });
+
+    await step("The destinations menu is made of anchors — places you can go", async () => {
+      await userEvent.click(canvas.getByRole("button", { name: "Destinations" }));
+      const menu = await body().findByRole("menu");
+      const rows = within(menu).getAllByRole("menuitem");
+      await expect(rows.map((row) => row.tagName)).toEqual(["A", "A", "A"]);
+      // The whole reason `DropdownMenuLinkItem` exists: a real `href`, so
+      // middle-click, ⌘-click and "copy link address" still work. None of
+      // those are testable here — but an `<a>` without an `href` cannot do
+      // any of them, and that *is*.
+      await expect(rows.map((row) => row.getAttribute("href"))).toEqual([
+        "#workers",
+        "#opt-outs",
+        "#audit",
+      ]);
+    });
+
+    await step("The current page is marked in the menu, not just tinted", async () => {
+      const menu = within(body().getByRole("menu"));
+      await expect(menu.getByRole("menuitem", { name: "Audit log" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      const marked = menu
+        .getAllByRole("menuitem")
+        .filter((row) => row.getAttribute("aria-current") === "page");
+      await expect(marked).toHaveLength(1);
+    });
+
+    await step("Escape closes it", async () => {
+      await userEvent.keyboard("{Escape}");
+      await waitFor(async () => {
+        await expect(body().queryByRole("menu")).toBeNull();
+      });
+    });
+  },
 };
 
+/**
+ * The play function walks the "Actions" menu with the arrow keys.
+ *
+ * Headless UI's `Menu` keeps DOM focus on the menu container and moves an
+ * `aria-activedescendant` pointer instead, so "which row is focused" is
+ * an attribute on the menu, not `document.activeElement` — which is
+ * exactly the kind of thing a play function is worth writing down for,
+ * since nobody reading the markup would guess it. Note the separator is
+ * skipped: four rows of markup, three stops.
+ */
 export const MenusAndTips: Story = {
   render: () => (
     <div className="flex flex-wrap items-center gap-6">
@@ -350,12 +480,80 @@ export const MenusAndTips: Story = {
       </Tooltip>
     </div>
   ),
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByRole("button", { name: "Actions" });
+
+    const rows = () => within(body().getByRole("menu")).getAllByRole("menuitem");
+    const activeRow = () => {
+      const menu = body().getByRole("menu");
+      const id = menu.getAttribute("aria-activedescendant");
+      return rows().find((row) => row.id === id) ?? null;
+    };
+
+    await step("Opening by click activates nothing yet", async () => {
+      await userEvent.click(trigger);
+      await body().findByRole("menu");
+      await expect(activeRow()).toBeNull();
+    });
+
+    await step("ArrowDown lands on the first row", async () => {
+      await userEvent.keyboard("{ArrowDown}");
+      await expect(activeRow()).toHaveTextContent("Replay");
+    });
+
+    await step("ArrowDown again moves to the second", async () => {
+      await userEvent.keyboard("{ArrowDown}");
+      await expect(activeRow()).toHaveTextContent("Copy id");
+    });
+
+    await step("…and again steps over the separator to the third and last", async () => {
+      await userEvent.keyboard("{ArrowDown}");
+      await expect(activeRow()).toHaveTextContent("Cancel");
+      await expect(rows()).toHaveLength(3);
+    });
+
+    await step("ArrowUp walks back the way it came", async () => {
+      await userEvent.keyboard("{ArrowUp}");
+      await expect(activeRow()).toHaveTextContent("Copy id");
+    });
+
+    await step("Escape closes the menu and returns focus to its trigger", async () => {
+      await userEvent.keyboard("{Escape}");
+      await waitFor(async () => {
+        await expect(body().queryByRole("menu")).toBeNull();
+      });
+      await expect(trigger).toHaveFocus();
+    });
+  },
 };
 
 /**
  * A checkbox item keeps the menu open on click, which is what makes a
  * column toggle usable — closing after each pick would mean reopening
  * the menu once per column.
+ *
+ * That sentence is the whole story, and until now nothing checked it. The
+ * play function ticks two columns in a row without reopening anything,
+ * and watches each row's announced state follow.
+ *
+ * **The state is in the name, not in `aria-checked`, and that is the
+ * fix rather than a workaround.** `DropdownMenuCheckboxItem` used to ask
+ * for `role="menuitemcheckbox"` and set `aria-checked`. Neither worked:
+ * Headless UI's `MenuItem` builds its own `role` into `ourProps` and
+ * wins, so the DOM said `role="menuitem"` regardless — the same
+ * ownership `select.tsx` records for `aria-describedby` on
+ * `ListboxButton`. `aria-checked` survived onto a role that does not
+ * permit it, which is invalid ARIA and reached a screen reader as
+ * nothing at all. The tick was visual only, in a component whose source
+ * read as though ARIA had it covered.
+ *
+ * So each row now carries an `sr-only` ", checked" / ", not checked"
+ * after its label, which is what a real `menuitemcheckbox` would have
+ * announced and does not depend on out-arguing the library. The
+ * assertions below read the accessible name for that reason, and
+ * `src/lib/a11y.test.tsx` pins it by effect so a future Headless UI that
+ * honours the role can be adopted without rewriting them.
  */
 export const MenuWithToggles: Story = {
   render: function Render() {
@@ -381,6 +579,45 @@ export const MenuWithToggles: Story = {
         </DropdownMenuContent>
       </DropdownMenu>
     );
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    // Re-read each time: these rows are inside a portal the menu owns, and
+    // a stale reference would keep passing against a detached node.
+    // A regex, not a string: the accessible name now ends with the
+    // `sr-only` state (", checked"), so an exact-string `name` match
+    // would find nothing and every assertion below would throw rather
+    // than pass vacuously — but a regex anchored on the label is what
+    // actually expresses "the row for this column".
+    const row = (name: string) =>
+      within(body().getByRole("menu")).getByRole("menuitem", { name: new RegExp(`^${name}`, "i") });
+
+    /** The state a screen reader would hear, read off the row's own name. */
+    const stateOf = (name: string) =>
+      /,\s*not checked$/i.test(row(name).textContent ?? "") ? "unchecked" : "checked";
+
+    await step("The menu opens with recipient and cost on, version off", async () => {
+      await userEvent.click(canvas.getByRole("button", { name: "Columns" }));
+      await body().findByRole("menu");
+      await expect(stateOf("recipient")).toBe("checked");
+      await expect(stateOf("cost")).toBe("checked");
+      await expect(stateOf("version")).toBe("unchecked");
+    });
+
+    await step("Clicking a row toggles it — and the menu stays open", async () => {
+      await userEvent.click(row("version"));
+      await expect(body().getByRole("menu")).toBeInTheDocument();
+      await expect(stateOf("version")).toBe("checked");
+    });
+
+    await step("…so a second column can be toggled without reopening anything", async () => {
+      await userEvent.click(row("cost"));
+      await expect(body().getByRole("menu")).toBeInTheDocument();
+      await expect(stateOf("cost")).toBe("unchecked");
+      await expect(stateOf("version")).toBe("checked");
+      await expect(stateOf("recipient")).toBe("checked");
+    });
   },
 };
 

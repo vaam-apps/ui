@@ -1,0 +1,201 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+import { InstrumentPanel } from "../components/data/instrument-panel";
+import { StatTile } from "../components/data/stat-tile";
+
+<Meta title="Docs/Introduction" />
+
+# @vaam-apps/ui
+
+A dark-first React component library for **operator consoles** — the screens a
+person uses to find out why one record out of a hundred thousand did not do
+what it was supposed to.
+
+That sentence is the whole brief, and most of what follows is a consequence of
+it. An operator console is not a marketing surface and it is not a
+general-purpose admin CRUD scaffold. Its reader is scanning a column of a
+thousand rows looking for the four that are wrong, then opening one of them and
+reading every field on it carefully. Those two activities want different
+surfaces, and the library says so out loud rather than leaving it to taste.
+
+Styling is **daisyUI**, so component classes stay short and a consumer can
+theme them without forking. Behaviour is **Headless UI**, so focus management,
+keyboard handling and ARIA are not reimplemented once per component. State
+machines are rendered through a **parameterised status system**, so one glyph
+vocabulary serves every enum in an application instead of one badge component
+per enum.
+
+## Colour means something here
+
+This is the premise the rest of the system is built on, and it is worth stating
+before anything else, because it is the reason several otherwise reasonable
+decisions were refused.
+
+Eight hues exist, and each one answers a question about a record: is it
+finished, did it work, and who is holding it. `neutral`, `progress` and
+`parked` are the three ways a record can be unfinished — nobody has it, this
+system has it, somebody outside has it. `success`, `danger` and `expired` are
+the three ways it can be over. `warning` and `uncertain` are the two ways it
+can want a human, and they are not the same want: `warning` means somebody can
+act and acting will help, `uncertain` means the outcome will never be learned.
+The README's hue and mark tables are the working reference for choosing between
+them.
+
+Colour is never the only channel. Each state also differs in silhouette,
+interior mark and fill, because colour alone fails for the roughly 8% of men
+with a colour-vision deficiency and fails completely in a monochrome screenshot
+pasted into a ticket. The redundancy is load-bearing rather than polite: inside
+a 14px glyph, the mark is doing much of the work of telling the closest two
+hues apart.
+
+The corollary is the part people trip over. **If a hue means a state, then a
+coloured surface anywhere else is a lie.** A tinted card, a per-state border on
+a panel, a chrome accent picked because it looked good — each of them invites a
+reader to infer a status that nobody encoded. So there is no per-state tinting
+of chrome in this library, and there is exactly one coloured surface: the
+`--aurora-*` ramp behind `InstrumentPanel` and `Card glow`. It is bound by
+`color-mix` to the system's own hues so it cannot drift into a fifth invented
+palette, and it carries **no meaning at all** — no status is inferable from it,
+there is no per-state variant, and a caller cannot tint it. That absence of
+meaning, not a separate hue, is the only reason a coloured surface is safe here.
+
+## Three surface registers
+
+`InstrumentPanel`'s module doc names the map, and it is the fastest orientation
+into the library's layout decisions. The registers are distinguished by what
+the reader is *doing*, not by what the component is called.
+
+The three panels below are the real components, rendered on this page. They sit
+inside their own `data-theme="dark"` wrapper, because a documentation page is
+not a story and the preview decorator that normally stamps that attribute on
+`<html>` never runs here — without it, every custom property declared under
+`[data-theme="dark"]` resolves to nothing. That is the same gap
+[Installation](?path=/docs/docs-installation--docs) describes for an
+attribute-less application page.
+
+<div data-theme="dark" className="grid gap-4 rounded-box bg-background p-4 lg:grid-cols-3">
+  <div className="rounded-box border border-edge bg-surface-1 p-4">
+    <p className="mb-3 font-display font-medium text-foreground text-title-sm">Diagnostic</p>
+    <dl className="flex flex-col gap-2 text-body">
+      <div className="flex justify-between gap-4">
+        <dt className="text-muted-foreground">Reference</dt>
+        <dd className="font-mono text-foreground">cs_4f9ac21b</dd>
+      </div>
+      <div className="flex justify-between gap-4">
+        <dt className="text-muted-foreground">Attempts</dt>
+        <dd className="font-mono text-foreground">3</dd>
+      </div>
+      <div className="flex justify-between gap-4">
+        <dt className="text-muted-foreground">Provider</dt>
+        <dd className="font-mono text-foreground">rail-2</dd>
+      </div>
+    </dl>
+    <p className="mt-3 text-caption text-muted-foreground">
+      A 1px edge on a surface step. You read this, row by row.
+    </p>
+  </div>
+
+  <div className="rounded-box border border-edge bg-surface-2 p-4 shadow-[var(--shadow-popover)]">
+    <p className="mb-3 font-display font-medium text-foreground text-title-sm">Floating</p>
+    <p className="text-body text-muted-foreground">
+      Popover, dialog, drawer, toast. A shadow, because the layer overlaps a
+      ground it does not know.
+    </p>
+    <p className="mt-3 text-caption text-muted-foreground">
+      Rendered here with the real <code className="font-mono">--shadow-popover</code>.
+    </p>
+  </div>
+
+  <InstrumentPanel title="Instrument" caption="Settled volume, last 24 hours">
+    <div className="grid grid-cols-2 gap-3">
+      <StatTile label="Delivered" value="12,481" caption="98.2% of 12,710 terminal" />
+      <StatTile label="Unresolved" value="37" caption="Outcome never learned" tone="uncertain" />
+    </div>
+  </InstrumentPanel>
+</div>
+
+- **Diagnostic** — tables, drawers, detail panes. You *read* these, looking for
+  the one row that is wrong. A hairline on a surface step, and nothing else
+  competing for attention. This is most of the library.
+- **Floating** — popover, dialog, drawer, toast. These overlap a ground they do
+  not know about, so they get a shadow. Two of them, `--shadow-popover` and
+  `--shadow-dialog`, and the light theme redefines both because a near-black
+  shadow on a light ground reads as dirt rather than as depth.
+- **Instrument** — dashboards and metric rows. You *scan* these, and the job is
+  to make one number findable in a glance. An aurora mesh ground, no border:
+  a hairline on top of the mesh reads as two competing boundaries.
+
+The third register is an exception with a budget, not a loosening of the rule.
+A glow on every card is a glow on none, and borders remain the default
+everywhere the rule was doing work. `InstrumentPanel`'s own mesh is capped at
+14% alpha and the panel steps its caption tier up from `subtle` to `muted`,
+because a gradient ground breaks the assumption every contrast check in the
+system rests on — see [Theming and tokens](?path=/docs/docs-theming-and-tokens--docs).
+
+## What is deliberately not here
+
+A library is as much what it refuses. Each of these is a decision with a
+written reason in the source, not a gap waiting to be filled, and reopening one
+should mean arguing with the reason rather than noticing the absence.
+
+- **No rich or interactive tooltips.** `Tooltip` is daisyUI's CSS
+  `.tooltip`/`data-tip` — no JS, no portal, hover and focus driven by
+  `:hover`/`:focus` alone. `data-tip` is rendered through
+  `content: attr(data-tip)`, so a label must be a plain string. Headless UI
+  ships no tooltip, and adding a second behaviour library to replace one
+  positioning dependency with another was the trade being declined. The
+  component also sets a native `title` alongside, as a fallback for the case a
+  scrolling ancestor clips the positioned bubble away.
+- **No per-state tinting of chrome.** See above. The aurora ramp is the one
+  coloured surface, and its whole safety argument is that it means nothing.
+- **No success or warning button.** Those hues belong to status. A button is
+  primary, secondary, ghost or destructive. Mixing the two vocabularies is how
+  a status language erodes: once a green button exists, green has two meanings.
+- **No `info` hue, and blue is selection only.** `--ring` is focus and
+  selection, never a state. `theme.css` even pins daisyUI's own
+  `--color-info` to the neutral grey with a written reason. The two states an
+  `info` hue is usually reached for are `progress` and `parked`.
+- **No syntax-highlighting palette in `PayloadInspector`.** A rainbow JSON
+  block would be the loudest thing on a diagnostic screen, on a surface whose
+  entire job is to be read carefully.
+- **No centred empty-state placards.** Empty states are inline status lines —
+  `InlineEmptyState` — with no illustration and no card. The one exception is
+  `variant="standalone"`, a single line plus one action on a screen with
+  nothing else to do.
+- **No skeleton shimmer.** A shimmer sweeps on a fixed period, which reads as
+  progress a placeholder cannot know about, and a column of them beats like a
+  metronome. `Skeleton` runs a chaotic aurora drift on coprime periods (23s and
+  31s) instead, and stops entirely under `prefers-reduced-motion`.
+- **No toast for anything an operator must act on.** Toasts are for transient
+  confirmations — copied, saved, replay queued. A toast that expires while
+  somebody is reading a payload is a lost message, so anything actionable is
+  inline.
+- **No font files.** Four family stacks are named; none of them are
+  `@font-face` rules. See [Installation](?path=/docs/docs-installation--docs).
+- **No authorisation inferred from presentation.** A status system's `family`
+  field is metadata for "should this row stop polling", and nothing else. A UI
+  that greys out *cancel* because its own table says `terminal` will be wrong
+  the first time the state machine changes and nobody remembers the table
+  exists. Propose the action; let the server refuse it.
+
+## Where to go next
+
+- [Installation](?path=/docs/docs-installation--docs) — peer dependencies, the
+  Tailwind and daisyUI wiring, `data-theme`, the fonts, and the inline script
+  that prevents a theme flash on first paint.
+- [Theming and tokens](?path=/docs/docs-theming-and-tokens--docs) — every token
+  axis in both themes, the theme switcher, and the contrast gate that the light
+  palette was searched against rather than checked after the fact.
+- [Typography](?path=/docs/docs-typography--docs) — the four voices, the
+  registered size scale and the `tailwind-merge` bug it exists for, and the
+  italic rule with worked examples of what declines it.
+
+Further pages go deeper on single subjects — the
+[status system](?path=/docs/docs-status-system--docs),
+[surfaces and registers](?path=/docs/docs-surfaces-and-registers--docs),
+[navigation](?path=/docs/docs-navigation--docs) and
+[accessibility](?path=/docs/docs-accessibility--docs).
+
+Every component has its own stories in the sidebar, with the a11y panel running
+axe on each one. The stories are the visual-QA surface, not an illustration of
+these pages — where a story and a page disagree, the story is rendering real
+code and this text is not.

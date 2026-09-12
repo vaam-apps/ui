@@ -83,3 +83,36 @@ jobs:
 
       - name: Build Storybook
         run: pnpm run build-storybook
+
+      # Kept in the same job, deliberately, rather than split into a
+      # parallel one: `pnpm e2e` runs against `storybook-static/`, which
+      # the step above just produced. A separate job would have to either
+      # rebuild it — the slowest step here — or pass it between jobs as an
+      # artifact, and both cost more than they save for a suite this size.
+      #
+      # `--with-deps` installs the system libraries Chromium needs on a
+      # bare runner. Only chromium: `playwright.config.ts` defines one
+      # project, and installing three browsers to run one is two downloads
+      # of pure latency on every push.
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      # The gate for everything jsdom cannot see — contrast in situ, focus
+      # rings, clipping, hit-target size. `src/lib/a11y.test.tsx`'s module
+      # doc lists those four as its own blind spots, and each has cost
+      # this package a real bug found only by looking at a render.
+      - name: End-to-end (real browser)
+        run: pnpm run e2e
+
+      # Traces and screenshots are retained on failure only (see
+      # `playwright.config.ts`), so this uploads nothing on a green run.
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore

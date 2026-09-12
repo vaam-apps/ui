@@ -1,0 +1,257 @@
+import { Meta, Canvas } from "@storybook/addon-docs/blocks";
+import * as TooltipStories from "../components/primitives/tooltip.stories";
+
+<Meta title="Docs/Accessibility" />
+
+# Accessibility
+
+This page is about what the library guarantees, what it checks, and —
+at more length than is comfortable — what it does not.
+
+The short version: **every component is audited by axe on every test run,
+and every colour token is measured against every surface it can land on
+in both themes.** Neither of those checks can see layout, so anything
+that depends on layout is unverified here and is being closed elsewhere.
+
+## What is guaranteed
+
+- Every exported component clears axe's structural rules when mounted for
+  real, with effects flushed, in the shape a real screen uses it.
+- Every foreground token clears WCAG AA (4.5:1, normal text) against all
+  four surface steps, in both `dark` and `light`.
+- Every loud status pill's label clears AA over its own translucent tint
+  composited on each of those surfaces.
+- Status is never carried by colour alone: silhouette, interior mark and
+  fill are redundant channels, and the status system page has the
+  measurements.
+- Focus behaviour, keyboard interaction and the ARIA wiring of overlays,
+  listboxes, disclosures and menus come from Headless UI rather than
+  being reimplemented per component.
+
+## The gates
+
+### `src/lib/a11y.test.tsx` — axe over mounted components
+
+One fixture per component, in the shape a real screen uses it, **not the
+minimum that renders**. A component audited with no label, no children
+and no error state passes trivially and proves nothing — so the
+`FormField` fixture is deliberately the errored case, because that is the
+one that was broken.
+
+The three bugs this file was written for, all found in one session:
+
+- `FormField`'s `hint` and `error` were wired to the control by nothing
+  at all — no `id`, no `aria-describedby`, no `aria-invalid`. A screen
+  reader user heard the label and neither the constraint nor the error.
+- `ValueTabsTrigger` carried `outline-none` with no substitute ring, so a
+  keyboard user tabbing into a tablist saw nothing.
+- `CopyButton` and `MaskedValue`'s toggle were bare 12px icons with no
+  hit area.
+
+The Storybook `@storybook/addon-a11y` panel runs axe too, and it is the
+reason several of those were eventually found. But it runs in a browser
+somebody has to open, on a story somebody has to write, and it **reports
+rather than fails**. This file runs on every `pnpm test`.
+
+Two self-check cases assert axe is still live: one mounts a deliberately
+invalid `role` and expects a violation, one mounts an unlabelled
+`<button>` and expects `button-name`. A gate that has silently become a
+no-op is worse than no gate, and `contrast.test.ts` has already been
+exactly that (see below).
+
+### It has to be a client render
+
+The obvious harness is `renderToStaticMarkup` plus `innerHTML`, matching
+`form-field.render.test.tsx`'s precedent. It produces **false failures
+across most of this library**, and it took a browser to work out why.
+
+Headless UI wires a control's `aria-labelledby` in an *effect*, not
+during render. Server markup therefore shows a `<label for="…">`
+pointing at a `<span role="checkbox">` — and `for` only associates with
+labelable elements, so the name is genuinely absent in that snapshot. axe
+flags `aria-toggle-field-name`, correctly, about a state the user never
+sees.
+
+Measured in the running Storybook to settle it: after hydration the same
+control carries `aria-labelledby="headlessui-label-_r_8_"`, resolving to
+"Mask the recipient in webhook payloads". The component was fine; the
+harness was lying. **A gate that cries wolf is worse than no gate,
+because it gets switched off.**
+
+So the harness is `createRoot` inside `act`, which flushes effects the
+way a browser does. The host node is a `<main>`, because axe's `region`
+rule flags content outside a landmark — a property of the *page* a
+consumer builds, not of a component rendered alone.
+
+### `src/lib/contrast.test.ts` — colour, against the stylesheet
+
+jsdom applies no CSS, so axe's own `color-contrast` rule is inert there.
+It is disabled explicitly rather than left to return nothing, and this
+file covers that half instead: it parses `theme.css` and measures every
+foreground against every surface, in every theme, including translucent
+state fills composited over the surface beneath them.
+
+It exists because a token can be declared and illegible.
+`--subtle-foreground` was `#6b727d`, which measures **4.06:1** on the
+page and **3.40:1** on a hovered row against a 4.5:1 bar, across 38
+usages all at 11–12px. It shipped for months. It was found by the
+Storybook addon flagging fourteen calendar weekday headers at once — not
+by any check in the build.
+
+Adding a light theme multiplied that risk by eight. Every status
+foreground in the dark set is a 300-level tint chosen for roughly 11:1
+against near-black; measured against white, all eight landed between
+**1.4:1 and 2.6:1** — every one below AA. So this gate was written
+*first* and the light values were searched against it, rather than picked
+and then spot-checked.
+
+Two of its assertions are about the gate rather than the colours, and
+they are there because the gate failed silently once:
+
+- **The theme roster, by name**, not a count of cases. Deleting the
+  entire light theme left this file green — one theme still produced 44
+  cases, comfortably over the old `> 20` floor. A floor on cases cannot
+  catch a missing theme, because the remaining theme already clears it.
+- **The three text tiers, by name.** The parser only matches `#rrggbb`;
+  rewriting a token as `rgb(91 99 113)` — a form this very stylesheet
+  uses for the aurora and the status tints — drops it silently out of the
+  case list with every other guard still green. The one token whose
+  historical failure justifies the file is the one that could vanish
+  unnoticed.
+
+### The `region` / `landmark-unique` trade in the `SideNav` block
+
+`SideNav` gets its own block because the fixture list cannot reach it:
+its two rails are portalled to `document.body`, outside the `<main>` host
+every other fixture is audited inside. Adding `SideNav` to the fixture
+list would have audited the in-flow sidebar and silently skipped both
+rails — a fixture that passes by looking at the wrong half of the
+component, which is worse than no fixture because it reads as coverage.
+So that block audits `document.body`.
+
+Auditing the whole body surfaces a real conflict. All three shapes are
+`<nav aria-label="Primary">` and exactly one is ever displayed, because
+their breakpoint gates are complements — but jsdom applies no CSS, so
+axe sees three identically-named landmarks no browser will ever show at
+once and reports `landmark-unique`.
+
+That is the definition of a false positive, and the rule this suite sets
+for itself is that a gate which cries wolf gets switched off wholesale.
+So the narrow rule is switched off instead of the gate, in that one
+block, with the reason written down — and the invariant it would have
+checked is pinned on the breakpoint gates themselves in
+`side-nav.portal.test.tsx`, the only place it is observable without a
+real layout.
+
+`region` stays on. It is the rule that caught the rails being plain
+`<div>`s outside any landmark, which is why they are `<nav>` at all, and
+disabling `landmark-unique` does not weaken it.
+
+## What these gates cannot see
+
+jsdom has no layout and no CSS. That excludes, specifically:
+
+- **Contrast in situ.** The stylesheet check measures token pairs the
+  library *intends*. It cannot tell you that a real render put one of
+  them somewhere else.
+- **Whether a focus ring is actually visible.** A substitute ring can be
+  declared and painted underneath something.
+- **Whether anything is clipped by an ancestor's `overflow`.**
+- **Hit-target size.**
+
+Three of the bugs found in one recent cycle were in that set. The
+existence of these gates is not a reason to stop looking at renders.
+
+Two related blind spots are worth naming because they are the same shape:
+
+- A class can be real and still resolve to nothing visible.
+  `calendar.render.test.tsx` found `bg-state-neutral-bg` on a range
+  interior — a real token that resolves to `transparent`, so the band was
+  invisible. Rendering to markup proves the class landed; only a browser
+  proves it painted.
+- A component can be wired correctly and still be unreachable in a
+  browser. `Table` only becomes a focusable, named region once it
+  *measures itself* as overflowing, and jsdom reports every element as
+  zero-width, so the branch a keyboard user depends on is the branch with
+  no natural coverage. `table.scroll.test.tsx` stubs `ResizeObserver` and
+  the widths narrowly to reach it.
+
+**A Playwright suite lives under `e2e/`** and is being added to close the
+layout-dependent half — in-situ contrast, focus-ring visibility, clipping
+and hit-target size, in a real browser against the built Storybook. That
+suite is authored separately from this page; treat this section as the
+statement of what a browser is *needed* for, not as documentation of what
+that suite currently asserts.
+
+## Checking both themes
+
+There is a **Theme** toolbar control in Storybook, defaulting to `dark`,
+with `light` available. A decorator stamps the choice onto
+`<html data-theme>`, and the a11y panel re-runs against whatever is
+displayed.
+
+Use it. Several of this library's contrast findings are marginal in both
+themes rather than obviously wrong in one — `--subtle-foreground` on the
+instrument mesh measures 4.41:1 in dark and 4.45:1 in light, which is
+exactly the kind of "looks fine" that ships a failure. A dark-only review
+would also have missed the loud-pill composited failures entirely, since
+in dark the tint lightens the ground under an already-light foreground
+and the ratios stay comfortable.
+
+## Known gaps
+
+These are stated rather than fixed, and each one has a reason.
+
+### `StatusPill`'s `meta.tooltip` is hover-only
+
+The sentence explaining what a state means is carried only by a native
+`title`, which reaches neither keyboard nor touch users. It is not routed
+through `aria-describedby`, deliberately: that content is announced
+automatically alongside the name rather than on request, and this is the
+most-rendered component in a console — every screen-reader pass over a
+table would read a paragraph per row.
+
+What makes it acceptable is that **the state is never solely carried by
+the tooltip**: glyph, hue, label and `detail` already say what happened
+through independent channels, so nothing load-bearing depends on hover.
+The tooltip adds an explanation, not a fact. A real fix is an on-demand
+disclosure a keyboard or touch user can reach, and it is follow-up work.
+
+### `Tooltip`'s bubble is still clipped by a scrolling ancestor
+
+`Tooltip` is daisyUI's CSS `.tooltip` — no JS, no portal. Its bubble is
+an absolutely positioned pseudo-element, so any scrolling ancestor clips
+it away on every hover while it still grows that ancestor's scrollable
+area. `Table`'s wrapper is exactly such an ancestor.
+
+The mitigation is a native `title` on the same element, as a fallback:
+wherever the bubble is clipped, the label still arrives, with the
+browser's own delay and styling. Where nothing clips it, both fire, which
+reads as mildly redundant but never as broken.
+
+<Canvas of={TooltipStories.ClippedByAScrollingAncestor} />
+
+That is a real degradation, not a fix to reach for on purpose. When a
+scroller is unavoidable, prefer a plain `title` attribute directly on the
+trigger, so the fallback is the *only* thing that renders rather than a
+bubble nobody sees plus a late plain one. The proper fix needs a portal
+or CSS anchor positioning — a floating-element dependency this package
+deliberately does not have, or a feature not yet safe to require.
+
+### A `FormField` hint cannot reach a `Select`
+
+Headless UI's `ListboxButton` builds `aria-describedby` into its own
+props from an internal description context and lets those win over the
+caller's, so a hint cannot be threaded to it from outside.
+`aria-invalid` does get through.
+
+This is pinned as a **limitation** in `form-field.render.test.tsx` rather
+than quietly accepted: if a Headless UI upgrade ever changes it, that
+test fails and says the limitation is gone.
+
+### Rich tooltip content is not available anywhere
+
+`data-tip` is a plain HTML attribute rendered via `content: attr(...)`,
+so a tooltip label must be a string. That is an accepted constraint of
+not taking a second behaviour library, and nothing in the library
+currently needs otherwise.

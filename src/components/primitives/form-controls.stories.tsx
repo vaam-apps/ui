@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
+import { expect, userEvent, within } from "storybook/test";
 import { Checkbox, CheckboxField } from "./checkbox";
 import { ChipSelect } from "./chip-select";
 import { FieldError, FormField, groupLabelId } from "./form-field";
@@ -20,10 +21,61 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
+ * Several rows below deliberately render the same control twice — once
+ * live, once `disabled` — so a role+name query legitimately matches both.
+ * This picks the live one and **throws** when the count is not exactly
+ * one, rather than returning `undefined`: a play function that quietly
+ * asserts against nothing is the failure mode these are written to avoid.
+ *
+ * Headless UI spells "disabled" two ways depending on the element it
+ * rendered — a real `disabled` attribute on the `<button>` a `Switch`
+ * produces, `aria-disabled` on the `<span role="checkbox">` a `Checkbox`
+ * produces — so both are checked.
+ */
+function theLiveOne(controls: readonly HTMLElement[]): HTMLElement {
+  const live = controls.filter(
+    (el) => !el.hasAttribute("disabled") && el.getAttribute("aria-disabled") !== "true",
+  );
+  const [only] = live;
+  if (live.length !== 1 || only === undefined) {
+    throw new Error(`expected exactly one enabled control, found ${live.length}`);
+  }
+  return only;
+}
+
+/** The `<label for="…">` among `candidates`, or a throw. Same reasoning as
+ * `theLiveOne`: two fields in `FieldsAndErrors` share the label text
+ * "Sender ID", and picking the wrong one silently is how an assertion
+ * ends up proving nothing. */
+function labelFor(candidates: readonly HTMLElement[], htmlFor: string): HTMLElement {
+  const found = candidates.find((el) => el.getAttribute("for") === htmlFor);
+  if (found === undefined) {
+    throw new Error(`no <label for="${htmlFor}"> among ${candidates.length} candidates`);
+  }
+  return found;
+}
+
+/** The element with this `id` among `candidates`, or a throw. */
+function withId(candidates: readonly HTMLElement[], id: string): HTMLElement {
+  const found = candidates.find((el) => el.id === id);
+  if (found === undefined) {
+    throw new Error(`no element with id "${id}" among ${candidates.length} candidates`);
+  }
+  return found;
+}
+
+/**
  * A checkbox is for a value a Save button will commit; a switch promises
  * the change already happened. Pairing a switch with a Save button tells
  * the operator two contradictory things and leaves them unsure whether
  * the toggle landed.
+ *
+ * The play function below replays the part of that claim a screenshot
+ * cannot show: the four live controls here share one `useState`, so
+ * toggling any of them by mouse *or* by Space moves all four, and
+ * `aria-checked` follows every time. It also pins the two states that only
+ * exist as an ARIA value — `mixed` for the indeterminate box, and a
+ * disabled control that does not move when clicked.
  */
 export const CheckboxAndSwitch: Story = {
   render: function Render() {
@@ -81,6 +133,62 @@ export const CheckboxAndSwitch: Story = {
       </div>
     );
   },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const box = canvas.getByRole("checkbox", { name: "Checked" });
+    const toggle = canvas.getByRole("switch", { name: "Toggle" });
+    const boxField = theLiveOne(
+      canvas.getAllByRole("checkbox", { name: "Mask the recipient in webhook payloads" }),
+    );
+    const switchField = theLiveOne(canvas.getAllByRole("switch", { name: "Live updates" }));
+
+    await step("All four live controls start checked — they share one state", async () => {
+      for (const control of [box, toggle, boxField, switchField]) {
+        await expect(control).toHaveAttribute("aria-checked", "true");
+      }
+    });
+
+    await step("Clicking the checkbox unchecks it", async () => {
+      await userEvent.click(box);
+      await expect(box).toHaveAttribute("aria-checked", "false");
+    });
+
+    await step("…and every control bound to the same state follows", async () => {
+      for (const control of [toggle, boxField, switchField]) {
+        await expect(control).toHaveAttribute("aria-checked", "false");
+      }
+    });
+
+    await step("Space checks it again from the keyboard", async () => {
+      box.focus();
+      await expect(box).toHaveFocus();
+      await userEvent.keyboard(" ");
+      await expect(box).toHaveAttribute("aria-checked", "true");
+    });
+
+    await step("Space operates the switch too, and lands back where it started", async () => {
+      switchField.focus();
+      await expect(switchField).toHaveFocus();
+      await userEvent.keyboard(" ");
+      await expect(switchField).toHaveAttribute("aria-checked", "false");
+      await userEvent.keyboard(" ");
+      await expect(switchField).toHaveAttribute("aria-checked", "true");
+    });
+
+    await step("The indeterminate box reports `mixed`, not checked", async () => {
+      await expect(canvas.getByRole("checkbox", { name: "Indeterminate" })).toHaveAttribute(
+        "aria-checked",
+        "mixed",
+      );
+    });
+
+    await step("A disabled switch does not move when clicked", async () => {
+      const off = canvas.getByRole("switch", { name: "Off" });
+      await expect(off).toBeDisabled();
+      await userEvent.click(off);
+      await expect(off).toHaveAttribute("aria-checked", "false");
+    });
+  },
 };
 
 /**
@@ -101,6 +209,13 @@ export const CheckboxAndSwitch: Story = {
  * `Input`/`Textarea` danger-tone border and text colour — none of which
  * a plain unassociated `<p>` (the previous shape) could do, and none of
  * which axe can see either way, so this story is the check.
+ *
+ * The play function is that check made executable. It clicks each label
+ * and watches focus land in the control it names (the thing a dangling
+ * `htmlFor` silently loses), then *resolves* the ids in the bad field's
+ * `aria-describedby` back to their elements and compares the text a
+ * screen reader would actually read out — asserting the attribute merely
+ * exists would pass just as happily on two ids pointing at nothing.
  */
 export const FieldsAndErrors: Story = {
   render: () => (
@@ -123,6 +238,60 @@ export const FieldsAndErrors: Story = {
       <Label htmlFor="sb-notes">A standalone Label</Label>
     </div>
   ),
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const doc = canvasElement.ownerDocument;
+    // Both fields are named "Sender ID", which is the point of the pair —
+    // so they are separated by id, and `withId` throws rather than
+    // guessing if either one ever stops existing.
+    const senderFields = canvas.getAllByRole("textbox", { name: "Sender ID" });
+    const good = withId(senderFields, "sb-sender");
+    const bad = withId(senderFields, "sb-sender-bad");
+    const senderLabels = canvas.getAllByText("Sender ID");
+
+    await step("Clicking a label focuses the control it names", async () => {
+      await userEvent.click(labelFor(senderLabels, "sb-sender"));
+      await expect(good).toHaveFocus();
+      await userEvent.click(labelFor(senderLabels, "sb-sender-bad"));
+      await expect(bad).toHaveFocus();
+    });
+
+    await step("The valid field is not marked invalid", async () => {
+      await expect(good).not.toHaveAttribute("aria-invalid");
+    });
+
+    await step("The field with an error is", async () => {
+      await expect(bad).toHaveAttribute("aria-invalid", "true");
+    });
+
+    await step("Its aria-describedby names two elements — the hint, then the error", async () => {
+      const ids = (bad.getAttribute("aria-describedby") ?? "").split(" ").filter(Boolean);
+      await expect(ids).toHaveLength(2);
+      // Resolve the ids rather than trusting them. A dangling id ref is
+      // the exact defect `FormField`'s `hintId`/`errorId` pair exists to
+      // make impossible, and it is invisible to every other check.
+      const described = ids.map((id) => doc.getElementById(id)?.textContent ?? null);
+      await expect(described).toEqual([
+        "Three to eleven characters.",
+        "Must be at most 11 characters.",
+      ]);
+    });
+
+    await step("The error element is an alert, so it announces on insertion", async () => {
+      const errorId = (bad.getAttribute("aria-describedby") ?? "").split(" ")[1];
+      await expect(errorId).toBeDefined();
+      await expect(doc.getElementById(errorId ?? "")).toHaveAttribute("role", "alert");
+    });
+
+    // `^Notes` rather than an exact name: this story deliberately points
+    // two labels at `#sb-notes` (the `FormField`'s own, and the
+    // standalone `Label` below it), and an accessible name is the
+    // concatenation of every associated label, not the first one.
+    await step("The standalone Label points at the textarea", async () => {
+      await userEvent.click(canvas.getByText("A standalone Label"));
+      await expect(canvas.getByRole("textbox", { name: /^Notes/ })).toHaveFocus();
+    });
+  },
 };
 
 /**
@@ -148,6 +317,12 @@ export const FieldsAndErrors: Story = {
  * every chip/option label above it. Side by side, italic vs. sans should
  * read as two different registers, not as one muted-text style with an
  * inconsistent font.
+ *
+ * The play function exercises the *semantic* difference between the two
+ * controls, which is the one thing the side-by-side rendering cannot
+ * show: picking a second chip keeps the first (multi-select), while an
+ * arrow key on the radio group moves the single choice and leaves exactly
+ * one option `aria-checked`.
  */
 export const SmallVocabularies: Story = {
   render: function Render() {
@@ -210,5 +385,70 @@ export const SmallVocabularies: Story = {
         />
       </div>
     );
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    // Scoped to the live `<fieldset>` — the disabled one below it repeats
+    // "OTP" and "Transactional", so an unscoped name query would match
+    // two chips and throw. The `<fieldset>` is reachable by the accessible
+    // name `FormField`'s `control="group"` wiring gives it, which is
+    // itself the thing `groupLabelId` exists to guarantee.
+    const classes = within(canvas.getByRole("group", { name: "Message class" }));
+    const otp = classes.getByRole("checkbox", { name: "OTP" });
+    const transactional = classes.getByRole("checkbox", { name: "Transactional" });
+
+    await step("One class is selected to begin with", async () => {
+      await expect(otp).toHaveAttribute("aria-checked", "true");
+      await expect(transactional).toHaveAttribute("aria-checked", "false");
+      await expect(canvas.getByText("1 of 4 message classes selected.")).toBeInTheDocument();
+    });
+
+    await step("Selecting a second one keeps the first — this is multi-select", async () => {
+      await userEvent.click(transactional);
+      await expect(transactional).toHaveAttribute("aria-checked", "true");
+      await expect(otp).toHaveAttribute("aria-checked", "true");
+      await expect(canvas.getByText("2 of 4 message classes selected.")).toBeInTheDocument();
+    });
+
+    await step("Deselecting one leaves the other alone", async () => {
+      await userEvent.click(otp);
+      await expect(otp).toHaveAttribute("aria-checked", "false");
+      await expect(transactional).toHaveAttribute("aria-checked", "true");
+      await expect(canvas.getByText("1 of 4 message classes selected.")).toBeInTheDocument();
+    });
+
+    const decision = within(canvas.getByRole("radiogroup", { name: "Registration decision" }));
+    // A `RadioGroupOption`'s `description` renders inside the `role="radio"`
+    // element, so the accessible name is "Approve The provider accepted
+    // it." — hence the anchored regex rather than an exact string.
+    const approve = decision.getByRole("radio", { name: /^Approve/ });
+    const reject = decision.getByRole("radio", { name: /^Reject/ });
+
+    await step("The radio group starts on Approve", async () => {
+      await expect(approve).toHaveAttribute("aria-checked", "true");
+      await expect(reject).toHaveAttribute("aria-checked", "false");
+    });
+
+    await step("An arrow key moves the choice to the next option", async () => {
+      await userEvent.click(approve);
+      await expect(approve).toHaveFocus();
+      await userEvent.keyboard("{ArrowRight}");
+      await expect(reject).toHaveAttribute("aria-checked", "true");
+      await expect(reject).toHaveFocus();
+    });
+
+    await step("…and exactly one option is checked, never two", async () => {
+      const checked = decision
+        .getAllByRole("radio")
+        .filter((radio) => radio.getAttribute("aria-checked") === "true");
+      await expect(checked).toHaveLength(1);
+      await expect(approve).toHaveAttribute("aria-checked", "false");
+    });
+
+    await step("The arrow key walks back the other way too", async () => {
+      await userEvent.keyboard("{ArrowLeft}");
+      await expect(approve).toHaveAttribute("aria-checked", "true");
+      await expect(reject).toHaveAttribute("aria-checked", "false");
+    });
   },
 };

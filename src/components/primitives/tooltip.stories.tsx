@@ -89,7 +89,13 @@ export const OnAnIconButton: Story = {
  * survives it. Both triggers are identical; the left one sits inside a
  * scrolling box. Hover both.
  *
- * The styled `.tooltip` bubble is clipped to nothing on the left, exactly
+ * The styled `.tooltip` bubble is *partially* clipped on the left —
+ * measured, 44.3px of a 276.6px bubble still paints inside a scrollport
+ * 158px wide whose content is 389px. It said "clipped to nothing" until
+ * a browser measured it, which was true only while `position="right"`
+ * was silently inert (see `tooltip.tsx` on the template-literal class
+ * Tailwind could not see). What survives is a fragment, which is worse
+ * to read than nothing and is why the native `title` matters. Otherwise
  * as it always was — there is no CSS-only fix for that half, since
  * escaping a scroll container needs a portal or CSS anchor positioning.
  * What is no longer true is that the label itself disappears: `Tooltip`

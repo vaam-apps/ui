@@ -13,6 +13,13 @@
     "noEmit": true,
     "isolatedModules": true
   },
-  "include": ["src/**/*", ".storybook/**/*", "types.d.ts"],
+  // `e2e/**/*` and `playwright.config.ts` are in here for the reason
+  // `.storybook` is: this repository typechecks its tooling, and that is
+  // what caught `docs.autodocs` being silently ignored after Storybook 10
+  // removed it. A Playwright spec that no longer compiles against the
+  // installed version should fail `pnpm typecheck`, not fail in CI ten
+  // minutes later with a runtime error. `tsconfig.build.json` narrows
+  // back to `src` so none of it reaches `dist`.
+  "include": ["src/**/*", ".storybook/**/*", "e2e/**/*", "playwright.config.ts", "types.d.ts"],
   "exclude": ["node_modules", "dist", "storybook-static"]
 }

@@ -1,0 +1,294 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+<Meta title="Docs/Navigation" />
+
+# Navigation
+
+`SideNav` is a pure structural component: it decides "flat top item →
+grouped middle → de-emphasised footer" and the treatment per breakpoint.
+Routing, session data and the current path all come from the caller — it
+never hardcodes a route and has no dependency on any router.
+
+What makes it worth a page of its own is the responsive behaviour, which
+is not a set of widths but a single rule with one exception.
+
+Every story below is linked rather than embedded, and that is not
+laziness: the rails are `fixed` and portalled to `document.body`, so a
+story canvas rendered inline in this page would attach them to *this*
+page and float them over the prose. Each band also needs a pinned
+viewport, which only the story canvas provides — `SideNav`'s stories
+carry named viewports for exactly that, because a breakpoint story that
+cannot show its own breakpoint is where responsive bugs hide.
+
+## The rule: only the sidebar takes space out of the page
+
+Every band except the widest one **floats over** the content. That is
+what lets a caller build one layout instead of one layout per band.
+
+<table style={{ borderCollapse: "collapse", width: "100%", margin: "1rem 0" }}>
+  <thead>
+    <tr>
+      <th style={{ textAlign: "left", padding: "0.4rem 0.75rem", borderBottom: "2px solid currentColor", opacity: 0.9 }}>Viewport</th>
+      <th style={{ textAlign: "left", padding: "0.4rem 0.75rem", borderBottom: "2px solid currentColor", opacity: 0.9 }}>Shape</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>Below 640px</td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>A horizontal pill along the bottom: four destinations and a menu for the rest.</td>
+    </tr>
+    <tr>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>640–1279px</td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>The vertical floating rail — a 52px pill, <code>fixed</code>, vertically centred, inset from the left edge.</td>
+    </tr>
+    <tr>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>1280px and up</td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>A 256px sidebar with labels, in flow.</td>
+    </tr>
+    <tr>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>1280px and up, <code>collapsed</code></td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>The vertical rail again.</td>
+    </tr>
+  </tbody>
+</table>
+
+`collapsed` is a JS boolean rather than a breakpoint, because it is a
+*preference* rather than a measurement — the caller owns it, persists it,
+and usually puts a toggle beside it. Note what it means: not "the
+sidebar, narrower", but the sidebar ceasing to exist and the rail taking
+over. That is the only version that actually gives the content its width
+back.
+
+Everything else is plain CSS — `sm:` / `xl:` Tailwind variants, no
+`useMediaQuery`, no viewport read. Two parallel trees, each visible only
+in its own band, rather than one tree whose content changes with a
+JS-read width. The cost is one extra copy of the links in the markup, and
+`display: none` removes a subtree from the accessibility tree entirely,
+so a screen reader still reaches each destination exactly once.
+
+[**Story: Floating rail**](?path=/story/primitives-sidenav--floating-rail) — the 640–1279px band, pinned at 900px.
+
+## Why the in-flow icon rail was removed
+
+There used to be a fourth band: an in-flow 64px icon rail from
+1024–1279px. Its removal is the fix, not a simplification.
+
+**The bug:** at exactly 1024px the floating rail vanished and a
+full-height strip appeared *below* the page content. `SideNav` stopped
+being `fixed` at `lg` and became an in-flow flex child, so it landed
+wherever it happened to sit in the caller's DOM — which, in a layout
+built for a rail that floats, is "after everything".
+
+The reason no caller could have avoided that is the general point:
+**it was the only shape that needed a flex-row parent while its
+neighbours needed none.** A caller had to build one layout for the
+floating rail and another for the icon rail and get the crossover exactly
+right. No single caller layout could satisfy both.
+
+The band survives in `smallScreen="off-canvas"`, where every shape is in
+flow and the contradiction does not arise.
+
+[**Story: Full sidebar**](?path=/story/primitives-sidenav--full-sidebar) — the ≥1280px band, pinned at 1440px. [**Collapsed on desktop**](?path=/story/primitives-sidenav--collapsed-on-desktop) is the same width with the rail taking over.
+
+## Below 640px the rail turns rather than shrinks
+
+A 52px column is 14% of a 375px viewport, permanently, down the side the
+writing starts on — and it sits where a thumb cannot comfortably reach on
+a phone held one-handed. Both problems are about the **axis**, not the
+width. Along the bottom the rail costs height in the region every mobile
+OS already reserves for chrome, and it lands under the thumb.
+
+[**Story: Tiny-screen rail**](?path=/story/primitives-sidenav--tiny-screen-rail) — pinned at 375px, with the current page deliberately behind the overflow menu.
+
+**Four slots**, and the number is a thumb measurement rather than a taste
+one: five 44px targets (four destinations plus the menu button), four 4px
+gaps and the pill's own 12px of padding come to 248px. At 375px — the
+narrowest phone this library targets — that leaves the rail visibly
+detached from both edges. Five slots would be 292px, which fits but reads
+as a bar rather than a pill, and six only fits by shrinking the targets
+below 44px, which is the one dimension not available to trade.
+
+The tap targets are an explicit `size-11` here, and that is a repair.
+`NavLink`'s rail variant is `px-0` and takes its width from its parent,
+which works in the vertical rail because `items-stretch` hands it the
+full 52px column. In a horizontal row with `items-center` there is
+nothing to stretch to, so the anchor collapsed to its own content: a
+**16×32px** tap target, measured, on the one form factor where that is
+least acceptable.
+
+### The overflow menu's rows are anchors
+
+Everything past the fourth slot — plus **all** footer items, which are
+administrivia and lose to any destination for a slot — goes behind one
+menu control. A sideways-scrolling strip of icons with no scrollbar and
+no affordance is the pattern where destinations simply go unfound, and it
+is also the exact class of unwanted horizontal scroll this library has
+spent two rounds removing. A menu is the honest version: the rest sits
+*visibly* behind one control rather than invisibly past an edge.
+
+Those rows use **`DropdownMenuLinkItem`, not `DropdownMenuItem`**, and
+the distinction is not cosmetic. `DropdownMenuItem` renders a `<button>`;
+`DropdownMenuLinkItem` renders an `<a href>`. A destination behind a menu
+must still support middle-click, cmd-click and "copy link address", or
+the overflow items become second-class links purely because of where they
+landed in the order. The item type was added for this component.
+
+If the current page is one of the hidden ones, the menu button takes the
+active treatment — otherwise the rail shows nothing as current, which
+reads as a bug.
+
+[**Story: Floating rail overflow**](?path=/story/primitives-sidenav--floating-rail-overflow) — more destinations than slots.
+
+## The portal, and what it costs
+
+Both rails are rendered through `createPortal` to `document.body`.
+
+The reason is specific. A `fixed` element's containing block is the
+viewport **only** while no ancestor establishes one — and `transform`,
+`filter`, `backdrop-filter`, `contain` and `will-change: transform` all
+do. That is not hypothetical: this package's own `Drawer` is exactly such
+an ancestor, because `vaul` stamps
+`[data-vaul-drawer]{will-change:transform}` unconditionally, with no
+state gate. Read it in `vaul/dist/index.mjs`; it is still true. Every
+consumer that wraps `SideNav` in a drawer would have re-anchored the rail
+to the drawer's box instead of the viewport.
+
+A portalled node's containing block resolves against the document root,
+so no ancestor of the caller's can capture it. `side-nav.portal.test.tsx`
+pins that directly by rendering inside a `transform: translateZ(0)`
+wrapper and asserting both rails' `parentElement` is `document.body` —
+not "somewhere outside", but specifically body, the only ancestor chain
+guaranteed free of a transform a consumer introduced.
+
+### The SSR cost, stated plainly
+
+`createPortal` needs a real DOM node, and `document` does not exist while
+this component renders on the server. So `FloatingRailPortal` renders
+`null` until an effect confirms a client has mounted it — `useState` plus
+`useEffect`, because the question is not "what breakpoint are we at"
+(still answered by CSS everywhere else) but "does `document.body` exist
+yet".
+
+The consequence: in the default `"floating"` mode there is **no
+small-screen navigation at all** in the server-rendered HTML, and none
+for a client whose JS has not finished hydrating or has failed to load.
+Every other band — the sidebar, and the whole off-canvas tree — renders
+with no JS at all. Verify that rather than trusting it: `curl` a page and
+grep the raw HTML for a nav item's label.
+
+This is a narrower version of a gap this component was rewritten to
+eliminate. An earlier revision used a `useMediaQuery` hook and wrapped
+`SideNav` in `next/dynamic({ ssr: false })` to work around its SSR crash,
+which meant the sidebar never appeared in server HTML at all and every
+full page load painted an empty slab. The remaining gap is scoped to one
+band, in one mode, and is bounded by hydration rather than by a lazy
+chunk's network round trip. It is not zero.
+
+**A caller who cannot accept any gap below `lg`** — a bot that only sees
+first-paint HTML, or a strict no-JS requirement — should use
+`smallScreen="off-canvas"`, which has none.
+
+## `smallScreen="off-canvas"`
+
+The opt-in mode: the original full-label accordion tree, groups
+collapsible via a Headless UI `Disclosure` and expanded only if they
+contain the current route, for a caller who already owns a drawer and
+wants this component to fill it rather than float over it.
+
+It differs from the default in four ways worth knowing:
+
+- Every band is in flow, including the 1024–1279px icon rail.
+- No rails, no portal, no mount gate: it is fully server-rendered.
+- `accountSlot` works below `lg`. In `"floating"` mode it never renders
+  below `lg` at all, because ~52px has no room for an email address and
+  a sign-out control, and there is no wider sibling column to defer to.
+- `collapsed` means nothing, because the mode has its own in-flow tree at
+  every width.
+
+Note the upgrade hazard if you already used this component: `"floating"`
+is now the **default**. A consumer who previously rendered `SideNav`
+inside their own drawer and passed nothing now gets both — their drawer
+(still openable, still empty, exactly as before) *and* a floating rail
+permanently on screen underneath it. That consumer passes
+`smallScreen="off-canvas"` explicitly to get their single below-`lg`
+experience back.
+
+[**Story: Off-canvas drawer**](?path=/story/primitives-sidenav--off-canvas-drawer) — the accordion tree inside a 300px stand-in for a caller's drawer.
+
+## What the caller still owns
+
+**The content column's padding.** A `fixed` rail cannot reserve its own
+space — that is what `fixed` means — so nothing this component renders
+can push the page over. The caller adds the inset, and it has to change
+with the band, because which side the rail is on changes at 640px: below
+that it is along the bottom, and a left gutter would be reserving space
+for nothing. The stories use `pl-16 sm:pl-20 xl:pl-6` on the content
+column for exactly this.
+
+**The current path.** A plain string, resolved by the caller's own
+router.
+
+**The account block's markup.** Rendered as-is through `accountSlot`, so
+this component stays free of any auth-specific knowledge.
+
+**The collapse preference**, if the application offers one.
+
+## Labels in the rail are a native `title`
+
+Every rail row is icon-only. Its accessible name comes from an `sr-only`
+span; the *visual* label on hover is a native `title` on an `aria-hidden`
+wrapper, so it stays purely visual and is not announced a second time as
+a description.
+
+That is a correction rather than a preference, and it was measured on a
+real render at 1100px before anything changed. daisyUI's `.tooltip`
+renders its bubble as an absolutely positioned pseudo-element at
+`left: 100%`, and the `<nav>` is a scroll container:
+
+```text
+nav.clientWidth   40      // the rail, content-sized
+nav.scrollWidth   212     // 172px of it unreachable
+::before content  "Dashboard"
+::before left     32px
+::before width    82.6px  // i.e. 32→115px, entirely outside the clip box
+```
+
+The bubble was clipped away on every hover — no label ever appeared in
+the icon rail — while still counting toward the scrollable area, which
+was the stray horizontal scrollbar under the rail. One cause, two
+symptoms.
+
+There is no CSS-only way out: any flyout anchored inside a scroll
+container is clipped by it, and escaping needs either a portal or CSS
+anchor positioning. A native `title` is painted by the browser *outside*
+the page entirely, so nothing can clip it, and it costs no CSS and no JS.
+That is also why the vertical rail stays usable once it outgrows
+`max-h-[80vh]` and starts scrolling.
+
+Labelled rows get no `title`. The label is already on screen, and a
+native tooltip repeating text the reader can see is noise on every row to
+spare the rare one that is actually cut.
+
+## One landmark is ever displayed, and three carry the label
+
+All three shapes are `<nav aria-label="Primary">`. The rails were plain
+`<div>`s until the a11y gate pointed out that below 640px the in-flow
+`<nav>` is `display: none` — so a phone got its navigation outside any
+landmark at all.
+
+Three identically-named landmarks in the DOM is only safe because exactly
+one is ever displayed, and their breakpoint gates are complements. jsdom
+applies no CSS, so axe sees all three and reports `landmark-unique`,
+which here genuinely is a false positive. That one rule is disabled in
+that one block with the reason written down, and the invariant it would
+have checked is pinned instead on the breakpoint gates themselves in
+`side-nav.portal.test.tsx` — the weaker kind of test, pinning the
+mechanism rather than the result, chosen because the result is not
+observable without a real layout and the alternative is pinning nothing.
+
+The rails carry a `data-floating-rail` attribute. It is a stable hook
+rather than a test-only wart: the subtree is portalled, so it is the one
+part of `SideNav` a caller cannot reach through the element they
+rendered, and both the portal test and a consumer's
+`body > [data-floating-rail]` override need it. Selecting on layout
+classes instead would make a styling change silently break both.

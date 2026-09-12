@@ -1,0 +1,211 @@
+import { Meta, Canvas } from "@storybook/addon-docs/blocks";
+import * as InstrumentPanelStories from "../components/data/instrument-panel.stories";
+
+<Meta title="Docs/Surfaces and registers" />
+
+# Surfaces and registers
+
+Most design systems have one answer to "how does a box read as a box":
+a border, or a shadow, picked once. This library has three, and the
+distinction between them is not decorative — it is **what the reader is
+doing on that surface**.
+
+- **Diagnostic** — tables, drawers, detail panes. You *read* these, row
+  by row, looking for the one that is wrong. A 1px hairline on a surface
+  step, and nothing else competing. This is most of the library.
+- **Floating** — popover, dropdown, dialog, tooltip, drawer, toast.
+  These overlap a ground they do not know, so they get a shadow.
+- **Instrument** — dashboards and metrics. You *scan* these. The job is
+  to make one number findable in a glance. These get an aurora:
+  `InstrumentPanel`'s mesh ground, or `Card glow`.
+
+`theme.css` states the default directly: borders, not shadows, for
+cards, tables and panels; only floating layers get one. The instrument
+register is a deliberate exception to that rule and not a loosening of
+it — the rule still governs every surface where it was doing work.
+
+## Choosing between them
+
+The question to ask is not "how important is this box" but "what is the
+reader's motion across it".
+
+**Reach for diagnostic** when the surface holds more than one comparable
+thing and the reader is working through them. Forty table rows, a detail
+list, a payload inspector. A hairline is the cheapest boundary that does
+not compete with the content, and forty of them in a column read as one
+grid rather than forty objects.
+
+**Reach for floating** only when the surface genuinely overlaps content
+it cannot know about. A shadow is how a layer says "I am in front", and
+a border cannot do that job for something that sits *over* rather than
+*beside*. The rule's edge case is `SideNav`'s floating rail, which is
+permanent chrome rather than a transient overlay, and which still earns
+`--shadow-popover` because the reasoning did not change: it floats
+unanchored over arbitrary, unknown-contrast page content.
+
+**Reach for instrument** when the surface is a single readable
+instrument — a row of metrics, a chart, a headline figure and its
+denominator — and repetition is currently doing the grouping. The
+component that named this register exists because `StatTile`'s own doc
+had already described it: *"tiles appear in rows of three to six, and six
+shadowed boxes is visual noise where six outlined ones read as one
+instrument panel."* That sentence names a surface the library did not
+have. Tiles were getting the effect by repetition — six identical
+outlines the eye groups — which works right up until something else on
+the screen is also outlined.
+
+<Canvas of={InstrumentPanelStories.AsADashboard} />
+
+`InstrumentPanel` draws **no border**. The mesh *is* the edge; a hairline
+on top of it reads as two competing boundaries, and not needing one is
+the entire point of a different ground.
+
+`Card glow` is the same register at card scale, and it is the same
+discipline: a glow on every card is a glow on none.
+
+<Canvas of={InstrumentPanelStories.GlowAndPlainTogether} />
+
+## The aurora carries no meaning
+
+This is the load-bearing constraint of the whole register, and without it
+the register could not exist here at all.
+
+The library's premise is that **colour means status**. A coloured surface
+in such a system is a contradiction waiting to be read as one — unless
+the colour is provably incapable of carrying a state. So:
+
+- The mesh and the glow are drawn from the `--aurora-*` ramp, which is
+  bound by `color-mix` to the system's own hues, so it cannot drift away
+  from the palette.
+- There is **no per-state variant** and **no way for a caller to tint
+  it**. `InstrumentPanel` takes a title, a caption and children. Nothing
+  else.
+- Nothing infers a state from a glow, and no caller can express one
+  through it.
+
+The hue vocabulary stays entirely with `StatusHue`. That is the only
+reason a coloured surface is safe here, and it is why the ramp is closed
+rather than exposed.
+
+The ramp itself was once less honest than its comment. The first version
+declared it "named rather than borrowed" while all four values were in
+fact the status palette copy-pasted as literals, with nothing binding
+them and the two themes borrowing inconsistently. They are `color-mix`
+derived now and the comment says what is true. The arc was also too
+narrow to read as several hues — `--aurora-3` sat on `--ring`, between
+the cyan and the violet it was meant to separate, so the mesh read as one
+hue with a gradient. It is a mix toward `--state-danger-fg` now, a real
+magenta between `parked` and `danger`, with the stop alphas raised
+(dark 30/26/22/14, light 20/17/15/10, from 22/18/16/10 and 14/12/11/7).
+
+## `--subtle-foreground` is banned on the mesh
+
+A gradient ground breaks the assumption every contrast check in this
+system rests on: that a foreground sits on **one** known surface.
+
+Measured over `--surface-1` at the shipped 14% stop cap, worst case
+across the four blobs:
+
+<table style={{ borderCollapse: "collapse", width: "100%", margin: "1rem 0" }}>
+  <thead>
+    <tr>
+      <th style={{ textAlign: "left", padding: "0.4rem 0.75rem", borderBottom: "2px solid currentColor", opacity: 0.9 }}>Token</th>
+      <th style={{ textAlign: "left", padding: "0.4rem 0.75rem", borderBottom: "2px solid currentColor", opacity: 0.9 }}>Dark</th>
+      <th style={{ textAlign: "left", padding: "0.4rem 0.75rem", borderBottom: "2px solid currentColor", opacity: 0.9 }}>Light</th>
+      <th style={{ textAlign: "left", padding: "0.4rem 0.75rem", borderBottom: "2px solid currentColor", opacity: 0.9 }}>AA bar</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}><code>--subtle-foreground</code></td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>4.41:1</td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>4.45:1</td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>4.5:1</td>
+    </tr>
+    <tr>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}><code>--muted-foreground</code></td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>5.29:1 and above</td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>5.29:1 and above</td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>4.5:1</td>
+    </tr>
+  </tbody>
+</table>
+
+So `InstrumentPanel` renders its own caption at `muted` and says so in
+its module doc, rather than documenting a rule and trusting every call
+site to follow it. `StatusPill` makes the identical move for the
+identical reason when a loud tint lands under its label. **Do not put
+`text-subtle-foreground` on this surface** — it is the one tier the mesh
+can swallow.
+
+<Canvas of={InstrumentPanelStories.WhySubtleIsBanned} />
+
+Switch the theme in the toolbar while looking at that story. It is worse
+in neither and marginal in both, which is exactly the kind of "looks
+fine" that ships a failure. The 14% cap and the tier swap are the two
+halves of one decision; neither survives alone.
+
+The mesh is also **static**. A drifting field behind a number you are
+trying to read is a different thing from one standing in for a number
+that has not arrived — that is `Skeleton`'s job, and its own drift is
+transform-only on coprime periods for reasons of its own.
+
+## The light-theme glow, and the fix that made it worse
+
+This one is worth a section because the principled-looking move was
+measured and rejected, and the finding is written into `theme.css` so
+nobody re-derives it.
+
+`Card glow` paints four offset shadows in four hues. In dark they read as
+four. **In light they collapsed into one grey-lilac smudge.**
+
+The cause is a constraint imported from the wrong place. Light's
+`--state-*-fg` values are dark and desaturated *because they are text
+colours* — chosen to clear 4.5:1 on a near-white page. A glow carries no
+text. The ramp had inherited a type constraint that does not apply to it.
+
+The obvious fix is to mix each stop toward white, freeing it from that
+constraint. Rendered, that is **strictly worse**: a tint mixed toward
+white sits *closer* to a white ground, so every stop lost the contrast
+that made it visible at all, and the mesh went from green-and-lilac to
+flat grey. On a light ground, saturation against the ground is the entire
+budget.
+
+What actually works is alpha. Light keeps the darker, more chromatic
+values and spends its budget on opacity instead: a `[data-theme="light"]`
+override takes the four glow stops to **78/72/66/58%**, against dark's
+60/55/50/40%. The skeleton goes the other way — light's stops are *lower*
+than dark's, because the same values do more work on a near-white ground
+and at dark's strengths the light skeleton reads as periwinkle rather
+than as a tint.
+
+One consequence is worth knowing before editing that block. The light
+override is `[data-theme="light"] .aurora-glow`, specificity (0,2,0). The
+reduced-motion softening had to be spelled out for **both** selectors,
+because a bare `.aurora-glow` inside the media query is (0,1,0) and
+specificity beats source order — it would have silently lost, leaving
+reduced-motion readers in the light theme with the full four-hue bloom
+and nothing anywhere reporting it.
+
+## Two implementation notes that look like bugs
+
+**The glow is four `box-shadow`s, not a blurred pseudo-element.** The
+pseudo-element version is the obvious one and it does not survive contact
+with a real page: it needs `z-index: -1` to sit behind the card's own
+opaque background, and a negative-z-index element paints in the *root*
+stacking context's negative layer, which is below in-flow block
+backgrounds. Any page whose `body` has a background colour paints
+straight over it — this library's own Storybook does exactly that, and so
+does essentially every consuming application. Every computed style
+correct, every value present, and no glow on screen. `box-shadow` paints
+outside the border box in the element's own painting order, where no
+ancestor background can get in front of it.
+
+**Neither register uses `filter: blur()`.** The skeleton bans it on a
+cost argument that `theme.css` records — a blurred layer is cheap once
+and ruinous at two hundred table cells, where it would promote every cell
+to its own composited layer — and the argument was expected to invert for
+a dashboard's six cards. It never got the chance to: the shipped glow is
+`box-shadow`, for the stacking-context reason above, and that costs no
+filter, no extra layer and no stacking assumptions. Nothing in the
+stylesheet declares a blur today.

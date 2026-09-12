@@ -59,6 +59,8 @@
     "bump": "changeset version",
     "changeset:status": "changeset status",
     "clean": "rm -rf dist storybook-static",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
     "format": "biome check --write .",
     "lint": "biome check .",
     "prepack": "npm run build",
@@ -86,6 +88,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.13",
     "@changesets/cli": "^3.0.2",
+    "@playwright/test": "^1.63.0",
     "@storybook/addon-a11y": "10.6.0",
     "@storybook/addon-docs": "10.6.0",
     "@storybook/react-vite": "10.6.0",
