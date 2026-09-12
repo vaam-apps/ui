@@ -63,7 +63,31 @@ jobs:
       #
       # Requires Trusted Publishing to be configured for @vaam-apps/ui on
       # npmjs.com against this repository and this workflow filename.
-      # That is a maintainer step on npmjs.com; until it is done, this
-      # fails with exactly the masked E404 described above.
+      #
+      # THE FIRST PUBLISH CANNOT USE THIS WORKFLOW. A trusted publisher
+      # attaches to an existing package — npm's own setup instructions
+      # begin "navigate to your package settings", and there are no
+      # settings for a name nobody has published. So a greenfield package
+      # has a bootstrap step that OIDC cannot perform, and skipping it
+      # produces exactly this, which reads like a missing package rather
+      # than a missing publisher:
+      #
+      #   [WARN] Skipped OIDC: ERR_PNPM_AUTH_TOKEN_EXCHANGE: Failed token
+      #          exchange request with body message: Unknown error (404)
+      #   x Failed to publish @vaam-apps/ui@0.1.0 (status 404 Not Found)
+      #
+      # Note the GitHub side succeeded — the OIDC token was issued (200);
+      # it is npm that has nobody to exchange it with.
+      #
+      # Bootstrap, once, by hand, from a maintainer's machine:
+      #
+      #   npm login                       # 2FA
+      #   pnpm install
+      #   pnpm publish --access public    # prepack rebuilds
+      #
+      # then add the trusted publisher on npmjs.com (repo vaam-apps/ui,
+      # workflow release.yml) and every later tag publishes tokenlessly
+      # through this job. Do not re-run the tag whose version was
+      # published by hand — npm refuses to republish a version.
       - name: Publish to npm (Trusted Publishing / OIDC)
         run: pnpm publish --access public --provenance --no-git-checks

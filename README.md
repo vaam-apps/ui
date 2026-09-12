@@ -257,6 +257,25 @@ A few guards are worth knowing about before you trip one:
   where `tailwind-merge` deletes a custom font size because it mistakes
   it for a colour.
 
+## Releasing
+
+Tag `vX.Y.Z` matching `package.json`; `.github/workflows/release.yml`
+publishes to npm through Trusted Publishing (OIDC), with no token stored
+in this repository.
+
+**Except the very first publish, which that workflow cannot do.** npm
+attaches a trusted publisher to an *existing* package, so there is
+nothing to configure until the name exists. Bootstrap it once by hand:
+
+```sh
+npm login
+pnpm install
+pnpm publish --access public
+```
+
+Then add the trusted publisher on npmjs.com (repository `vaam-apps/ui`,
+workflow `release.yml`). Every later tag publishes tokenlessly.
+
 ## Versioning
 
 Pre-1.0. Minor versions may contain breaking changes; pin exactly if that
