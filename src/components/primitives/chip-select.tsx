@@ -53,7 +53,14 @@ import { cn } from "../../lib/cn";
 export interface ChipOption<T extends string> {
   value: T;
   label: ReactNode;
-  /** Shown beneath the label — for scopes, what the scope actually permits. */
+  /**
+   * Shown beneath the label — for scopes, what the scope actually
+   * permits, e.g. "Needs a reason." Rendered `font-italic italic` — see
+   * `FormField`'s `hint` prop doc for the line: a person wrote this
+   * sentence to explain the option, rather than the system filling a
+   * template with a value it already had, so it is commentary, not an
+   * emitted fact.
+   */
   description?: ReactNode;
 }
 
@@ -138,7 +145,14 @@ export function ChipSelect<T extends string>({
                   // Clamped for the same reason `RadioGroup`'s is: chips
                   // wrap into rows and stretch to the tallest member, so
                   // one long description pads the whole row.
-                  <span className="line-clamp-2 text-caption text-subtle-foreground">
+                  //
+                  // `font-italic italic tracking-normal`: see the
+                  // `ChipOption.description` doc above. `tracking-normal`
+                  // for the same reason as `StateTimeline`'s
+                  // `AnnotationNode` and `FormField`'s hint — the global
+                  // sans-tuned negative letter-spacing crowds a 12px serif
+                  // more than a 12px sans.
+                  <span className="line-clamp-2 font-italic text-caption text-subtle-foreground italic tracking-normal">
                     {option.description}
                   </span>
                 )}

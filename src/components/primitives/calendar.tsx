@@ -101,7 +101,23 @@ export function Calendar({
         // a range; `range_middle` below overrides it for the interior.
         selected:
           "[&>button]:bg-primary [&>button]:text-primary-content [&>button]:hover:bg-primary",
-        today: "font-semibold text-state-uncertain-fg",
+        // "Today" is a calendar fact, not a system status — it does not
+        // belong in the status-hue vocabulary (`status-tokens.ts`), the
+        // same category error `radio-group.tsx` documents for selection.
+        // It also would not have worked: `day_button` already sets its own
+        // `text-foreground`, which — because inherited colour only applies
+        // when the element carries no explicit declaration of its own —
+        // always wins over a colour set here on the cell. Rendered and
+        // measured (`getComputedStyle`) to be sure rather than reasoned
+        // about: the digit painted `--foreground`, never
+        // `--state-uncertain-fg`, in either theme. So today was already
+        // achromatic in practice; only the (dead) class name was wrong.
+        // Marked instead with the same achromatic border every other
+        // unselected-but-present control state in this library uses
+        // (`border-edge-strong`: `checkbox.tsx`, `switch.tsx`,
+        // `radio-group.tsx`, `chip-select.tsx`) plus the weight this class
+        // already carried — shape and weight, never hue.
+        today: "font-semibold [&>button]:border [&>button]:border-edge-strong",
         outside: "text-subtle-foreground opacity-50",
         disabled: "pointer-events-none opacity-30",
         hidden: "invisible",

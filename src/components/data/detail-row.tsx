@@ -42,6 +42,25 @@ import { cn } from "../../lib/cn";
  * step and gain baseline centring. That is a real, if small, visual change,
  * and it is the point: the console should not render the same concept two
  * ways because two people typed a different gap.
+ *
+ * **A second deliberate normalisation, same register:** the three variants
+ * disagreed about which of a label and its value is the bigger text.
+ * `divided` paired label `text-caption text-subtle-foreground` with value
+ * `text-body text-foreground` — the label smaller and quieter, the value
+ * the thing you came for. `stacked` had it backwards: label
+ * `text-muted-foreground` at 13px, value `text-caption` at 12px, so the
+ * label of every stacked row read larger than the value it was labelling.
+ * `inline` set no size or colour on either side, so both sides fell back to
+ * the surrounding `<dl>`'s `text-body` and whatever colour was ambient —
+ * a label indistinguishable from its own value. All three render inside
+ * one `<dl className="… text-body">`, so a drawer mixing `stacked` and
+ * `divided` rows showed values at two different sizes next to each other.
+ * `stacked` and `inline` are now repointed onto `divided`'s pairing —
+ * label `text-caption text-subtle-foreground`, value `text-body
+ * text-foreground` — so every variant agrees on which text is the label
+ * and which is the answer. That changes the rendered type size and/or
+ * colour of every existing `stacked` and `inline` call site; it is not a
+ * tidy-up, it is this file picking one hierarchy instead of three.
  */
 export type DetailRowVariant = "inline" | "stacked" | "divided";
 
@@ -70,8 +89,8 @@ export function DetailRow({ label, children, variant = "inline", className }: De
   if (variant === "stacked") {
     return (
       <div className={cn("flex min-w-0 flex-col gap-1", className)}>
-        <dt className="text-muted-foreground">{label}</dt>
-        <dd className="min-w-0 break-words text-caption">{children}</dd>
+        <dt className="text-caption text-subtle-foreground">{label}</dt>
+        <dd className="min-w-0 break-words text-body text-foreground">{children}</dd>
       </div>
     );
   }
@@ -88,8 +107,8 @@ export function DetailRow({ label, children, variant = "inline", className }: De
   // room and the `break-words`.
   return (
     <div className={cn("flex min-w-0 items-center justify-between gap-3", className)}>
-      <dt className="shrink-0 text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 break-words text-right">{children}</dd>
+      <dt className="shrink-0 text-caption text-subtle-foreground">{label}</dt>
+      <dd className="min-w-0 break-words text-body text-foreground text-right">{children}</dd>
     </div>
   );
 }

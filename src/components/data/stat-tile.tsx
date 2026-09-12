@@ -13,18 +13,22 @@ export interface StatTileProps {
    * A bare number with no denominator is the most common way a dashboard
    * misleads, so this slot exists to make the denominator easy.
    *
-   * Stays `font-sans`, deliberately not `font-italic`. `--font-italic`'s
-   * test (`theme.css`'s comment on the four voices, quoted in
-   * `inline-empty-state.tsx`) is "a person wrote this to explain a
-   * decision the system made". This caption fails that test: the shipped
-   * fixtures — `"98.2% of 12,710 terminal"`, `"XAF, across all
-   * providers"` — are a computed ratio and a currency unit, emitted facts
-   * of the same register as the mono value above them, not commentary
-   * standing apart from it. Compare `StateTimeline`'s `AnnotationNode`,
-   * which *is* a person qualifying one specific fact, and stays italic.
-   * If a future caption is genuinely a person's explanation, it still
-   * shouldn't flip this default — pass it through a slot that says so,
-   * rather than reopening this one. */
+   * Stays `font-sans`, deliberately not `font-italic`, and it still
+   * declines under the **wider** reading of that role — italic now marks
+   * any human prose written to the operator, including `FormField` hints
+   * and option descriptions, not only commentary on a decision.
+   *
+   * The line `theme.css` draws is: could this string be a template that
+   * only fills in a value the system already has? The shipped fixtures —
+   * `"98.2% of 12,710 terminal"`, `"XAF, across all providers"` — are a
+   * computed ratio and a currency unit. Both are exactly that, emitted
+   * facts of the same register as the mono value above them, so both stay
+   * upright however small and muted they are.
+   *
+   * Compare `StateTimeline`'s `AnnotationNode`, which is a person
+   * qualifying one specific record, and stays italic. If a future caption
+   * is genuinely someone's explanation, it should not flip this default —
+   * pass it through a slot that says so, rather than reopening this one. */
   caption?: ReactNode;
   /** Tints the value. Leave unset unless the number's own colour carries
    * meaning — a wall of coloured tiles makes the one that matters harder

@@ -175,14 +175,20 @@
    * 8–20%, a card glow wants more, and baking alpha into the token made
    * the second impossible. */
   --aurora-1: var(--state-progress-fg);
-  --aurora-2: #a78bfa;
-  --aurora-3: var(--ring);
+  --aurora-2: var(--state-parked-fg);
+  /* The arc's third point is mixed rather than borrowed: `--ring` sat
+     between cyan and violet, so four anchors spanned barely a third of
+     the wheel and the drift read as one colour breathing. A magenta
+     between `parked` and `danger` opens it to cyan → violet → magenta →
+     green, which is the arc a real aurora walks. Still derived from the
+     palette, so it cannot drift from it. */
+  --aurora-3: color-mix(in oklab, var(--state-parked-fg) 55%, var(--state-danger-fg));
   --aurora-4: var(--state-success-fg);
 
-  --skeleton-aurora-1: color-mix(in oklab, var(--aurora-1) 20%, transparent);
-  --skeleton-aurora-2: color-mix(in oklab, var(--aurora-2) 18%, transparent);
-  --skeleton-aurora-3: color-mix(in oklab, var(--aurora-3) 16%, transparent);
-  --skeleton-aurora-4: color-mix(in oklab, var(--aurora-4) 8%, transparent);
+  --skeleton-aurora-1: color-mix(in oklab, var(--aurora-1) 30%, transparent);
+  --skeleton-aurora-2: color-mix(in oklab, var(--aurora-2) 26%, transparent);
+  --skeleton-aurora-3: color-mix(in oklab, var(--aurora-3) 22%, transparent);
+  --skeleton-aurora-4: color-mix(in oklab, var(--aurora-4) 14%, transparent);
 
   /* Overlay scrim. The only literal colour left in a component after the
      light theme landed was `bg-black/50`, hardcoded in three places —
@@ -444,18 +450,33 @@
   --state-parked-bg: rgb(109 40 217 / 0.08);
   --state-parked-border: rgb(109 40 217 / 0.24);
 
-  /* Same ramp, bound the same way. The alphas are lower because the same
-     values do more work on a light ground — at dark's strengths the
-     light skeleton reads as periwinkle rather than as a tint. */
+  /* Same ramp, bound the same way — and deliberately NOT lightened.
+
+     The obvious idea here is wrong, and it was tried and measured before
+     being rejected. The light theme's `--state-*-fg` values are dark,
+     because they are chosen to clear 4.5:1 as **text** on a near-white
+     page, and a glow carries no text — so mixing each stop toward white
+     "to free it from a type constraint" looks like the principled move.
+     Rendered, it is the opposite: a tint mixed toward white sits *closer*
+     to a white ground, so every stop lost the contrast that made it
+     visible at all and the mesh went from green-and-lilac to flat grey.
+     On a light ground, saturation against the ground is the whole budget.
+
+     So light keeps the darker, more chromatic values and spends its
+     budget on alpha instead — lower than dark's, because the same values
+     do more work here (at dark's strengths the light skeleton reads as
+     periwinkle rather than as a tint), but not so low that the hues stop
+     separating. `.aurora-glow` carries its own light-theme override for
+     the same reason. */
   --aurora-1: var(--state-progress-fg);
-  --aurora-2: #6d28d9;
-  --aurora-3: var(--ring);
+  --aurora-2: var(--state-parked-fg);
+  --aurora-3: color-mix(in oklab, var(--state-parked-fg) 55%, var(--state-danger-fg));
   --aurora-4: var(--state-success-fg);
 
-  --skeleton-aurora-1: color-mix(in oklab, var(--aurora-1) 14%, transparent);
-  --skeleton-aurora-2: color-mix(in oklab, var(--aurora-2) 12%, transparent);
-  --skeleton-aurora-3: color-mix(in oklab, var(--aurora-3) 12%, transparent);
-  --skeleton-aurora-4: color-mix(in oklab, var(--aurora-4) 7%, transparent);
+  --skeleton-aurora-1: color-mix(in oklab, var(--aurora-1) 20%, transparent);
+  --skeleton-aurora-2: color-mix(in oklab, var(--aurora-2) 17%, transparent);
+  --skeleton-aurora-3: color-mix(in oklab, var(--aurora-3) 15%, transparent);
+  --skeleton-aurora-4: color-mix(in oklab, var(--aurora-4) 10%, transparent);
 
   --scrim: rgb(20 23 28 / 0.32);
 }
@@ -585,14 +606,27 @@
    *   controls and prose at 11–14px, so it is chosen for density and
    *   legibility, not personality.
    * - `--font-italic` — **a person wrote this.** On a screen of emitted
-   *   facts, italic is the one weight that can mark human commentary:
-   *   a `StateTimeline` annotation ("sent, but no receipt ever arrived;
-   *   it will not be resubmitted") is someone explaining a decision, not
-   *   the system reporting one. That is the status system's own logic —
-   *   redundant channels, never colour alone — applied to type. Set it
-   *   with `italic` beside `font-italic`; the token names the *family*,
-   *   not the style.
-   * - `--font-mono` — data. Unchanged, and deliberately so.
+ *   facts, italic marks human prose written *to* the operator, as
+ *   distinct from the system reporting its own state: a `StateTimeline`
+ *   annotation ("sent, but no receipt ever arrived; it will not be
+ *   resubmitted") explaining a decision, a `FormField` hint ("Three to
+ *   eleven characters."), a `RadioGroupOption` or `ChipOption`
+ *   description ("Needs a reason.") stating a constraint. Someone wrote
+ *   each of those sentences for a reader.
+ *
+ *   The line, and it is worth being able to apply it: **could this string
+ *   be a template that only fills in a value the system already has** — a
+ *   count, a ratio, a unit, an id, a label? Then it is an emitted fact and
+ *   stays `font-sans` however small and however muted. `StatTile`'s
+ *   caption ("98.2% of 12,710 terminal") and `InlineEmptyState`'s message
+ *   ("No messages match these filters") both fail that test and both stay
+ *   upright, which is the point — the role only carries meaning because
+ *   something is excluded.
+ *
+ *   That is the status system's own logic — redundant channels, never
+ *   colour alone — applied to type. Set it with `italic` beside
+ *   `font-italic`; the token names the *family*, not the style.
+ * - `--font-mono` — data. Unchanged, and deliberately so.
    *
    * IBM Plex is one superfamily drawn to work together, which is worth
    * more here than four individually optimal faces. The mono is the
@@ -922,11 +956,39 @@
       0 20px 38px -18px color-mix(in oklab, var(--aurora-4) 40%, transparent);
   }
 
+  /* Light needs more of each hue, not less, and the reason is the same one
+     the light `--aurora-*` block records: these four shadows are offset
+     from each other so their hues are supposed to separate, and on a
+     near-white ground a translucent dark tint at dark-theme strength
+     resolves close enough to the page that all four collapse into one
+     grey-lilac smudge. Measured side by side against the dark card, which
+     reads as four hues at the same percentages.
+
+     Alpha is the only budget available — lightening the stops themselves
+     makes it strictly worse (see the light `--aurora-*` comment), and the
+     offsets are already as far apart as a card-scale shadow can be
+     without looking detached. */
+  [data-theme="light"] .aurora-glow {
+    box-shadow:
+      0 4px 20px -6px color-mix(in oklab, var(--aurora-1) 78%, transparent),
+      -12px 10px 26px -12px color-mix(in oklab, var(--aurora-2) 72%, transparent),
+      12px 14px 30px -12px color-mix(in oklab, var(--aurora-3) 66%, transparent),
+      0 20px 38px -18px color-mix(in oklab, var(--aurora-4) 58%, transparent);
+  }
+
   /* Softened, not removed — a heavy coloured bloom is often part of what a
      reduced-motion reader is asking to be spared, but the card keeps its
-     identity as an instrument surface. */
+     identity as an instrument surface.
+
+     Both selectors are spelled out rather than just `.aurora-glow`,
+     because the light override above is `[data-theme="light"] .aurora-glow`
+     — specificity (0,2,0) against (0,1,0) — and specificity beats source
+     order. A bare `.aurora-glow` here would have lost to it, leaving the
+     light theme with the full four-hue bloom under reduced motion and no
+     error anywhere to say so. */
   @media (prefers-reduced-motion: reduce) {
-    .aurora-glow {
+    .aurora-glow,
+    [data-theme="light"] .aurora-glow {
       box-shadow:
         0 4px 14px -8px color-mix(in oklab, var(--aurora-1) 40%, transparent),
         0 10px 22px -14px color-mix(in oklab, var(--aurora-3) 35%, transparent);
@@ -965,5 +1027,58 @@
         color-mix(in oklab, var(--aurora-4) 8%, transparent),
         transparent 68%
       );
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Reduced motion, once, for everything.
+ *
+ * Before this rule the library honoured the preference in exactly two
+ * places — `.skeleton-chaos` below, and `LiveRow` reading `matchMedia`
+ * during render. Everything else ignored it: `Dialog`'s scaling backdrop
+ * and panel, `vaul`'s slide-in drawer, table row hovers, `Progress`'s
+ * width transition, every `transition-colors` in the tree.
+ *
+ * A component-by-component sweep cannot fix that, and this is the reason
+ * the rule lives here instead: **`vaul` injects its own keyframes into a
+ * `<style>` tag it appends to `<head>` at runtime** (`dist/index.js`'s
+ * `__insertCSS`). No class this package writes can reach them. A global
+ * rule can.
+ *
+ * `0.01ms` rather than `0`, deliberately: a zero-duration transition
+ * never fires `transitionend`, and code that waits for one — `vaul`
+ * closes on it — would hang forever with the drawer stranded open. This
+ * is the standard idiom for exactly that reason.
+ *
+ * It is a blunt instrument and it reaches a consumer's own animations
+ * too. That is the intended reading of the preference: the user asked
+ * the operating system for less motion, not for less motion from this
+ * package. Anything that genuinely must move under reduced motion has to
+ * say so explicitly, which is the right way round.
+ *
+ * What it deliberately does not do is remove *signal*. `LiveRow`'s
+ * status wash still paints and still holds — see that component, which
+ * turns its timed decay into a static hold rather than dropping the
+ * indication. Motion is negotiable; the fact that a row changed is not.
+ * ------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /* `!important` is the mechanism, not a shortcut. This rule has to beat
+       a Tailwind `duration-*` utility, a daisyUI component transition, and
+       `vaul`'s runtime-injected `<head>` keyframes — none of which this
+       stylesheet can outrank by specificity or layer, because one of them
+       is not in the cascade until the drawer mounts. Suppressed with a
+       reason rather than worked around; the standard reduced-motion reset
+       uses the same idiom for the same reason. */
+    /* biome-ignore lint/complexity/noImportantStyles: must outrank utilities and vaul's injected keyframes */
+    animation-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: see above */
+    animation-iteration-count: 1 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: see above */
+    transition-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: see above */
+    scroll-behavior: auto !important;
   }
 }
