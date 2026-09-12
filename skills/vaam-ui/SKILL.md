@@ -51,10 +51,25 @@ Both lines that look optional are not:
 If a screen looks broken, check those two first. Full detail and the
 font/theme steps: `references/setup.md`.
 
-## Picking a component
+## Finding the component you need
 
-58 exports. `references/components.md` is the index, grouped by what you
-are trying to do. Three orientation rules:
+Every public export is documented, and a test in the package fails if one
+is not — so if something is missing here, it does not exist.
+
+| Reference | What is in it |
+|---|---|
+| `references/components.md` | How to choose: the three surface registers, and what belongs where |
+| `references/primitives-input.md` | Buttons, text inputs, selects, checkboxes, switches, radios, chips, date pickers, `FormField` |
+| `references/primitives-overlay.md` | Dialogs, drawers, popovers, dropdown and command menus, tooltips, toasts |
+| `references/primitives-layout.md` | Cards, tables, tabs, pagination, `SideNav`, screen scaffolding, skeletons, theming |
+| `references/data-display.md` | Ids, phones, money, timestamps, masked secrets, detail lists, stat tiles, `InstrumentPanel` |
+| `references/patterns.md` | Banners, empty states, live rows, payload inspectors, timelines |
+| `references/status-system.md` | `defineStatusSystem`, `StatusPill`, `StateChip`, `StateMark` |
+| `references/utilities.md` | **`cn()`** — read this before writing a `className` — and `useReducedMotion` |
+| `references/setup.md` | Install, the stylesheet, fonts, the theme attribute |
+| `references/pitfalls.md` | Every entry is a bug that actually shipped |
+
+Three orientation rules:
 
 - **Surfaces come in three registers** — diagnostic (a hairline; most of
   the library), floating (a shadow, because it overlaps a ground it does
@@ -62,7 +77,8 @@ are trying to do. Three orientation rules:
   *scan* rather than read).
 - **`cn()` is exported** and is the only correct way to merge classes onto
   these components — plain string concatenation loses to `tailwind-merge`
-  in ways that delete classes silently.
+  in ways that delete classes silently. `references/utilities.md` has the
+  examples and the two bugs that forced its custom configuration.
 - **Don't reach past the API for a colour.** The tokens are
   `bg-surface-*`, `border-edge*`, `text-foreground` /
   `text-muted-foreground` / `text-subtle-foreground`. An undeclared token

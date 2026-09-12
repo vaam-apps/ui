@@ -78,6 +78,37 @@ six loud ones reads instantly; one with forty reads as noise.
 - **`StateMark`** — the glyph alone, `aria-hidden`, for when a nearby
   label already says the word.
 
+## The three helpers that come with it
+
+`defineStatusSystem` and `createStatusPill` are the ones you call. Three
+more exist for the code *around* a status, and knowing they are there
+stops you re-deriving them:
+
+```ts
+import { HUE_CLASSES, isQuietHue, isTerminalStatus } from "@vaam-apps/ui";
+```
+
+- **`isTerminalStatus(system, state)`** — is this state over? Note the
+  two arguments: the system *and* the key, not a `StatusMeta`. It reads
+  that state's `family`, so your code can ask "can this still change?"
+  without learning which of your own keys are endings — whether to keep
+  polling, whether to offer a retry, whether to keep a row live.
+- **`isQuietHue(hue)`** — does this hue render with no fill? `neutral`
+  and `success` are the quiet two: transparent background and border,
+  foreground only. That changes what chrome a surface has to draw for
+  itself, which is the decision `StateChip` uses it for. You need it only
+  if you are composing a hue onto a surface the library does not provide.
+- **`HUE_CLASSES`** — the hue-to-Tailwind-class table the status
+  components read: `fg`, `bg` and `border` per hue. Exported so a
+  consumer building something the library does not have — a chart series,
+  a custom badge — can take its colours **from the same table** rather
+  than eyeballing a match. That is the whole point: a near-match is worse
+  than an obvious difference, because it reads as a distinction that is
+  not there.
+
+If you find yourself writing a `switch` over `StatusHue` to pick a
+colour, one of these three is the thing you actually wanted.
+
 ## Three redundant channels, on purpose
 
 Shape, fill and colour all carry the state, so a reader who does not

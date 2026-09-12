@@ -5,9 +5,16 @@ import { forwardRef, type ReactNode } from "react";
 import { Drawer as DrawerPrimitive } from "vaul";
 import { cn } from "../../lib/cn";
 
-// vaul is standalone. Direction defaults to "right" — a side drawer reads
-// as the console's Sheet-equivalent (design doc T15: "extend, don't fork");
-// pass `direction="bottom"` for the mobile/narrow-viewport case.
+// vaul is standalone. **`direction` defaults to `"bottom"`** — vaul's, not
+// ours; this comment said `"right"` for a while and the same file
+// contradicts it 110 lines down, where the reasoning behind
+// `QuickDetailDrawer`/`MoreDetailDrawer` fixing the prop is written out.
+//
+// The mismatch is not cosmetic: `DrawerContent` is CSS-positioned at the
+// right edge, but vaul reads `direction` to choose its keyframes and its
+// drag axis. A generic `<Drawer>` with no `direction` therefore sits on
+// the right and animates and drags vertically. Pass `direction="right"`
+// for a side drawer, or use the two compositions below, which fix it.
 //
 // This generic composition (`Drawer`/`DrawerTrigger`/`DrawerClose`/
 // `DrawerContent`) is unchanged by console-redesign.md §6.4/D14 — it is
@@ -335,10 +342,14 @@ export function QuickDetailDrawer(props: DetailDrawerProps) {
  * visual/behavioural weight, never routing; pass `open` derived from that
  * query param and `onOpenChange` wired to update it.
  *
- * A destructive-confirmation step opened *from inside* this drawer (e.g.
- * webhook-secret rotation) stays a nested `Dialog` (§3's own footnote) —
- * that dialog needs a z-index at or above this drawer's `z-50`; setting
- * that is `primitives/dialog.tsx`'s job (§8 risk list), not this file's.
+ * A destructive-confirmation step opened *from inside* this drawer uses
+ * **`InlineConfirm`**, not a nested `Dialog`. This paragraph used to say
+ * the opposite, citing a z-index fix; `inline-confirm.tsx` documents that
+ * composition as broken for a reason no z-index reaches — vaul holds a
+ * document-level focus scope while Headless UI's dialog portals to its
+ * own root, so the two fight over focus and the inner dialog cannot be
+ * operated. `InlineConfirm` exists precisely because of it, and the story
+ * for this drawer already does it that way.
  */
 export function MoreDetailDrawer(props: DetailDrawerProps) {
   return <DetailDrawerContent {...props} dimmed contentClassName="max-h-[92vh] md:max-w-[680px]" />;

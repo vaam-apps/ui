@@ -254,10 +254,24 @@ export const OffCanvasDrawer: Story = {
  * exists: nothing between 640px and 1280px takes space out of the page
  * any more.
  *
- * The content column carries `xl:pl-0 pl-16` rather than a fixed inset,
- * because which side the rail is on changes at 640px — below that it is
- * along the bottom and the left gutter would be reserving space for
- * nothing.
+ * The content column's padding is `p-6 pb-24 sm:pb-6 sm:pl-20 xl:pl-6`,
+ * and every part of it is doing something — because the rail is `fixed`
+ * and portalled, so it **cannot reserve its own space**. That padding is
+ * the caller's job in a real application too, which is the single thing
+ * an integrator is most likely to miss.
+ *
+ * Reading it: below `sm` the rail is the bottom pill, so the clearance is
+ * `pb-24` and there is no left gutter to leave. From `sm` the vertical
+ * rail takes the leftmost 64px (`left-3` plus `w-[52px]`), so `pl-20`
+ * gives it 80px and a 16px margin, and the bottom clearance goes away.
+ * At `xl` the sidebar is in flow and takes its own lane, so the gutter
+ * returns to `p-6`.
+ *
+ * (This paragraph used to quote `xl:pl-0 pl-16`, which is not what the
+ * code says and argued the opposite of what the classes do — it claimed a
+ * left gutter below 640px would reserve space for nothing, while leaving
+ * one there. With `collapsed`, note the `xl:pl-6` is wrong: the sidebar
+ * never renders, so the left gutter has to stay.)
  *
  * Hover (or focus) an icon for its native-`title` label: nothing here is
  * a CSS tooltip, so nothing here can be clipped by an ancestor.
@@ -267,7 +281,7 @@ export const FloatingRail: Story = {
   render: (args) => (
     <div className="flex h-[32rem] overflow-hidden rounded-md border border-edge">
       <SideNav {...args} />
-      <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto bg-base-100 p-6 pl-16 sm:pl-20 xl:pl-6">
+      <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto bg-base-100 p-6 pb-24 sm:pb-6 sm:pl-20 xl:pl-6">
         <div className="h-7 w-48 rounded-sm bg-surface-3" />
         <div className="h-4 w-full max-w-xs rounded-sm bg-surface-2" />
         <div className="mt-2 h-40 rounded-md bg-surface-2" />

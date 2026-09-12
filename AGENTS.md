@@ -144,6 +144,31 @@ broken. That is the point of the list.
 restore. A guard nobody has seen fail is a guard nobody should trust. This
 has caught at least three tests here that asserted nothing.
 
+## The skill, and keeping it current
+
+`skills/vaam-ui/` is installed into **other repositories** — vpay, vsms —
+by `npx skills add vaam-apps/ui`. Over there it is the whole
+documentation: the agent reading it cannot see this source tree, and none
+of the tests below run.
+
+**Whenever you add, rename, or meaningfully change a public export,
+update the skill in the same change.** Not afterwards, and not "when
+someone notices" — a rename here becomes an instruction to import
+something that does not exist, in a repo where nothing will contradict it.
+The same applies to a changed default or a new required setup step: if a
+consumer would do something different because of your change, the skill
+has to say so.
+
+You are not relied on to remember this. `src/lib/skill.test.ts` fails
+when a public export is not mentioned anywhere in the skill, and fails
+when the skill names something that is no longer exported — it caught
+four wrong names the day it was written. Exemptions live in that file as
+a short list with reasons, and a stale exemption fails too.
+
+What the gate cannot check is whether the *prose* is still true. If you
+change what a component means rather than what it is called, read the
+skill's entry for it before you finish.
+
 ## Releasing
 
 Versions are [changesets](https://www.npmjs.com/package/@changesets/cli);
@@ -166,7 +191,9 @@ trades for prose. `.changeset/README.md` has the full reasoning.
   peers on vitest ^3/^4 against this repo's ^5).
 - Behaviour changes to defaults are breaking for consumers even when the
   types are unchanged. Say so in `CHANGELOG.md` explicitly; several
-  entries exist purely to do that.
+  entries exist purely to do that — **and check whether
+  `skills/vaam-ui/` needs the same sentence**, since that is what the
+  consuming repositories actually read.
 - When a reviewer or a gate contradicts you, reproduce it before arguing.
   More wrong conclusions here have come from reasoning about CSS than from
   looking at a render.

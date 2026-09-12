@@ -37,8 +37,65 @@ else's.
 
 It caught four on the first run — `MoneyDisplay`, `ScreenLayout`, `Tabs`
 and `Toast`, none of which exist; the real names are `Money`,
-`ScreenStack`/`ScreenHeader`, `ValueTabs` and `toast`/`Toaster`. Both the
-export check and the reference-link check are mutation-tested.
+`ScreenStack`/`ScreenHeader`, `ValueTabs` and `toast`/`Toaster`.
+
+**Every public export is documented, and that is a build failure rather
+than an intention.** The same test now fails when an export is mentioned
+nowhere in the skill — measured against what was first written, 52 were
+missing, including all of `Dialog*`, `Drawer*`, `Select*`, `Table*` and
+`DropdownMenu*`. Seven are exempt with reasons (`omitUndefined`,
+`groupLabelId`, the two `cva` variant tables, and `DrawerPortal` /
+`DrawerOverlay`, which `DrawerContent` already renders).
+
+The public surface is resolved by **following `src/index.ts`'s re-export
+graph**, not by scanning `src/`. The first version scanned, and
+over-reported: `format-instant.ts` and `mask-secret.ts` are deliberately
+not re-exported — their module docs say testability must not widen the
+API — so the gate was demanding documentation for three helpers nobody
+can import, and the only way to satisfy it would have been to print an
+import that does not compile.
+
+There is also a check with no judgement in it: every identifier inside an
+`import { … } from "@vaam-apps/ui"` in the skill's examples must be
+exported. Where that and the backtick heuristic disagree, it wins.
+
+`AGENTS.md` (and so `CLAUDE.md`) now carries the rule the gate enforces:
+update the skill in the same change as any public export you add, rename
+or meaningfully alter — over in vpay and vsms the skill *is* the
+documentation, and nothing there will contradict a stale name. It also
+says what the gate cannot check: whether the prose is still true when you
+change what a component means rather than what it is called.
+
+### Four bugs the skill's own writing turned up
+
+Documenting every export against the source, rather than against the
+comments, found these:
+
+- **`<DialogTrigger as={Button}>` inside a `<form>` submitted the form.**
+  `DialogTrigger` set `type="button"` only when `as` was undefined;
+  `as={Button}` renders a `<button>` with no `type`, and HTML's default
+  there is `submit`. So the most natural way to write it posted the form
+  on its way to opening the dialog — silently, with valid markup and a
+  working dialog. `DialogClose` had it too. Both now type any element
+  that could be a button, leaving intrinsic non-button tags alone, and
+  `dialog.trigger.test.tsx` pins it.
+- **`drawer.tsx` said `direction` defaults to `"right"`.** vaul's default
+  is `"bottom"`, and the same file says so 110 lines further down.
+  `DrawerContent` is CSS-positioned at the right edge, so a generic
+  `<Drawer>` with no `direction` sits right and animates and drags
+  vertically.
+- **`MoreDetailDrawer`'s doc recommended a nested `Dialog`** for a
+  destructive confirmation, citing a z-index fix. `inline-confirm.tsx`
+  documents that composition as broken for a reason no z-index reaches —
+  vaul's document-level focus scope against Headless UI's own portal
+  root. `InlineConfirm` exists because of it.
+- **`form-field.tsx` claimed `Select` forwards both `aria-describedby`
+  and `aria-invalid`.** It forwards `aria-invalid` only, and `select.tsx`
+  explains at length why the other cannot work.
+
+Plus one of my own: `side-nav.stories.tsx`'s `FloatingRail` doc quoted
+padding the code does not have and argued the opposite of what its
+classes do.
 
 ### The dark theme applies without `data-theme`, which the README already promised
 
