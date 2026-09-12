@@ -17,6 +17,30 @@ Requires React 18.3+ or 19, Tailwind CSS v4, and daisyUI v5.
 pnpm add @vaam-apps/ui
 ```
 
+## For agents: `npx skills add vaam-apps/ui`
+
+If you are integrating this package into another repository — vpay, vsms,
+anything else — install the skill first:
+
+```sh
+npx skills add vaam-apps/ui
+```
+
+That drops `skills/vaam-ui/` into the consuming repo's agent directory: a
+short entry point plus references on setup, the status system, which
+component to reach for, and the pitfalls. It exists because the two ways
+this package fails at integration time are both silent — a missing
+`@source` renders every component unstyled, and leaving daisyUI's
+built-in themes on quietly overrides half the palette — and neither
+produces an error anybody can search for.
+
+The skill is checked by `src/lib/skill.test.ts`, which resolves the
+package's real export surface and fails if the skill names something that
+is no longer exported. That matters more than it sounds: the skill is
+copied *into other repositories*, where nothing in this test suite runs,
+so a rename here would otherwise go on recommending the old name
+indefinitely. It has already caught four.
+
 ## Setup
 
 Two steps, and skipping the second is the most common way to end up with

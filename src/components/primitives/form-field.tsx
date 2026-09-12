@@ -127,9 +127,17 @@ function errorId(htmlFor: string): string {
  * destructure a **closed** prop list and would have dropped them with no
  * type error and no runtime warning — verified live, on this package's
  * own `Select` story: the hint rendered with an id and the trigger's
- * `aria-describedby` was `null`. They now declare both props explicitly
- * and forward them to the element that can carry them (for `Select`, down
- * a context to `SelectTrigger`'s button, which is a grandchild).
+ * `aria-describedby` was `null`. They now declare explicitly whichever of
+ * the two they can actually carry, and forward it to the element that can
+ * carry it — for the date pickers, both; for `Select`, `aria-invalid`
+ * alone, threaded down a context to `SelectTrigger`'s button.
+ *
+ * `Select` genuinely cannot take `aria-describedby`: Headless UI's
+ * `ListboxButton` builds it into its own props and wins, so accepting one
+ * would be accepting a prop that silently does nothing. `select.tsx` has
+ * the full account, and `form-field.render.test.tsx` pins the limitation
+ * rather than the wish. This sentence used to say "both", which read as
+ * though the gap had been closed.
  *
  * A control from outside this library will only honour these if it
  * forwards unknown props to a DOM node. There is no way to check that

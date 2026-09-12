@@ -101,7 +101,20 @@ export function DialogTrigger<T extends ElementType = "button">({
   const Component = (as ?? "button") as ElementType;
   return (
     <Component
-      type={as === undefined ? "button" : undefined}
+      // `type="button"` unless the caller is rendering a non-button tag.
+      //
+      // This was `as === undefined ? "button" : undefined`, which is the
+      // one case it needed to cover and one it missed: `as={Button}`
+      // renders a `<button>` with no `type`, and HTML's default for that
+      // is `submit`. So `<DialogTrigger as={Button}>` inside a `<form>`
+      // **submitted the form** on its way to opening the dialog — the
+      // most natural way to write it, and silent.
+      //
+      // Any component could render a button, so the test is inverted:
+      // only an intrinsic tag that is definitely not a button (`a`,
+      // `div`) gets no `type`. `{...props}` still spreads after this, so
+      // a caller who genuinely wants a submit can say so.
+      type={typeof Component === "string" && Component !== "button" ? undefined : "button"}
       onClick={(event: MouseEvent) => {
         (onClick as ((e: MouseEvent) => void) | undefined)?.(event);
         setOpen(true);
@@ -122,7 +135,9 @@ export function DialogClose<T extends ElementType = "button">({
   const Component = (as ?? "button") as ElementType;
   return (
     <Component
-      type={as === undefined ? "button" : undefined}
+      // See `DialogTrigger` above — same trap, same fix. A close button
+      // that submits the form it sits inside is worse, if anything.
+      type={typeof Component === "string" && Component !== "button" ? undefined : "button"}
       onClick={(event: MouseEvent) => {
         (onClick as ((e: MouseEvent) => void) | undefined)?.(event);
         setOpen(false);
