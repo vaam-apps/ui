@@ -62,7 +62,15 @@ export function stampChangelog(source, version) {
     );
   }
 
-  if (new RegExp(`^## ${version.replace(/\./g, "\\.")}$`, "m").test(source)) {
+  // A line scan, not a regex built from `version`. The validation above
+  // already makes a backslash impossible, so escaping only `.` was safe —
+  // but only because of a check twenty lines away, which is exactly the
+  // kind of coupling that stops being true when someone relaxes the
+  // version pattern for a prerelease suffix. CodeQL flagged it as
+  // incomplete escaping and was right to; comparing whole lines needs no
+  // escaping at all and is a more exact check into the bargain.
+  const versionHeading = `## ${version}`;
+  if (source.split("\n").some((line) => line === versionHeading)) {
     throw new Error(
       `CHANGELOG.md already has a \`## ${version}\` section. Either that ` +
         "version was already stamped, or the manifest was bumped to a number " +
