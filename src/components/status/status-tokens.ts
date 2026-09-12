@@ -13,7 +13,7 @@
  * ```tsx
  * const ORDER_STATUS = defineStatusSystem({
  *   pending:  { family: "in-flight", silhouette: "circle", mark: "pie-1",
- *               hue: "neutral", filled: false, attention: "quiet",
+ *               hue: "progress", filled: false, attention: "quiet",
  *               label: "Pending", tooltip: "Awaiting payment." },
  *   paid:     { family: "terminal", silhouette: "circle", mark: "check",
  *               hue: "success", filled: true, attention: "quiet",
@@ -84,9 +84,28 @@ export type StatusMark =
  * means a recoverable condition needs a human. `expired` and `parked` are
  * separated from `neutral` for the same reason — a state nobody needs to
  * act on and a state waiting for someone should not look identical.
+ *
+ * `progress` is that same rule applied to the axis it matters most on.
+ * It means **running, and the outcome is not yet known** — a payment the
+ * rail has, a job a worker claimed, a deploy underway, a webhook in
+ * delivery. Before it existed the hue axis had seven values, five of
+ * which meant trouble or stasis and one of which (`success`) was
+ * terminal, so the one state every state machine spends most of its time
+ * in had to borrow `neutral` — the same hue this module's own examples
+ * give a *refunded* order. "Still moving" and "over, and there is nothing
+ * to see" are opposites on the only question an operator is asking, and
+ * they were the same colour.
+ *
+ * It is not a substitute for `attention`. A running payment needs no
+ * human, so it stays `quiet`; the hue is there so the row is *told apart*
+ * in a peripheral scan, not so it pulls the eye. Reach for `uncertain`
+ * only once the outcome is genuinely unknowable rather than merely
+ * unknown — a row that says "something may be wrong" on every healthy
+ * in-flight record is a false positive a hundred thousand times over.
  */
 export type StatusHue =
   | "neutral"
+  | "progress"
   | "success"
   | "warning"
   | "danger"
@@ -164,6 +183,11 @@ export const HUE_CLASSES: Record<StatusHue, { fg: string; bg: string; border: st
     fg: "text-state-neutral-fg",
     bg: "bg-state-neutral-bg",
     border: "border-state-neutral-border",
+  },
+  progress: {
+    fg: "text-state-progress-fg",
+    bg: "bg-state-progress-bg",
+    border: "border-state-progress-border",
   },
   success: {
     fg: "text-state-success-fg",

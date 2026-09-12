@@ -1,15 +1,16 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { StateChip, type StateChipTone } from "./state-chip";
+import { HUE_CLASSES } from "./status-tokens";
 
-const TONES: StateChipTone[] = [
-  "neutral",
-  "success",
-  "warning",
-  "danger",
-  "uncertain",
-  "expired",
-  "parked",
-];
+/**
+ * Derived from `HUE_CLASSES`, not retyped. This list used to be a literal
+ * and had already fallen behind the vocabulary once — `expired` and
+ * `parked` were unreachable through the chip for as long as it carried
+ * its own private tone table. Reading the keys means a hue added to
+ * `StatusHue` shows up in this story on the next render rather than
+ * whenever somebody remembers two files are meant to agree.
+ */
+const TONES = Object.keys(HUE_CLASSES) as StateChipTone[];
 
 const meta = {
   title: "Status/StateChip",
@@ -22,20 +23,23 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * All seven hues together, which is the only arrangement that catches a
+ * Every hue together, which is the only arrangement that catches a
  * collision. Two of these were unreachable until recently — the chip
  * carried its own four-tone copy of a table that already existed — and
  * `warning` was a shade of `uncertain` close enough to be the same colour
- * in a 14px glyph. Both were found by rendering them side by side.
+ * in a 14px glyph. Both were found by rendering them side by side, which
+ * is also how teal was rejected for `progress`: at ΔE 17 from `success`
+ * it read as a dim green here, and "processing" against "succeeded" is
+ * the one pair on a payments table that must never be confusable.
  *
  * `neutral` and `success` are a third thing this arrangement caught: both
  * borrow tokens `theme.css` declares `transparent` on purpose, and the
  * chip used to paint them unconditionally, so those two rendered as bare
- * text with no box while the other five were bordered chips — legible
- * only as "two of these are broken" once shown together. They now fall
- * back to the same achromatic `border-edge`/`bg-surface-2` chrome
+ * text with no box while the others were bordered chips — legible only as
+ * "two of these are broken" once shown together. They now fall back to
+ * the same achromatic `border-edge`/`bg-surface-2` chrome
  * `InlineBanner`'s `neutral` variant uses (see `isQuietHue` in
- * `../status/status-tokens`), so all seven read as chips.
+ * `../status/status-tokens`), so all eight read as chips.
  */
 export const EveryTone: Story = {
   render: () => (
