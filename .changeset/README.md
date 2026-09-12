@@ -18,23 +18,25 @@ they are written down here rather than discovered.
    for whoever decides the next release, not for users — the CHANGELOG is
    where users are addressed.
 
-2. **When releasing**, on `main`:
+2. **Write the entry** under `## Unreleased` in `CHANGELOG.md`, as the
+   work happens. No number yet; the release puts one on.
 
-   ```bash
-   pnpm bump
-   ```
+3. **Release: run the `Version` workflow** from the Actions tab. It
+   consumes the pending changesets, bumps the manifest, renames
+   `## Unreleased` to the version it produced, commits, tags, and hands
+   the tag to `release.yml`.
 
-   `changeset version` collapses every pending changeset into one bump of
-   `package.json` and deletes the files it consumed. Then write the real
-   `CHANGELOG.md` entry by hand (see below) and open a release PR.
+   It has a `dry_run` input that does all of that and pushes nothing —
+   worth using the first time, and any time the changelog is in doubt.
 
-3. **Publishing is a tag**, unchanged:
+   It refuses to release when `## Unreleased` is empty. That refusal is
+   the point of the whole arrangement: nothing generates this changelog,
+   so an empty section means a published version nobody described.
 
-   ```bash
-   git tag v0.1.2 && git push origin v0.1.2
-   ```
-
-   `.github/workflows/release.yml` takes it from there.
+Everything in step 3 is also doable by hand — `pnpm bump`, then
+`node scripts/stamp-changelog.mjs <version>`, then commit and tag. The
+workflow is not a different mechanism, just the same one without the
+opportunity to forget a step.
 
 ## Why `changelog: false`
 
@@ -63,7 +65,19 @@ losing it. Changesets stops at the version number; the tag does the rest.
 
 There is no `changesets/action` bot for the same reason: its value is the
 "Version Packages" PR, which assumes it also owns the changelog and the
-publish. The `pnpm bump` step above is that PR, opened by a person.
+publish. `.github/workflows/version.yml` does that job instead, and stops
+where changesets stops — at the version number and the tag.
+
+One thing that workflow has to work around, documented here because it
+looks like a bug otherwise: it pushes a `v*` tag, and `release.yml`
+triggers on `push: tags` — and that does **not** fire. GitHub suppresses
+workflow runs from events raised by the default `GITHUB_TOKEN`, with
+`workflow_dispatch` and `repository_dispatch` as the only exceptions. So
+`version.yml` pushes the tag and then dispatches `release.yml` at it
+explicitly. The alternatives were a stored personal access token, which
+this repository deliberately does not have, or making `release.yml`
+reusable, which changes the OIDC claim npm matches its trusted publisher
+against.
 
 ## Checking before a release
 

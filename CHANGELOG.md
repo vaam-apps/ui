@@ -2,6 +2,43 @@
 
 ## Unreleased
 
+### Releasing is one button
+
+`.github/workflows/version.yml` — run it from the Actions tab. It
+consumes the pending changesets, bumps the manifest, stamps
+`## Unreleased` with the version it produced, commits, tags, and hands
+the tag to `release.yml`. `dry_run` does all of it and pushes nothing.
+
+**It refuses to release when `## Unreleased` is empty**, and that refusal
+is the reason the workflow exists rather than a `sed` in a release step.
+`changelog: false` means nothing generates this file and nothing checks
+it, so the failure it trades for prose is a published version nobody
+described — most likely at exactly the moment someone is in a hurry. The
+check lives in `scripts/stamp-changelog.mjs`, which has its own tests,
+and most of those tests are about what it refuses rather than what it
+renames.
+
+**A tag pushed by a workflow does not trigger another workflow.** That is
+documented GitHub behaviour — runs from events raised by the default
+`GITHUB_TOKEN` are suppressed, with `workflow_dispatch` and
+`repository_dispatch` as the only exceptions — and it means the obvious
+implementation of this (push `v0.1.3`, let `release.yml` notice) silently
+does nothing. So `version.yml` pushes the tag and then dispatches
+`release.yml` at that ref.
+
+The two alternatives both cost something real. A stored personal access
+token would trigger the tag normally, and this repository deliberately
+has no publishing credential — that is the entire point of Trusted
+Publishing. Making `release.yml` a reusable `workflow_call` would change
+the OIDC claim npm matches its trusted publisher against, and that breaks
+only at publish time, which is the worst place to find out. Dispatching
+leaves `release.yml` identical from npm's point of view.
+
+`release.yml` gained `workflow_dispatch` and a guard that it is running
+on a `v*` tag ref at all — dispatched on `main` it would otherwise report
+`tag vmain disagrees with package.json 0.1.2`, which is true and reads
+like the wrong problem.
+
 ## 0.1.2
 
 Versions are managed with [changesets](https://www.npmjs.com/package/@changesets/cli)

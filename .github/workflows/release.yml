@@ -4,6 +4,21 @@ on:
   push:
     tags: ['v*.*.*']
 
+  # How `version.yml` reaches this workflow, and not a convenience.
+  #
+  # A tag pushed by a job using the default GITHUB_TOKEN does not fire
+  # the `push` trigger above — GitHub suppresses it to prevent recursive
+  # runs, and documents `workflow_dispatch` and `repository_dispatch` as
+  # the only exceptions. So `version.yml` pushes the tag and then
+  # dispatches this workflow *at that tag ref*, which is why the guard
+  # below insists on a tag ref rather than assuming one.
+  #
+  # Dispatching rather than making this a reusable `workflow_call` is
+  # deliberate: npm matches its trusted publisher against this workflow's
+  # own identity, and being called from another workflow changes that
+  # claim. Breaking it would only show up at publish time.
+  workflow_dispatch:
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -25,6 +40,23 @@ jobs:
 
       # The tag is the only input, so a tag that disagrees with the
       # manifest would publish a version nobody asked for. Refuse instead.
+      #
+      # The ref check came with `workflow_dispatch`: that trigger will
+      # happily run this on `main`, where `GITHUB_REF_NAME` is `main` and
+      # the comparison below would report `tag vmain disagrees with
+      # package.json 0.1.2` — true, but it reads like a version mismatch
+      # rather than "you dispatched this on the wrong ref", which is the
+      # mistake actually being made.
+      - name: Must run on a version tag
+        run: |
+          case "$GITHUB_REF" in
+            refs/tags/v*) ;;
+            *)
+              echo "::error::release must run on a v* tag ref, got $GITHUB_REF. Dispatch it with --ref v<version>, or let the Version workflow do it."
+              exit 1
+              ;;
+          esac
+
       - name: Tag must match package.json
         run: |
           tag="${GITHUB_REF_NAME#v}"
