@@ -4,14 +4,13 @@
   "description": "A dark-first React component library for operator consoles \u2014 daisyUI styling, Headless UI behaviour, and a parameterised status-glyph system.",
   "license": "MIT",
   "author": "Vaam Apps",
-  "homepage": "https://github.com/vaam-apps/vsms/tree/main/frontends/packages/ui#readme",
+  "homepage": "https://github.com/vaam-apps/ui#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vaam-apps/vsms.git",
-    "directory": "frontends/packages/ui"
+    "url": "git+https://github.com/vaam-apps/ui.git"
   },
   "bugs": {
-    "url": "https://github.com/vaam-apps/vsms/issues"
+    "url": "https://github.com/vaam-apps/ui/issues"
   },
   "keywords": [
     "react",
@@ -40,6 +39,7 @@
     "src",
     "!src/**/*.test.ts",
     "!src/**/*.test.tsx",
+    "!src/**/*.stories.tsx",
     "README.md",
     "CHANGELOG.md"
   ],
@@ -58,8 +58,12 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node scripts/specify-extensions.mjs dist",
-    "clean": "rm -rf dist",
+    "build-storybook": "storybook build -o storybook-static",
+    "clean": "rm -rf dist storybook-static",
+    "format": "biome check --write .",
+    "lint": "biome check .",
     "prepack": "npm run build",
+    "storybook": "storybook dev -p 6006",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
@@ -81,12 +85,25 @@
     "vaul": "1.1.2"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.7",
+    "@storybook/addon-a11y": "10.6.0",
+    "@storybook/addon-docs": "10.6.0",
+    "@storybook/react-vite": "10.6.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "daisyui": "^5.7.28",
+    "react": "^19",
+    "react-dom": "^19",
+    "storybook": "10.6.0",
+    "tailwindcss": "^4.3.3",
     "typescript": "5.9.3",
+    "vite": "^7",
     "vitest": "^3.2.4"
   },
   "engines": {
     "node": ">=18"
-  }
+  },
+  "packageManager": "pnpm@11.18.0"
 }

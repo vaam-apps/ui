@@ -150,7 +150,25 @@
   --edge-strong: #3d434d;
 
   --muted-foreground: #9aa1ac;
-  --subtle-foreground: #6b727d;
+  /* `--subtle-foreground` was #6b727d, which fails WCAG AA on every
+     surface in this system — 4.06:1 on `--background` down to 3.40:1 on
+     `--surface-3`, against the 4.5:1 normal text requires. It is used in
+     38 places, all of them at `--text-caption` (12px) or `--text-micro`
+     (11px), so the normal-text bar is the right one; none of them are
+     large enough for the 3:1 exception.
+     
+     Found by the accessibility addon on a Storybook story, not by
+     inspection — the fourteen weekday headers of a two-month calendar
+     all failing at once is what made a token-level problem visible.
+     
+     #838a95 is the minimum that clears AA on the worst case (4.74:1 on
+     `--surface-3`, 5.66:1 on `--background`). It does compress the
+     three-tier ladder: the gap to `--muted-foreground` goes from ΔE 18.2
+     to 8.8, still comfortably above the ~2-3 where two greys stop being
+     told apart, but the dimmest tier is now less dim than it was. That
+     is a real visual change and it is deliberate — a design system
+     cannot ship text below AA and call the contrast a style choice. */
+  --subtle-foreground: #838a95;
 
   --ring: #5b8def;
   --ring-subtle: rgb(91 141 239 / 0.24);

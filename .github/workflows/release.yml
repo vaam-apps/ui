@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Required for npm Trusted Publishing: npm verifies this workflow's
+      # OIDC identity instead of a long-lived token, so no NPM_TOKEN secret
+      # exists to leak or rotate.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile
+
+      # The tag is the only input, so a tag that disagrees with the
+      # manifest would publish a version nobody asked for. Refuse instead.
+      - name: Tag must match package.json
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          manifest="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$manifest" ]; then
+            echo "::error::tag v$tag disagrees with package.json $manifest"
+            exit 1
+          fi
+
+      - run: pnpm run lint
+      - run: pnpm run typecheck
+      - run: pnpm run test
+      - run: pnpm run build
+
+      # `prepack` rebuilds, so the tarball can never be stale.
+      # Requires Trusted Publishing to be configured for @vaam-apps/ui on
+      # npmjs.com against this repository and this workflow file; without
+      # it this step fails with a masked E404.
+      - name: Publish to npm
+        run: npm publish --provenance --access public

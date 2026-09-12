@@ -1,0 +1,9 @@
+# Single-package repo, but pnpm 11 reads its build allowlist from here.
+# Without it, `pnpm run <script>` fails with ERR_PNPM_IGNORED_BUILDS behind
+# a stack trace that reads like an internal pnpm crash rather than a config
+# gap — the same trap vsms documents in its own workspace file.
+packages:
+  - '.'
+
+allowBuilds:
+  esbuild: true

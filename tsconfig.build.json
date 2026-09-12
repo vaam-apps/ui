@@ -9,5 +9,18 @@
     "rootDir": "src"
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.test.tsx"]
+  // Stories are documentation, not library API: they must not reach
+  // `dist` and must not be published. Excluding them also sidesteps a
+  // real declaration-emit failure — a story's inferred `meta` type
+  // cannot be named through pnpm's virtual store (TS2742), the same
+  // class of error the drawer's re-exports hit, and invisible to
+  // `tsc --noEmit` because only emit exercises it.
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.stories.tsx",
+    ".storybook"
+  ]
 }
