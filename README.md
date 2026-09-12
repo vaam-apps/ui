@@ -104,13 +104,28 @@ import { createStatusPill, defineStatusSystem } from "@vaam-apps/ui";
 export const ORDER_STATUS = defineStatusSystem({
   pending: {
     family: "in-flight", silhouette: "circle", mark: "pie-1",
+    hue: "neutral", filled: false, attention: "quiet",
+    label: "Pending", tooltip: "Accepted. Nothing has claimed it yet.",
+  },
+  charging: {
+    family: "in-flight", silhouette: "circle", mark: "pie-2",
     hue: "progress", filled: false, attention: "quiet",
-    label: "Pending", tooltip: "Awaiting payment.",
+    label: "Charging", tooltip: "The rail is taking the payment. Nothing is decided yet.",
+  },
+  authorising: {
+    family: "in-flight", silhouette: "circle", mark: "ring",
+    hue: "parked", filled: false, attention: "quiet",
+    label: "Authorising", tooltip: "Sent to the payer's bank. Waiting for them to approve it.",
   },
   paid: {
     family: "terminal", silhouette: "circle", mark: "check",
     hue: "success", filled: true, attention: "quiet",
     label: "Paid", tooltip: "Settled and captured.",
+  },
+  lapsed: {
+    family: "terminal", silhouette: "circle", mark: "clock",
+    hue: "expired", filled: true, attention: "quiet",
+    label: "Lapsed", tooltip: "Nobody approved it before the window closed.",
   },
   disputed: {
     family: "unresolved", silhouette: "diamond", mark: "question",
@@ -131,19 +146,90 @@ different machine is a compile error. Add a second machine by calling
 `createStatusPill` again — the rendering is shared, the vocabularies stay
 apart.
 
-Three things about it are deliberate:
+### Choosing a hue
 
-- **Each state differs in silhouette, interior mark and fill as well as
-  hue.** Colour alone fails for the ~8% of men with a colour-vision
-  deficiency and fails completely in a monochrome screenshot pasted into
-  a ticket.
-- **`family` is presentational, never authorisation.** A UI that greys
-  out "cancel" because its own table says `terminal` will be wrong the
-  first time the state machine changes and nobody remembers the table
-  exists. Propose the action; let the server refuse it.
-- **`unresolved` is a first-class outcome**, distinct from success and
-  failure. Systems that model only two outcomes end up reporting "we
-  never learned what happened" as whichever is more convenient.
+Eight, and picking from the four obvious ones is the mistake this table
+exists to stop. The first three rows are all "not finished", and they are
+not interchangeable.
+
+| Hue | What it tells the reader | Example state |
+| --- | --- | --- |
+| `neutral` | Not finished, and nothing is happening to it | `pending` — accepted, nothing has claimed it |
+| `progress` | Not finished, and **this** system is working on it now | `charging` — the rail is taking the payment |
+| `parked` | Not finished, and somebody **outside** this system is holding it | `authorising` — waiting for the payer to approve on their handset |
+| `success` | Over, and it worked | `paid` |
+| `danger` | Over, and it did not work | `failed` |
+| `expired` | Over because a window closed — nobody decided anything | `lapsed` — no answer arrived in time |
+| `warning` | A recoverable condition needs a human | `stalled` — retryable in principle, but nothing is driving it |
+| `uncertain` | The outcome is unknown, and will not be learned | `unknown` — sent, and no acknowledgement ever arrived |
+
+Three clusters account for nearly every wrong pick:
+
+- **`neutral` vs `progress` vs `parked`** — the three ways a record can be
+  unfinished, and they answer *who has it*: nobody (`neutral`), this
+  system (`progress`), somebody else (`parked`). All three stay `quiet`;
+  none of them needs a human. The hue is there so the row is told apart in
+  a peripheral scan down a column, not so it pulls the eye.
+- **`warning` vs `uncertain`** both read as "attention", and are not the
+  same attention. `warning` means a recoverable condition needs a human —
+  somebody can act, and acting will help. `uncertain` means the outcome is
+  unknown — there may be nothing to do and nothing to learn. A stalled job
+  is `warning`; a send whose receipt never came back is `uncertain`.
+- **`neutral` vs `expired`** are the two undramatic ones. Both say nothing
+  is happening; only `expired` says a window closed. They are also the
+  closest pair in the system chromatically — see the ΔE note below.
+
+`parked` is the one that gets missed, because it looks like either of its
+neighbours. It is not `progress`: nothing is being attempted, and time
+passing will not advance it — only a decision by someone you are waiting
+on. It is not `neutral` either, which is transparent on a transparent
+ground and deliberately does *not* pull the eye, so a payment sitting on a
+payer's handset stops being findable in a table of a thousand rows.
+Reaching for `uncertain` is worse still: amber makes every healthy
+in-flight payment read as a problem. `parked` is violet, and quiet, and
+its mark is `ring`.
+
+There is deliberately **no `info` hue**, and the eighth hue is named
+`progress` for that reason. Blue is selection and focus only (`--ring`),
+never a status — `theme.css` even pins daisyUI's own `--color-info` to the
+neutral grey with a written reason, so a `StatusHue` named `info` would
+contradict its own neighbour by name. The two states an `info` hue gets
+reached for are `progress` and `parked`.
+
+### Choosing a mark
+
+Eleven, and the names do not tell you which of the unfinished ones you
+want. `filled` is a separate channel: terminal marks sit on a filled
+silhouette and knock out of it, in-flight and unresolved marks are
+stroked on an empty one.
+
+| Mark | The distinction it draws | Reach for it when |
+| --- | --- | --- |
+| `pie-1` `pie-2` `pie-3` | A quarter, half and three-quarter progress wedge | **This** system is doing the work, and you can say roughly how far through it is |
+| `ring` | A completed stroke with a hollow centre | The work has left this system — the next event comes from outside, and no progress can be reported until it does |
+| `clock` | A window, not a worker | Nothing is being attempted; only time passing changes anything |
+| `pause` | Stopped, with nobody driving it | It could resume, and it will not resume on its own |
+| `check` | Over, and it worked | The happy terminal state |
+| `cross` | Over, and it failed | Something went wrong and stayed wrong |
+| `slash` | Over, on purpose | Cancelled, rejected, skipped — nothing failed |
+| `bar` | Over, with no verdict to report | Refunded, voided, superseded |
+| `question` | The outcome was never learned | Pair it with `uncertain`; it is not a failure |
+
+The four that overlap are `pie-*`, `ring`, `clock` and `pause` — all of
+them "not finished yet", and they split on the same question the hue axis
+splits on: *who is holding it*. That is not a coincidence, and the two
+axes are meant to agree:
+
+| Who has it | Hue | Mark |
+| --- | --- | --- |
+| This system, actively | `progress` | `pie-1` / `pie-2` / `pie-3` |
+| Somebody outside it | `parked` | `ring` |
+| Nobody — only the clock | `neutral` | `clock` |
+| Nobody at all, and it is stuck | `warning` | `pause` |
+
+`ring` + `parked` is the combination a real state machine reaches for most
+and the one easiest to miss, because "submitted" sounds like progress this
+system is making.
 
 ### Mapping an in-flight state
 
@@ -170,20 +256,47 @@ processing: {
   nobody has claimed, a refunded order that is over. An in-flight record
   has to stay tellable-apart from a settled one in a peripheral scan of a
   hundred thousand rows, which is the scan this library exists for.
+- **`hue: "progress"`**, not `parked`, *while the rail is still working*.
+  The moment the next move belongs to a person — the payer approving on
+  their handset, a reviewer signing off — it becomes `parked` and its mark
+  becomes `ring`. Time advances a `progress` state; only somebody else
+  advances a `parked` one.
 - **`attention: "quiet"`.** The hue makes the row *identifiable*; the
   attention level makes it *demand a human*. An in-flight payment demands
   nobody. Go `loud` on a detail screen showing one record, not down a
   column.
 - **`filled: false`, and a `pie-*` mark.** Fill answers "is it over?" on
   its own, in grayscale and in a monochrome screenshot — the redundancy
-  that keeps hue from being load-bearing. `pie-1`/`pie-2`/`pie-3` are the
-  progress wedge; use them in order if your machine has several in-flight
-  states, and `ring` for one that is handed off and awaiting an external
-  answer.
+  that keeps hue from being load-bearing.
 
 `family: "in-flight"` is metadata, not a channel — nothing in the
 rendering reads it. It drives `isTerminalStatus`, which answers "should
 this row stop polling", and that is all it does.
+
+### What is deliberate
+
+- **Each state differs in silhouette, interior mark and fill as well as
+  hue.** Colour alone fails for the ~8% of men with a colour-vision
+  deficiency and fails completely in a monochrome screenshot pasted into
+  a ticket. That redundancy is load-bearing rather than decorative: the
+  closest two hues in the system, `neutral` and `expired`, are ΔE00 8.7
+  apart, so inside a 14px glyph the *mark* is doing much of the work of
+  telling them apart.
+- **`family` is presentational, never authorisation.** A UI that greys
+  out "cancel" because its own table says `terminal` will be wrong the
+  first time the state machine changes and nobody remembers the table
+  exists. Propose the action; let the server refuse it.
+- **`unresolved` is a first-class outcome**, distinct from success and
+  failure. Systems that model only two outcomes end up reporting "we
+  never learned what happened" as whichever is more convenient.
+- **Every hue is legible in both treatments**, on all four steps of the
+  surface ladder. Measured against the hex tokens in `theme.css`, not
+  assumed — the tokens are authored in hex, so a helper that expects oklch
+  parses none of them and reports success on nothing. Quiet glyphs run
+  6.34:1 to 13.65:1 against the 3:1 a non-text graphic needs, and loud
+  pills — where the 12px label takes the hue itself — run 5.53:1 to
+  11.71:1 against 4.5:1. The worst case in the system is `expired`, loud,
+  on a hovered row.
 
 ## Money
 
