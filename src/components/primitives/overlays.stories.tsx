@@ -36,6 +36,7 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuLinkItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./dropdown-menu";
@@ -259,6 +260,56 @@ export const PlainDrawer: Story = {
         </div>
       </DrawerContent>
     </Drawer>
+  ),
+};
+
+/**
+ * Commands and destinations are different rows.
+ *
+ * `DropdownMenuItem` is a `<button>`, which is correct for "Replay" or
+ * "Cancel" — things that *happen*. `DropdownMenuLinkItem` is an `<a>`,
+ * for rows that are *places*. The distinction is not cosmetic: the two
+ * render identically, and only the anchor supports middle-click,
+ * cmd-click, "open in new tab" and "copy link address". A menu of
+ * destinations built from buttons loses all four silently, and nobody
+ * files a bug about it — they just stop using the menu.
+ *
+ * `SideNav`'s tiny-screen rail is the caller that needed this: it shows
+ * four destinations and puts the rest here, and the ones here must not
+ * be worse links for having landed fifth.
+ */
+export const CommandsVersusDestinations: Story = {
+  render: () => (
+    <div className="flex flex-wrap items-center gap-6">
+      <DropdownMenu>
+        <DropdownMenuTrigger as={Button} variant="secondary" size="sm">
+          Commands
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuLabel>This message</DropdownMenuLabel>
+          <DropdownMenuItem onClick={() => toast({ title: "Replayed" })}>Replay</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => toast({ title: "Copied" })}>Copy id</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger as={Button} variant="secondary" size="sm">
+          Destinations
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuLabel>Go to</DropdownMenuLabel>
+          <DropdownMenuLinkItem href="#workers">Workers</DropdownMenuLinkItem>
+          <DropdownMenuLinkItem href="#opt-outs">Opt-outs</DropdownMenuLinkItem>
+          <DropdownMenuLinkItem
+            href="#audit"
+            aria-current="page"
+            className="bg-base-300 font-medium"
+          >
+            Audit log
+          </DropdownMenuLinkItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   ),
 };
 

@@ -74,25 +74,104 @@ describe("the floating rail escapes its wrapper without duplicating the landmark
       <SideNav {...PROPS} smallScreen="floating" />,
       () => {
         const rails = [...document.querySelectorAll("[data-floating-rail]")];
-        expect(rails).toHaveLength(1);
-        // Not "somewhere outside" — specifically a child of body, which
+        // Two: the horizontal tiny-screen rail and the vertical one.
+        // Both are always in the DOM and CSS picks — see the next case.
+        expect(rails).toHaveLength(2);
+        // Not "somewhere outside" — specifically children of body, which
         // is the only ancestor chain guaranteed free of a transform a
         // consumer introduced.
-        expect(rails[0]?.parentElement).toBe(document.body);
+        for (const rail of rails) {
+          expect(rail.parentElement).toBe(document.body);
+        }
       },
       true,
     );
   });
 
-  it("leaves exactly one Primary landmark in the whole document", async () => {
+  /**
+   * The two rails are chosen by CSS, not by a JS viewport read — so
+   * jsdom, which has no layout, cannot tell you which one a user sees.
+   * What it *can* check is the property that makes the CSS choice safe:
+   * that the two gates are complements. If both ever became visible at
+   * one width, a phone would get a vertical rail down its side and a
+   * horizontal one along its bottom, at the same time.
+   *
+   * Asserted on the class strings deliberately. It is the weaker kind of
+   * test — it pins the mechanism rather than the result — but the result
+   * is not observable here at all, and the alternative is pinning
+   * nothing.
+   */
+  it("gates the two rails on complementary breakpoints", async () => {
     await mount(<SideNav {...PROPS} smallScreen="floating" />, () => {
+      const horizontal = document.querySelector('[data-floating-rail-axis="horizontal"]');
+      const vertical = document.querySelector(
+        "[data-floating-rail]:not([data-floating-rail-axis])",
+      );
+      expect(horizontal).not.toBeNull();
+      expect(vertical).not.toBeNull();
+      // Horizontal: below `sm` only.
+      expect(horizontal?.className).toContain("sm:hidden");
+      // Vertical: `sm` and up, and it hands over to the sidebar at `xl`.
+      expect(vertical?.className).toContain("hidden");
+      expect(vertical?.className).toContain("sm:flex");
+      expect(vertical?.className).toContain("xl:hidden");
+    });
+  });
+
+  it("keeps the vertical rail past xl when the sidebar is collapsed", async () => {
+    await mount(<SideNav {...PROPS} collapsed />, () => {
+      const vertical = document.querySelector(
+        "[data-floating-rail]:not([data-floating-rail-axis])",
+      );
+      // No `xl:hidden` — at `xl` there is no sidebar to hand over to.
+      expect(vertical?.className).not.toContain("xl:hidden");
+      expect(vertical?.className).toContain("sm:flex");
+    });
+  });
+
+  it("puts overflow destinations behind a menu, as real links", async () => {
+    await mount(<SideNav {...PROPS} />, () => {
+      const horizontal = document.querySelector('[data-floating-rail-axis="horizontal"]');
+      // PROPS has 4 destinations (top + 2 grouped + ... ) plus a footer
+      // item; whatever the split, every slot shown is an anchor and the
+      // menu trigger is a button.
+      const slots = horizontal?.querySelectorAll("a") ?? [];
+      expect(slots.length).toBeLessThanOrEqual(4);
+      expect(horizontal?.querySelector('button[aria-label="More destinations"]')).not.toBeNull();
+    });
+  });
+
+  /**
+   * Every shape is a `<nav aria-label="Primary">` — including the two
+   * portalled rails, which were plain `<div>`s until the a11y gate
+   * pointed out that below `sm` the in-flow nav is `display: none` and a
+   * phone was therefore getting its navigation with no landmark at all.
+   *
+   * Three identically-named landmarks in the DOM is only safe because
+   * exactly one is ever displayed, which is what the previous case
+   * pins. This one pins the other half: that all three really do carry
+   * the landmark, so the fix cannot be half-reverted by someone turning
+   * one of them back into a `div`.
+   */
+  it("makes every shape a Primary landmark, rails included", async () => {
+    await mount(<SideNav {...PROPS} smallScreen="floating" />, () => {
+      const navs = [...document.querySelectorAll('nav[aria-label="Primary"]')];
+      expect(navs).toHaveLength(3);
+      // Two of them are the portalled rails.
+      expect(navs.filter((n) => n.hasAttribute("data-floating-rail"))).toHaveLength(2);
+    });
+  });
+
+  it("leaves exactly one Primary landmark when the caller opts out of floating", async () => {
+    await mount(<SideNav {...PROPS} smallScreen="off-canvas" />, () => {
+      // No rails at all in this mode, so no duplication to reason about.
       expect(document.querySelectorAll('nav[aria-label="Primary"]')).toHaveLength(1);
     });
   });
 
   it("is the default, so a caller gets it without opting in", async () => {
     await mount(<SideNav {...PROPS} />, () => {
-      expect(document.querySelectorAll("[data-floating-rail]")).toHaveLength(1);
+      expect(document.querySelectorAll("[data-floating-rail]")).toHaveLength(2);
     });
   });
 

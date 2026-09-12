@@ -118,6 +118,45 @@ export function DropdownMenuItem({
 /** Unconsumed today (see module doc above) — caller controls `checked`
  * itself, since Headless UI's `Menu` has no built-in checkbox-item state
  * the way Radix's `DropdownMenuCheckboxItem` did. */
+/**
+ * A menu row that is a real link, not a button that navigates.
+ *
+ * `DropdownMenuItem` hardcodes `as="button"`, which is right for a
+ * command — "Requeue", "Copy id" — and wrong for a destination. A menu of
+ * places the operator can go has to be made of anchors, or it silently
+ * loses middle-click, ⌘-click, "open in new tab" and "copy link address":
+ * four things people do with navigation without thinking, and none of
+ * which a `button` with an `onClick` can be made to do.
+ *
+ * `SideNav`'s tiny-screen rail is the caller that forced this: it shows
+ * four destinations and puts the rest behind a menu, and the ones behind
+ * the menu must not be second-class links.
+ *
+ * Styling is deliberately identical to `DropdownMenuItem` — the two are
+ * the same row to a reader, and the difference is only in what the
+ * browser will let them do.
+ */
+export function DropdownMenuLinkItem({
+  className,
+  children,
+  ...props
+}: ComponentPropsWithoutRef<"a">) {
+  return (
+    <MenuItem
+      as="a"
+      className={cn(
+        "flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-body text-foreground outline-none",
+        "data-focus:bg-surface-3",
+        "data-disabled:pointer-events-none data-disabled:opacity-50",
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </MenuItem>
+  );
+}
+
 export function DropdownMenuCheckboxItem({
   className,
   checked = false,
