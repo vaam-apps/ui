@@ -167,8 +167,26 @@ export function DropdownMenuCheckboxItem({
     <MenuItem
       as="button"
       type="button"
-      role="menuitemcheckbox"
-      aria-checked={checked}
+      // No `role="menuitemcheckbox"` and no `aria-checked`, and their
+      // absence is the fix rather than a regression.
+      //
+      // Both used to be here and neither worked. Headless UI's `MenuItem`
+      // builds `role` into its own props and lets those win — measured,
+      // the element renders as `BUTTON[role=menuitem]` no matter what is
+      // passed. It is the same ownership `select.tsx` documents for
+      // `aria-describedby` on `ListboxButton`.
+      //
+      // `aria-checked` *did* survive, which was worse than it sounds:
+      // `aria-checked` is not a permitted attribute on `role="menuitem"`,
+      // so the markup was invalid ARIA and the checked state reached
+      // assistive tech through nothing at all. It was visual only, while
+      // reading in the source as though it were handled.
+      //
+      // So the state goes in the accessible name instead — the same move
+      // `StatusPill` makes for a `literal` that is meaningful but not
+      // visible. A reader hears "Delivered, checked", which is what a
+      // real `menuitemcheckbox` would have announced, and it does not
+      // depend on winning an argument with the library.
       className={cn(
         "flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-body text-foreground outline-none",
         "data-focus:bg-surface-3",
@@ -185,6 +203,17 @@ export function DropdownMenuCheckboxItem({
         {checked && <Check size={14} strokeWidth={1.5} aria-hidden="true" />}
       </span>
       <span className="min-w-0 flex-1 truncate text-left">{children}</span>
+      {/* The checkmark is decorative; this is what actually carries the
+       * state to a screen reader. See the comment on `MenuItem` above for
+       * why it cannot be `aria-checked`.
+       *
+       * **After** the label, not before: the accessible name is read in
+       * DOM order, and "Cost, checked" is the order a real
+       * `menuitemcheckbox` would be announced in. Leading with the state
+       * gives "checked Cost" and makes a menu of them hard to scan by
+       * ear. It also keeps `getByRole("menuitem", { name: /Cost/ })`
+       * anchored on the word a reader is actually looking for. */}
+      <span className="sr-only">{checked ? ", checked" : ", not checked"}</span>
     </MenuItem>
   );
 }

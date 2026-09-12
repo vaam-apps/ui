@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ReactNode } from "react";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 import { SideNav } from "./side-nav";
 
 /** Minimal stand-in icons — the real ones come from the consuming app, so
@@ -291,6 +292,13 @@ export const FloatingRail: Story = {
  *
  * The menu button takes the active treatment when the current page is one
  * of the hidden ones, so the rail never shows nothing as current.
+ *
+ * Both of those paragraphs are claims, and the play function is what
+ * makes them fail when they stop being true. Note that everything it
+ * touches lives in `document.body`, not `canvasElement`: the rail is
+ * portalled (see `FloatingRailPortal`), and Headless UI's `MenuItems`
+ * portals again on top of that, so a canvas-scoped query here would find
+ * nothing at all and report success for it.
  */
 export const TinyScreenRail: Story = {
   globals: { viewport: { value: "tiny" } },
@@ -314,6 +322,73 @@ export const TinyScreenRail: Story = {
       </div>
     </div>
   ),
+  play: async ({ step }) => {
+    const body = within(document.body);
+    const railSelector = 'nav[data-floating-rail-axis="horizontal"]';
+
+    await step("The horizontal pill is the navigation at this width", async () => {
+      const rail = await waitFor(() => {
+        const found = document.body.querySelector(railSelector);
+        if (found === null) throw new Error("the horizontal rail has not mounted");
+        return found as HTMLElement;
+      });
+      // Four destinations in slots, the rest behind the menu. The count is
+      // `HORIZONTAL_RAIL_SLOTS`, and it is a thumb measurement — see the
+      // component's own note.
+      await expect(within(rail).getAllByRole("link")).toHaveLength(4);
+      // A `<nav aria-label="Primary">`, not a `<div>` — below `sm` this
+      // pill *is* the navigation landmark, and every rail link sits
+      // inside it.
+      await expect(rail.tagName).toBe("NAV");
+      await expect(rail).toHaveAttribute("aria-label", "Primary");
+    });
+
+    const menuButton = body.getByRole("button", { name: "More destinations" });
+
+    await step("`/routes` is behind the menu, so the menu button reads as current", async () => {
+      // A class, deliberately: the trigger's "current" state is *only* a
+      // visual treatment today — there is no ARIA on it to assert (see
+      // the report accompanying this story). The painted result is the
+      // Playwright suite's business; that this branch was taken at all is
+      // this one's.
+      await expect(menuButton).toHaveClass("bg-base-300");
+    });
+
+    await step("Opening it shows the three destinations that did not fit", async () => {
+      await userEvent.click(menuButton);
+      const menu = within(await body.findByRole("menu"));
+      const rows = menu.getAllByRole("menuitem");
+      await expect(rows.map((row) => row.textContent)).toEqual([
+        "Routes",
+        "Documentation",
+        "Settings",
+      ]);
+    });
+
+    await step("Every row is a real anchor with a real href", async () => {
+      const rows = within(body.getByRole("menu")).getAllByRole("menuitem");
+      await expect(rows.map((row) => row.tagName)).toEqual(["A", "A", "A"]);
+      await expect(rows.map((row) => row.getAttribute("href"))).toEqual([
+        "/routes",
+        "/docs",
+        "/settings",
+      ]);
+    });
+
+    await step("…and the current page is the one marked inside it", async () => {
+      const rows = within(body.getByRole("menu")).getAllByRole("menuitem");
+      const current = rows.filter((row) => row.getAttribute("aria-current") === "page");
+      await expect(current.map((row) => row.getAttribute("href"))).toEqual(["/routes"]);
+    });
+
+    await step("Escape closes the menu and hands focus back to its button", async () => {
+      await userEvent.keyboard("{Escape}");
+      await waitFor(async () => {
+        await expect(body.queryByRole("menu")).toBeNull();
+      });
+      await expect(menuButton).toHaveFocus();
+    });
+  },
 };
 
 /**

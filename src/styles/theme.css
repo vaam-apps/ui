@@ -148,7 +148,35 @@
  * This block's light counterpart lives ~150 lines below. D9 had deleted it
  * outright; the header explains why it is back and what had to be true
  * first.
+ *
+ * # Why `:root` is in this selector list
+ *
+ * daisyUI's `dark` carries `default: true`, so *its* tokens —
+ * `base-100`, `base-200`, `base-300`, `base-content` — apply with no
+ * `data-theme` attribute at all. The README said the same held for the
+ * theme as a whole: "`<html data-theme="dark">` — or no attribute at all
+ * — picks it up exactly as before." That was **false for every token
+ * declared here**, and it was false silently.
+ *
+ * Measured on a page with no attribute: `--color-base-100` resolved to
+ * `#0a0b0d` (daisyUI's default doing its job) while
+ * `--muted-foreground`, `--edge` and `--subtle-foreground` all resolved
+ * to the empty string. Every `text-muted-foreground`, `border-edge` and
+ * `bg-surface-3` on that page therefore computed to nothing — text with
+ * no colour, borders with no colour. It is the exact failure
+ * `theme-tokens.test.ts` exists to prevent, arriving through a door that
+ * test does not watch: the tokens *are* declared, just not reachable.
+ *
+ * Found on Storybook's own documentation pages, which render outside the
+ * decorator that stamps the attribute — i.e. the one place in this
+ * repository that renders the library the way a consumer who read that
+ * README sentence would.
+ *
+ * `:root` and `[data-theme="light"]` are both specificity (0,1,0), and
+ * the light block is later in this file, so an explicit light theme still
+ * wins. Nothing about `[data-theme="dark"]` changes.
  */
+:root,
 [data-theme="dark"] {
   --surface-3: #1c1f25;
 
@@ -692,7 +720,22 @@
     font-variant-numeric: tabular-nums slashed-zero;
   }
 
-  /* §3.6: one focus-ring definition, every focusable element, no exceptions.
+  /* §3.6: one focus-ring definition — for everything this stylesheet
+   * reaches, which is not quite "every focusable element, no exceptions"
+   * as this said before it was measured.
+   *
+   * daisyUI ships its own `:focus-visible` rules for `.btn` and `.input`,
+   * and they win: a focused button computes
+   * `2px solid rgb(232, 234, 237)` — `currentColor` — while `--ring` is
+   * `#5b8def`. Proven by mutation rather than inspection: setting the
+   * outline colour below to `transparent` left the button and the input
+   * ringed and removed the ring only from a rail link and a tab, which
+   * are the elements this rule actually owns.
+   *
+   * Both rings clear WCAG 1.4.11 against their surroundings (`e2e/focus.spec.ts`
+   * measures the repainted pixels), so this is a consistency gap rather
+   * than an accessibility one — but it is a gap, and a reader of the old
+   * sentence would have gone looking for a bug somewhere else.
      outline (not box-shadow) so it is never clipped by an ancestor's
      `overflow: hidden` — a real failure mode in sticky table headers. */
   :focus-visible {
@@ -946,14 +989,21 @@
  * is inferable from a glow, and a caller cannot express one through it.
  * That is what keeps this out of the status vocabulary's way.
  *
- * # `filter: blur()` is correct here, for the exact reason it was wrong on
- * the skeleton
+ * # No `filter: blur()` here either, and this heading used to say the
+ * opposite
  *
- * `.skeleton-chaos` bans blur because a blurred layer is cheap once and
- * ruinous at two hundred table cells, and it would promote every cell to
- * its own composited layer. A dashboard has six cards. Same analysis,
- * opposite answer — and the inversion is written down here so nobody
- * "fixes" one to match the other.
+ * The reasoning was: `.skeleton-chaos` bans blur because a blurred layer
+ * is cheap once and ruinous at two hundred table cells, whereas a
+ * dashboard has six cards — same analysis, opposite answer. That argument
+ * is sound and it was never applied. The glow below is four offset
+ * `box-shadow`s and contains no `filter` at all, because the blurred
+ * pseudo-element it would have needed does not survive contact with a
+ * real page (the next comment down has the whole autopsy).
+ *
+ * The heading outlived the design it described, which is the failure mode
+ * this file's comments are supposed to guard against rather than
+ * demonstrate. Recorded rather than quietly deleted: `grep blur
+ * src/styles/theme.css` returns comments only, and that is the check.
  *
  * # The mesh is static, and the alpha is capped
  *

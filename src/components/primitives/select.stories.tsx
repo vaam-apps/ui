@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 import { Button } from "./button";
 import { MoreDetailDrawer } from "./drawer";
 import { FormField } from "./form-field";
@@ -43,7 +44,16 @@ const PROVIDERS = [
 
 /** The trigger shows the matching item's *label*, not the raw value —
  * `provider.name` for an `id`, which is what Radix's `SelectValue` used to
- * give for free and what `findItemLabel` reproduces here. */
+ * give for free and what `findItemLabel` reproduces here.
+ *
+ * The play function is the proof of that sentence: it never names an
+ * option itself. It reads the active option out of the listbox's own
+ * `aria-activedescendant` after each arrow key, picks *that* one with
+ * Enter, and then asserts the trigger is showing the same text — so a
+ * `findItemLabel` that fell back to the raw `mtn_agg` would fail here
+ * rather than pass against a hardcoded expectation that happened to
+ * match. It also walks the rest of the keyboard contract: opening,
+ * moving, Escape closing, and focus returning to the trigger. */
 export const Default: Story = {
   render: function Render() {
     const [value, setValue] = useState<string>();
@@ -66,6 +76,76 @@ export const Default: Story = {
         <p className="font-mono text-caption text-subtle-foreground">value: {value ?? "—"}</p>
       </div>
     );
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByRole("button", { name: "Provider" });
+
+    // `SelectContent` renders `portal={false}` — see the component's own
+    // note on #315 — so the options really are inside `canvasElement`.
+    // Every query here stays scoped to the canvas on purpose: if that
+    // fix were ever reverted, these would stop finding the listbox
+    // instead of quietly passing against a portalled copy.
+    const options = () => within(canvas.getByRole("listbox")).getAllByRole("option");
+    const activeOption = () => {
+      const id = canvas.getByRole("listbox").getAttribute("aria-activedescendant");
+      const found = options().find((option) => option.id === id);
+      if (found === undefined) {
+        throw new Error(`no option matches aria-activedescendant "${id}"`);
+      }
+      return found;
+    };
+
+    await step("It starts closed, showing the placeholder", async () => {
+      await expect(trigger).toHaveTextContent("Any provider");
+      await expect(trigger).toHaveAttribute("aria-expanded", "false");
+      await expect(canvas.queryByRole("listbox")).toBeNull();
+      await expect(canvas.getByText("value: —")).toBeInTheDocument();
+    });
+
+    await step("Clicking the trigger opens the whole vocabulary", async () => {
+      await userEvent.click(trigger);
+      await expect(await canvas.findByRole("listbox")).toBeInTheDocument();
+      await expect(trigger).toHaveAttribute("aria-expanded", "true");
+      await expect(options()).toHaveLength(PROVIDERS.length);
+    });
+
+    await step("The first arrow key activates the first option", async () => {
+      await userEvent.keyboard("{ArrowDown}");
+      await expect(activeOption()).toBe(options()[0]);
+    });
+
+    let picked = "";
+    await step("The next one moves down by exactly one row", async () => {
+      await userEvent.keyboard("{ArrowDown}");
+      await expect(activeOption()).toBe(options()[1]);
+      picked = activeOption().textContent ?? "";
+      await expect(picked).not.toBe("");
+    });
+
+    await step("Enter selects whatever is active, and the button shows its label", async () => {
+      await userEvent.keyboard("{Enter}");
+      await waitFor(async () => {
+        await expect(canvas.queryByRole("listbox")).toBeNull();
+      });
+      // Not "MTN (aggregator)" spelled out here — `picked` is whatever the
+      // listbox said was active a moment ago, so this fails if the trigger
+      // shows anything else, the raw `mtn_agg` value included.
+      await expect(trigger).toHaveTextContent(picked);
+      await expect(canvas.getByText("value: mtn_agg")).toBeInTheDocument();
+    });
+
+    await step("Escape closes it again and hands focus back to the trigger", async () => {
+      await userEvent.click(trigger);
+      await expect(await canvas.findByRole("listbox")).toBeInTheDocument();
+      await userEvent.keyboard("{Escape}");
+      await waitFor(async () => {
+        await expect(canvas.queryByRole("listbox")).toBeNull();
+      });
+      await expect(trigger).toHaveFocus();
+      // Escape is a cancel, not a pick: the selection made above survives.
+      await expect(canvas.getByText("value: mtn_agg")).toBeInTheDocument();
+    });
   },
 };
 

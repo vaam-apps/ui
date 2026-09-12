@@ -1,0 +1,270 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+import { FormField } from "../components/primitives/form-field";
+import { Input } from "../components/primitives/input";
+import { StatTile } from "../components/data/stat-tile";
+import { InlineEmptyState } from "../components/patterns/inline-empty-state";
+import { REGISTERED_FONT_SIZES } from "../lib/cn";
+
+<Meta title="Docs/Typography" />
+
+export const SIZES = [
+  ["micro", "11px", "16px", "Densest metadata, rail labels"],
+  ["caption", "12px", "18px", "Captions, hints, option descriptions"],
+  ["body", "13px", "20px", "The default. Rows, values, controls"],
+  ["prose", "14px", "21px", "Running text a person reads in sentences"],
+  ["title-sm", "16px", "24px", "Card and panel titles"],
+  ["title", "20px", "28px", "Screen titles"],
+  ["metric", "28px", "34px", "A headline figure"],
+  ["metric-lg", "40px", "44px", "The one figure a screen is about"],
+];
+
+# Typography
+
+Four voices and eight steps. The roles are the point rather than the faces —
+substitute the faces and the system still works, drop a role and it does not.
+
+The specimens on this page carry their own `data-theme="dark"` wrapper. A
+documentation page is not a story, so the decorator that normally stamps that
+attribute on `<html>` never runs here — see
+[Theming and tokens](?path=/docs/docs-theming-and-tokens--docs).
+
+## The four voices
+
+<div data-theme="dark" className="flex flex-col gap-4 rounded-box bg-background p-5">
+  <div>
+    <code className="font-mono text-micro text-muted-foreground">--font-display</code>
+    <p className="font-display font-medium text-foreground text-title">
+      Settlement exceptions
+    </p>
+    <p className="text-caption text-muted-foreground">
+      IBM Plex Serif. Screen titles, card and dialog headings. A serif gives a
+      dense console one calm anchor per surface without reading as a magazine.
+    </p>
+  </div>
+  <div>
+    <code className="font-mono text-micro text-muted-foreground">--font-sans</code>
+    <p className="font-sans text-body text-foreground">
+      Everything else — labels, controls, table cells, emitted facts.
+    </p>
+    <p className="text-caption text-muted-foreground">
+      IBM Plex Sans. The body face carries 11–14px text almost exclusively, so
+      it is chosen for density and legibility, not personality.
+    </p>
+  </div>
+  <div>
+    <code className="font-mono text-micro text-muted-foreground">--font-italic</code>
+    <p className="font-italic text-foreground text-prose italic tracking-normal">
+      Sent, but no receipt ever arrived; it will not be resubmitted.
+    </p>
+    <p className="text-caption text-muted-foreground">
+      IBM Plex Serif, slanted. A person wrote this — see the rule below.
+    </p>
+  </div>
+  <div>
+    <code className="font-mono text-micro text-muted-foreground">--font-mono</code>
+    <p className="font-mono text-body text-foreground">cs_4f9ac21b · 0 O · 318,420.00</p>
+    <p className="text-caption text-muted-foreground">
+      JetBrains Mono. Data, always.
+    </p>
+  </div>
+</div>
+
+IBM Plex is one superfamily drawn to work together, which is worth more here
+than four individually optimal faces. `--font-mono` is the deliberate
+exception: it stays JetBrains Mono because this system leans on its slashed
+zero — an operator tells `0` from `O` in a `cs_cuid()` at 12px only because of
+the slash — and Plex Mono would be more coherent on paper and a worse
+instrument for that job.
+
+Everywhere `.font-mono` applies, `font-variant-numeric: tabular-nums
+slashed-zero` comes with it, globally, so a column of figures aligns and a zero
+is never a letter.
+
+These are **stacks, not `@font-face` rules**; the package ships no font files.
+See [Installation](?path=/docs/docs-installation--docs) for loading them and
+for exactly what is lost if you do not: display and italic collapse into the
+same system serif, and the four-voice distinction goes with them.
+
+One global correction worth knowing about: `html` carries
+`letter-spacing: -0.011em`, tuned for the sans body face. The serif slots are
+the ones that suffer from it, most of all at 12px, so `CardHeader`,
+`FormField`'s hint and `StateTimeline`'s annotation all set `tracking-normal`
+explicitly.
+
+## The size scale
+
+<table>
+  <thead>
+    <tr>
+      <th>Step</th>
+      <th>Size</th>
+      <th>Line height</th>
+      <th>Where it is used</th>
+    </tr>
+  </thead>
+  <tbody>
+    {SIZES.map(([name, size, leading, use]) => (
+      <tr key={name}>
+        <td>
+          <code className="font-mono text-caption">text-{name}</code>
+        </td>
+        <td>
+          <code className="font-mono text-caption">{size}</code>
+        </td>
+        <td>
+          <code className="font-mono text-caption">{leading}</code>
+        </td>
+        <td>{use}</td>
+      </tr>
+    ))}
+  </tbody>
+</table>
+
+<div data-theme="dark" className="flex flex-col gap-1 rounded-box bg-background p-5">
+  <p className="text-foreground text-micro">micro — 12,481 of 12,710 terminal</p>
+  <p className="text-caption text-foreground">caption — 12,481 of 12,710 terminal</p>
+  <p className="text-body text-foreground">body — 12,481 of 12,710 terminal</p>
+  <p className="text-foreground text-prose">prose — 12,481 of 12,710 terminal</p>
+  <p className="text-foreground text-title-sm">title-sm — 12,481 of 12,710</p>
+  <p className="text-foreground text-title">title — 12,481 of 12,710</p>
+  <p className="font-mono text-foreground text-metric tabular-nums">12,481</p>
+  <p className="font-mono text-foreground text-metric-lg tabular-nums">12,481</p>
+</div>
+
+Declaring these under Tailwind's own `--text-*` keys overrides its stock scale
+app-wide, which is the point: `text-sm` is not a step in this system, and there
+is one ladder rather than two competing ones.
+
+### The bug the scale is registered for
+
+`cn()` is `clsx` plus `tailwind-merge`, and it registers these eight steps
+under `tailwind-merge`'s `text` theme key. That registration is not
+configuration polish — it fixes a live, silent bug.
+
+Stock `tailwind-merge` only knows Tailwind's *default* theme. `text-caption` is
+a key it has never heard of, so it classified it by its fallback rule — as a
+**colour** — and then treated it as conflicting with the actual colour beside
+it:
+
+```text
+twMerge("text-caption text-state-danger-fg")  // → "text-state-danger-fg"
+twMerge("text-body text-foreground")          // → "text-foreground"
+twMerge("text-title-sm text-foreground")      // → "text-foreground"
+```
+
+Those three strings are, verbatim, `FieldError`, `DetailList` and `CardHeader`.
+Every one of them rendered at the browser's default font size rather than its
+intended step, in this package and in any application consuming it, for as long
+as `cn()` existed. The class was right at the call site and deleted on the way
+out — no error, no warning, and a plausible-looking source line.
+
+`src/lib/cn.test.ts` pins it, with those exact strings as the cases, and checks
+that two font sizes still collapse against each other and two colours still
+collapse against each other. The bug predates the `tailwind-merge` 3.x upgrade
+— 2.6.0 was checked directly and drops the same classes — so these are
+regression guards rather than upgrade guards.
+
+`REGISTERED_FONT_SIZES` is exported for `theme-tokens.test.ts`, which checks the
+list against `theme.css` by parsing the stylesheet rather than trusting the
+array. The steps registered right now are:
+
+<p data-theme="dark" className="rounded-box bg-background p-4 font-mono text-body text-foreground">
+  {REGISTERED_FONT_SIZES.join(" · ")}
+</p>
+
+**If you add a step to `theme.css`, add it to `FONT_SIZES` in `src/lib/cn.ts`
+in the same change.** A step registered in one place and not the other is
+exactly the shape above: a class that parses, looks right, and does nothing.
+
+## The italic rule
+
+`--font-italic` is the only voice in the system that carries a *claim* rather
+than a category. It means: **a person wrote this.**
+
+On a screen of emitted facts, italic marks human prose written *to* the
+operator, as distinct from the system reporting its own state. The rule has
+widened since it was first written — it used to mean commentary on a decision
+the system had already made, and it now covers any sentence a person composed
+for a reader, including hints and option descriptions.
+
+Widening a signal is how a signal dies, so the rule comes with a test, and the
+test is what keeps the role meaning anything:
+
+> **Could this string be a template that only fills in a value the system
+> already has** — a count, a ratio, a unit, an id, a label?
+
+If yes, it is an emitted fact. It stays `font-sans`, however small and however
+muted it is. The role only carries meaning because things are excluded from it.
+
+Set it with `italic` beside `font-italic`: the token names the *family*, not the
+style. In practice the full trio is `font-italic italic tracking-normal`.
+
+### Worked examples: these take italic
+
+<div data-theme="dark" className="flex max-w-sm flex-col gap-4 rounded-box bg-background p-5">
+  <FormField
+    label="Reference"
+    htmlFor="docs-type-ref"
+    hint="Three to eleven characters."
+  >
+    <Input id="docs-type-ref" placeholder="cs_4f9ac21b" />
+  </FormField>
+</div>
+
+- **A `FormField` hint** — "Three to eleven characters." There is no value
+  behind that sentence for a template to have filled in. A person decided the
+  constraint and wrote the sentence explaining it, which the control itself
+  cannot say out loud.
+- **A `RadioGroupOption` description** — "Match the OS setting." Same shape: a
+  person explaining what an option does.
+- **A `ChipOption` description** — "Needs a reason." A person explaining what a
+  scope actually permits.
+- **A `StateTimeline` annotation** — "sent, but no receipt ever arrived; it
+  will not be resubmitted." The original case the role was invented for: a
+  person qualifying one specific record, set apart from every emitted-fact row
+  around it by more than the `Info` glyph beside it.
+
+### Worked examples: these decline it
+
+Two components say so in their own documentation, and both are worth reading
+before adding a third.
+
+<div data-theme="dark" className="flex flex-col gap-4 rounded-box bg-background p-5">
+  <div className="max-w-xs">
+    <StatTile label="Delivered" value="12,481" caption="98.2% of 12,710 terminal" />
+  </div>
+  <div className="rounded-box border border-edge bg-surface-1 px-4">
+    <InlineEmptyState message="No messages match these filters" />
+  </div>
+</div>
+
+- **`StatTile`'s caption** stays `font-sans`. The shipped fixtures —
+  "98.2% of 12,710 terminal", "XAF, across all providers" — are a computed
+  ratio and a currency unit. Both are exactly what the test describes: emitted
+  facts, of the same register as the mono value above them. They stay upright
+  however small and muted they are. The prop doc goes further and says what to
+  do if a future caption genuinely is somebody's explanation — pass it through
+  a slot that says so, rather than reopening this default.
+- **`InlineEmptyState`'s message** stays `font-sans` too. "No messages match
+  these filters" is the component reporting its own state, in the same register
+  as an empty table cell or a skeleton. Nobody is addressing anybody; the
+  component is describing itself. Marking it italic would dilute the one signal
+  the role carries elsewhere rather than extend it correctly.
+
+The pattern in both refusals is the same, and it is the thing to hold on to:
+the temptation is to italicise *every small muted string*, because that is what
+the italic ones look like. Size and tier are not the rule. Authorship is.
+
+## Three habits that keep this consistent
+
+- **Never reach for a Tailwind default size.** `text-sm` and `text-xs` are not
+  steps here. If a slot needs something between two steps, that is a
+  conversation about the scale, not a one-off class.
+- **A slot with a line budget clips, it never grows.** Nav labels, card titles,
+  select values, tile captions, option descriptions and toast bodies all end in
+  an ellipsis rather than wrapping, because a row of cards where one is taller
+  reads as broken rather than as informative.
+- **Values a reader must be able to *match* are never truncated.** Ids, phone
+  numbers and amounts stay whole — a truncated figure is a wrong figure. That
+  is the whole distinction `Code` and `IdDisplay` exist to draw, and it is why
+  `StatTile`'s value gets `break-words` while its label gets `truncate`.

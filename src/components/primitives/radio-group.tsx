@@ -1,6 +1,12 @@
 "use client";
 
-import { RadioGroup as HeadlessRadioGroup, Radio } from "@headlessui/react";
+import {
+  Description,
+  Field,
+  RadioGroup as HeadlessRadioGroup,
+  Label,
+  Radio,
+} from "@headlessui/react";
 import type { ReactNode } from "react";
 import { cn } from "../../lib/cn";
 
@@ -101,51 +107,82 @@ export function RadioGroup<T extends string>({
       {...aria}
     >
       {options.map((option) => (
-        <Radio
-          key={option.value}
-          value={option.value}
-          className={cn(
-            "group flex min-w-0 cursor-pointer items-start gap-2 rounded-sm border border-edge bg-surface-2 px-3 py-2 text-body text-muted-foreground transition-colors",
-            "data-checked:border-edge-strong data-checked:bg-surface-3 data-checked:text-foreground",
-            "data-focus:outline-none data-focus:ring-1 data-focus:ring-ring",
-            "data-disabled:cursor-not-allowed data-disabled:opacity-50",
-          )}
-        >
-          {/* A real radio glyph, not just a tinted box. The same three
+        // `Field` per option, and it is the only thing that makes the
+        // name correct.
+        //
+        // Both the label and the description render *inside* the
+        // `role="radio"` element, so content-based naming concatenates
+        // them: measured on the shipped fixture, the option was named
+        // "ApproveThe provider accepted it.", and a screen-reader user
+        // heard the whole description again on every arrow press through
+        // the group. axe reports nothing — the radio has a role and a
+        // non-empty name, it is just the wrong text, and there is no rule
+        // for "this name is longer than it should be".
+        //
+        // Two obvious fixes do not work, both checked directly rather
+        // than assumed. Passing `aria-labelledby`/`aria-describedby` to
+        // `Radio` does nothing: Headless UI owns those attributes and
+        // drops what you hand it, the same way `ListboxButton` does with
+        // `aria-describedby` (see `select.tsx`). And `Label`/
+        // `Description` nested in a bare `Radio` wire nothing either —
+        // both attributes came back `null` — because a `Radio` is not a
+        // `Field`.
+        //
+        // With a `Field` ancestor they register through context even
+        // though they sit inside the `Radio`, which is what keeps the
+        // whole card clickable rather than shrinking the target to the
+        // label. `ChipSelect` reached the same arrangement first.
+        //
+        // `className="contents"`: the wrapper must not become a flex item
+        // of its own, or every option would be boxed and the group's
+        // `flex-wrap gap-2` would apply to the wrappers instead of the
+        // cards.
+        <Field key={option.value} className="contents">
+          <Radio
+            value={option.value}
+            className={cn(
+              "group flex min-w-0 cursor-pointer items-start gap-2 rounded-sm border border-edge bg-surface-2 px-3 py-2 text-body text-muted-foreground transition-colors",
+              "data-checked:border-edge-strong data-checked:bg-surface-3 data-checked:text-foreground",
+              "data-focus:outline-none data-focus:ring-1 data-focus:ring-ring",
+              "data-disabled:cursor-not-allowed data-disabled:opacity-50",
+            )}
+          >
+            {/* A real radio glyph, not just a tinted box. The same three
               redundant channels the status system insists on (shape,
               fill, colour) apply to a control whose entire job is to say
               which one is chosen: a reader looking at a greyscale
               screenshot, or anyone who does not perceive the surface-2 →
               surface-3 step, can still see the filled dot. */}
-          <span
-            aria-hidden="true"
-            className={cn(
-              "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border border-edge-strong bg-surface-2 transition-colors",
-              "group-data-checked:border-primary group-data-checked:bg-primary",
-            )}
-          >
-            <span className="size-1.5 rounded-full bg-primary-content opacity-0 transition-opacity group-data-checked:opacity-100" />
-          </span>
-          <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="truncate font-medium">{option.label}</span>
-            {option.description !== undefined && (
-              // Two lines, then an ellipsis. Options sit side by side in a
-              // wrap container and stretch to the tallest one, so an
-              // unclamped three-line description silently pads every
-              // sibling — measured at 112px against 94px for the pair in
-              // this component's own story before the clamp.
-              //
-              // `font-italic italic tracking-normal`: see the
-              // `RadioGroupOption.description` doc above. `tracking-normal`
-              // for the same reason as `StateTimeline`'s `AnnotationNode`
-              // and `FormField`'s hint — the global sans-tuned negative
-              // letter-spacing crowds a 12px serif more than a 12px sans.
-              <span className="line-clamp-2 font-italic text-caption text-subtle-foreground italic tracking-normal">
-                {option.description}
-              </span>
-            )}
-          </span>
-        </Radio>
+            <span
+              aria-hidden="true"
+              className={cn(
+                "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border border-edge-strong bg-surface-2 transition-colors",
+                "group-data-checked:border-primary group-data-checked:bg-primary",
+              )}
+            >
+              <span className="size-1.5 rounded-full bg-primary-content opacity-0 transition-opacity group-data-checked:opacity-100" />
+            </span>
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <Label className="truncate font-medium">{option.label}</Label>
+              {option.description !== undefined && (
+                // Two lines, then an ellipsis. Options sit side by side in a
+                // wrap container and stretch to the tallest one, so an
+                // unclamped three-line description silently pads every
+                // sibling — measured at 112px against 94px for the pair in
+                // this component's own story before the clamp.
+                //
+                // `font-italic italic tracking-normal`: see the
+                // `RadioGroupOption.description` doc above. `tracking-normal`
+                // for the same reason as `StateTimeline`'s `AnnotationNode`
+                // and `FormField`'s hint — the global sans-tuned negative
+                // letter-spacing crowds a 12px serif more than a 12px sans.
+                <Description className="line-clamp-2 font-italic text-caption text-subtle-foreground italic tracking-normal">
+                  {option.description}
+                </Description>
+              )}
+            </span>
+          </Radio>
+        </Field>
       ))}
     </HeadlessRadioGroup>
   );

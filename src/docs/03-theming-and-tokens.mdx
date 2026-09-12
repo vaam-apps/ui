@@ -1,0 +1,400 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+import { ThemeSwitcher } from "../components/primitives/theme-switcher";
+import { HUE_CLASSES, isQuietHue } from "../components/status/status-tokens";
+
+<Meta title="Docs/Theming and tokens" />
+
+export const HUES = [
+  "neutral",
+  "progress",
+  "success",
+  "warning",
+  "danger",
+  "uncertain",
+  "expired",
+  "parked",
+];
+
+export const Swatch = ({ token, className, note }) => (
+  <div className="flex min-w-0 flex-col gap-1">
+    <div className={`h-12 rounded-sm border border-edge ${className}`} />
+    <code className="truncate font-mono text-micro text-muted-foreground">{token}</code>
+    {note ? <span className="text-micro text-subtle-foreground">{note}</span> : null}
+  </div>
+);
+
+export const Both = ({ children }) => (
+  <div className="grid gap-3 lg:grid-cols-2">
+    <div data-theme="dark" className="rounded-box bg-background p-4">
+      <p className="mb-3 font-mono text-micro text-muted-foreground">dark</p>
+      {children}
+    </div>
+    <div data-theme="light" className="rounded-box bg-background p-4">
+      <p className="mb-3 font-mono text-micro text-muted-foreground">light</p>
+      {children}
+    </div>
+  </div>
+);
+
+export const Themed = ({ children }) => (
+  <div data-theme="dark" className="rounded-box bg-background p-4">{children}</div>
+);
+
+# Theming and tokens
+
+Every colour, radius and shadow in this library resolves through a custom
+property declared in `src/styles/theme.css`, and every one of them is
+re-exposed as a Tailwind utility through `@theme inline`. Component code writes
+`bg-surface-3`, never `bg-[var(--surface-3)]`.
+
+That indirection is worth understanding before you use it, because it has a
+sharp edge: **Tailwind generates nothing for a token it does not know about,
+and says nothing about it.** A class written against an unregistered token
+produces a transparent surface, not an error. That has happened here twice —
+once when `bg-surface-1` and `bg-surface-2` were used across dozens of files
+without ever being registered (confirmed live as `rgba(0,0,0,0)` on a real
+render, easy to miss because a transparent panel over a near-black page still
+reads as dark enough), and once when `--state-warning-*` was referenced by
+`StateChip` and `InlineBanner` from the day both shipped without ever being
+declared. `src/lib/theme-tokens.test.ts` now scans the components for
+`bg-`/`text-`/`border-` tokens this stylesheet owns and fails the build on a
+third occurrence.
+
+Everything below exists in **both** themes, and the swatches show both side by
+side rather than following the theme toolbar. That is not a stylistic choice:
+a documentation page is not a story, so the preview decorator that stamps
+`data-theme` on `<html>` never runs here, and every custom property declared
+under a `[data-theme]` block would resolve to nothing. Each example therefore
+carries its own `data-theme` attribute on a wrapper element — which works
+exactly as well there as it does on `<html>`, and is worth knowing if you ever
+need two themes on one screen.
+
+## Surfaces
+
+Four steps, and daisyUI owns three of them. `--color-base-100`, `-200` and
+`-300` double as background, surface-1 and surface-2; `--surface-3` — row
+hover, pressed, selected fill — is the step daisyUI's three-tier base system
+does not have, so it lives as a plain custom property alongside.
+
+<Both>
+  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <Swatch token="--color-base-100" className="bg-background" note="The page" />
+    <Swatch token="--color-base-200" className="bg-surface-1" note="Panels, cards" />
+    <Swatch token="--color-base-300" className="bg-surface-2" note="Floating layers" />
+    <Swatch token="--surface-3" className="bg-surface-3" note="Hover, pressed, selected" />
+  </div>
+</Both>
+
+Dark runs `#0a0b0d` → `#101216` → `#16181d` → `#1c1f25`. Light is the same
+ladder inverted and kept slightly blue-biased — `#fcfcfd` → `#f4f6f8` →
+`#eceef2` → `#e1e5ea` — so the greys read as chosen rather than as stock
+neutrals. Pure white would sit oddly beside a status palette this cool.
+
+## Edges
+
+Three tiers, and the name is a deliberate rename from the design document's own
+`--border`. daisyUI reserves `--border` for component border *width*, so
+reusing the name for a colour would silently overwrite that width value at
+`[data-theme]` scope.
+
+<Both>
+  <div className="grid grid-cols-3 gap-3">
+    <Swatch token="--edge-subtle" className="bg-edge-subtle" note="Internal rules" />
+    <Swatch token="--edge" className="bg-edge" note="The default" />
+    <Swatch token="--edge-strong" className="bg-edge-strong" note="Emphasis, selected" />
+  </div>
+</Both>
+
+Borders are the default in this system, not shadows. Only floating layers get a
+shadow — `--shadow-popover` and `--shadow-dialog`, both redefined in light,
+cooler and far softer, because a near-black shadow on a light ground reads as
+dirt rather than as depth.
+
+## Text, in three tiers
+
+<Both>
+  <div className="flex flex-col gap-1 rounded-box border border-edge bg-surface-1 p-4">
+    <p className="text-body text-foreground">
+      <code className="font-mono text-caption">--foreground</code> — the value a reader came for.
+    </p>
+    <p className="text-body text-muted-foreground">
+      <code className="font-mono text-caption">--muted-foreground</code> — labels, captions, the
+      frame around a value.
+    </p>
+    <p className="text-body text-subtle-foreground">
+      <code className="font-mono text-caption">--subtle-foreground</code> — the dimmest tier;
+      metadata a reader skips until they need it.
+    </p>
+  </div>
+</Both>
+
+`--foreground` is an alias onto daisyUI's `--color-base-content`, registered so
+component code can use the conventional name.
+
+**The third tier has a history worth knowing.** `--subtle-foreground` was
+`#6b727d`, which fails WCAG AA on every surface in the system — 4.06:1 on the
+page background down to 3.40:1 on a hovered row, against the 4.5:1 normal text
+requires. It was used in 38 places, every one of them at 11px or 12px, so the
+normal-text bar is the right one and none of them qualify for the large-text
+exception. It shipped for months.
+
+It was found by the Storybook a11y addon, not by inspection: fourteen weekday
+headers of a two-month calendar failing at once is what made a token-level
+problem visible. `#838a95` is the minimum that clears AA on the worst case
+(4.74:1 on `--surface-3`, 5.66:1 on the page). That does compress the ladder —
+the gap to `--muted-foreground` went from ΔE 18.2 to 8.8, still well above the
+~2–3 where two greys stop being told apart, but the dimmest tier is now less
+dim than it was. A real visual change, taken deliberately: a design system
+cannot ship text below AA and call the contrast a style choice.
+
+### One place `--subtle-foreground` is banned outright
+
+**Never put `text-subtle-foreground` on the aurora mesh.** A gradient ground
+breaks the assumption every contrast check in this system rests on — that a
+foreground sits on *one* known surface. Measured over `--surface-1` at the
+shipped 14% alpha cap, worst case across the four blobs, `--subtle-foreground`
+falls to **4.41:1 in dark and 4.45:1 in light**, below the bar, while
+`--muted-foreground` holds at 5.29:1 and above.
+
+`InstrumentPanel` therefore renders its own caption at `muted` rather than
+documenting a rule and trusting every call site to follow it. `StatusPill`
+makes the identical move for the identical reason when a loud tint lands under
+its label. If you are building a surface on the mesh, do the same.
+
+## The state hues
+
+Eight, and their meanings are the subject of the README's hue table. What lives
+here is the token shape: each hue declares a foreground, a fill and a border,
+and `HUE_CLASSES` maps a hue to the three class names.
+
+<Both>
+  <div className="flex flex-col gap-2">
+    {HUES.map((hue) => (
+      <div key={hue} className="flex items-center gap-3">
+        <code className="w-20 shrink-0 font-mono text-micro text-muted-foreground">{hue}</code>
+        <span
+          className={`inline-flex items-center rounded-field border px-2 py-0.5 text-caption ${HUE_CLASSES[hue].fg} ${HUE_CLASSES[hue].bg} ${HUE_CLASSES[hue].border}`}
+        >
+          loud
+        </span>
+        <span className={`text-caption ${HUE_CLASSES[hue].fg}`}>quiet</span>
+        {isQuietHue(hue) ? (
+          <span className="text-micro text-subtle-foreground">no fill, no border</span>
+        ) : null}
+      </div>
+    ))}
+  </div>
+</Both>
+
+**Two of the eight are quiet.** `neutral` and `success` declare `transparent`
+for their own fill and border on purpose, so a screen where most rows succeeded
+is a column of glyphs and words rather than a wall of green boxes. That is a
+property of the hue vocabulary rather than of either palette, which is why it
+holds in both themes and why `isQuietHue` is the single place the fact is
+written down.
+
+The consequence is easy to get wrong: a surface that needs a *box* for a quiet
+hue must draw ordinary `border-edge`/`bg-surface-2` chrome and keep only the
+hue's foreground. Painting the quiet tokens as unconditional chrome produces an
+invisible box, and has done so four separate times.
+
+## Scrim and radius
+
+`--scrim` is the overlay wash behind a dialog or drawer. It exists because the
+only literal colour left in a component after the light theme landed was
+`bg-black/50`, hard-coded in three places — free in dark, and in light it
+crushes a near-white page to a dead mid-grey with no way for a theme or a
+consumer to say otherwise. Dark uses `rgb(0 0 0 / 0.5)`; light uses
+`rgb(20 23 28 / 0.32)`.
+
+The radius register is theme-invariant, and it is deliberately, visibly rounded
+— a break from the near-square 2px system that preceded it, taken outright
+rather than split down the middle.
+
+<Themed>
+  <div className="flex flex-wrap items-end gap-4">
+  <div className="flex flex-col items-center gap-1">
+    <div className="size-12 rounded-xs border border-edge-strong bg-surface-2" />
+    <code className="font-mono text-micro text-muted-foreground">rounded-xs · 4px</code>
+  </div>
+  <div className="flex flex-col items-center gap-1">
+    <div className="size-12 rounded-selector border border-edge-strong bg-surface-2" />
+    <code className="font-mono text-micro text-muted-foreground">rounded-selector · 8px</code>
+  </div>
+  <div className="flex flex-col items-center gap-1">
+    <div className="size-12 rounded-field border border-edge-strong bg-surface-2" />
+    <code className="font-mono text-micro text-muted-foreground">rounded-field · 12px</code>
+  </div>
+  <div className="flex flex-col items-center gap-1">
+    <div className="size-12 rounded-box border border-edge-strong bg-surface-2" />
+      <code className="font-mono text-micro text-muted-foreground">rounded-box · 20px</code>
+    </div>
+  </div>
+</Themed>
+
+`rounded-sm` and `rounded-md` are aliased onto the same register (12px and
+20px), overriding Tailwind's stock scale app-wide, so there is one ladder
+rather than a fourth disconnected one.
+
+`--radius-xs` is the step the three-tier register does not have, and it exists
+because of a fact about how `border-radius` resolves rather than a change of
+taste: **a radius larger than half the box is clamped to half, and the result
+is a circle.** `--radius-selector` is 8px, exactly half of the 16px checkbox
+every form in this system renders, so `rounded-selector` on a `size-4` box
+produced a perfectly round checkbox — visually identical to a radio button, in
+a library that ships both. Found by putting the two side by side in Storybook,
+not by reading the token. 4px is the largest value that still reads as a square
+with softened corners at that size.
+
+## The aurora ramp
+
+Four stops, and they are the one place in the system where chrome carries hue:
+`--aurora-1` through `--aurora-4`, feeding `Skeleton`'s drift,
+`InstrumentPanel`'s mesh and `Card glow`.
+
+They are drawn from the system's own hues — `progress`, `parked`, a mix of
+`parked` and `danger`, and `success` — and bound to them by `color-mix` so they
+cannot drift. An earlier version claimed the same thing in a comment while
+actually copy-pasting four literals, which is the failure class this changelog
+records repeatedly.
+
+What makes them chrome is not a separate hue but the **absence of meaning**: no
+status surface reads this ramp, nothing infers state from it, and no caller can
+express a state through it. That is the entire safety argument for a coloured
+surface in a system whose premise is that colour means something.
+
+Light does not lighten them, and the reason is measured rather than argued.
+The obvious move — mix each stop toward white "to free it from a type
+constraint", since a glow carries no text — makes it strictly worse: a tint
+mixed toward white sits *closer* to a white ground, so every stop loses the
+contrast that made it visible and the mesh goes from green-and-lilac to flat
+grey. On a light ground, saturation against the ground is the whole budget. So
+light keeps the darker, more chromatic values and spends its budget on alpha
+instead.
+
+## Switching themes
+
+```tsx
+import { ThemeSwitcher, useTheme, THEME_STORAGE_KEY } from "@vaam-apps/ui";
+```
+
+<Themed>
+  <div className="rounded-box border border-edge bg-surface-1 p-4">
+    <ThemeSwitcher persist={false} />
+  </div>
+</Themed>
+
+That control is live. It writes `data-theme` to this iframe's own `<html>`, so
+clicking it re-themes the surrounding documentation chrome rather than the
+wrapper it sits in — the wrapper carries its own attribute, which wins for its
+subtree. `persist={false}` means nothing is written to storage.
+
+**Three states, not two.** `dark` carries `prefersdark: true`, so this package
+already has an opinion about following the operator's OS setting. A plain
+light/dark toggle can only represent an *explicit* choice, so the moment one is
+wired up, "follow my OS" stops being expressible at all — the toggle has to
+start somewhere, and wherever it starts is a decision the operator never made.
+A three-state control costs one more option and keeps `prefersdark` meaningful.
+
+`useTheme()` is the headless half, for a settings row, a command-menu action or
+a keyboard shortcut:
+
+```tsx
+const { preference, resolvedTheme, setPreference } = useTheme();
+```
+
+`preference` is what the operator asked for (`"system" | "light" | "dark"`);
+`resolvedTheme` is what is actually painted, with `"system"` resolved against
+the OS media query. Render the first to decide which control is checked, the
+second to write "currently dark" copy. `setThemePreference` is the same path
+outside React.
+
+The preference persists to `localStorage` under `THEME_STORAGE_KEY`
+(`"vaam-ui:theme"`), namespaced so it cannot collide with a consuming app's
+other keys. Every read and write is wrapped in `try`/`catch` — Safari's private
+windows throw on `setItem`, and some webviews and org policies block storage
+entirely. Losing persistence for a session is an acceptable degradation;
+throwing out of a click handler is not.
+
+`persist={false}` — used by the switcher above, and by this package's own
+stories — re-themes the document without writing anything. A switcher mounted
+in a story without it writes into Storybook's own `localStorage`, where the
+value outlives the story and silently overrides the theme toolbar on a later
+load.
+
+For the first-paint flash and the inline script that prevents it, see
+[Installation](?path=/docs/docs-installation--docs).
+
+## The contrast gate
+
+`src/lib/contrast.test.ts` is the reason the light palette is trustworthy, and
+it is worth reading before changing any colour here.
+
+**What it checks.** It parses `theme.css` itself — not a duplicated table of
+values — and asserts:
+
+- The theme **roster**, by name: exactly `dark` and `light`.
+- That each theme declares all four surfaces, all eight status foregrounds, and
+  all three text tiers **by name**.
+- Every foreground against every surface, in every theme, at the 4.5:1 AA bar
+  for normal text.
+- Every **loud** status foreground against its own `--state-*-bg` tint
+  composited onto each surface.
+
+The roster and by-name assertions are not belt-and-braces. An earlier version
+asserted a floor on the number of generated cases instead, and stayed green
+with the entire light theme deleted — one theme still produced 44 cases,
+comfortably over the old floor. A floor on cases cannot catch a missing theme,
+because the remaining theme already clears it. Separately, `hexTokens` only
+matches `#rrggbb`: rewrite a tier as `rgb(91 99 113)` — a form this very
+stylesheet uses elsewhere — and it drops silently out of the case list with
+every guard still green. The one token whose historical failure gave the file
+its reason to exist is the one that could have vanished unnoticed.
+
+**Why it came first.** `theme-tokens.test.ts` asserts a token is *declared*. It
+cannot assert the value is *legible*, and that gap had already cost a real
+accessibility failure. Adding a light theme multiplied the risk by eight: every
+status foreground is a 300-level tint chosen for roughly 11:1 against
+near-black, and measured against white all eight landed between **1.4:1 and
+2.6:1** — every one below AA. A light palette picked by eye would have shipped
+a status vocabulary nobody could read, and nothing in the build would have said
+a word.
+
+So the gate was written **before** the colours, and the light values were
+*searched* against it — maximum pairwise ΔE among candidates that already
+cleared the bar — rather than chosen and then spot-checked. The result
+separates better than the dark set it mirrors.
+
+**The composited case it caught.** The file originally measured bare surfaces
+only, and said so in its own header: extending it to composited grounds "is
+worth doing and is not done here". It was worth doing, and the block that does
+it found two loud pills below AA on `--surface-3`, the row-hover fill —
+`expired` at **4.27:1** and `danger` at **4.36:1**. Both cleared the bar on a
+bare surface, both were invisible to the flat check, and both were invisible to
+axe as well, because no story renders a loud pill on a hovered row. The
+original limitation note is kept in the file as history rather than deleted,
+because the gap it describes is the reason the block exists.
+
+The fixes are in `theme.css` with their numbers attached: `danger` moved to
+`#a80f35`, which clears 5.20:1 composited and stays ΔE 26 from `warning`;
+`expired` moved to `#5c544e`, which clears 5.24:1 composited and holds ΔE 18
+from `neutral`, the pair this palette has always had to work hardest to keep
+apart.
+
+The asymmetry is worth internalising if you touch either palette: in dark, a
+translucent tint *lightens* the ground under an already-light foreground and
+the ratios stay comfortable. In light it *darkens* the ground under an
+already-dark foreground. The same palette logic does not transfer between the
+two.
+
+## Changing a colour
+
+1. Change it in `src/styles/theme.css`, in the block for the theme you mean.
+2. Run `pnpm test`. `contrast.test.ts` will tell you the measured ratio and
+   which surface it failed on, and `theme-tokens.test.ts` will tell you if a
+   component references something you removed.
+3. If you are adding a hue or a tier, add it to **both** themes. The roster
+   checks are what turn a half-finished change into a failing build.
+4. Do not relax the gate. Darken the foreground in light, lighten it in dark —
+   the failure message says which, and says why the large-text exception does
+   not apply.

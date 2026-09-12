@@ -2,6 +2,133 @@
 
 ## Unreleased
 
+### The dark theme applies without `data-theme`, which the README already promised
+
+**Fixed: on a page with no `data-theme` attribute, every token this
+stylesheet adds resolved to nothing.**
+
+daisyUI's `dark` carries `default: true`, so *its* tokens — `base-100`,
+`base-200`, `base-300`, `base-content` — apply to a bare `<html>`. The
+README stated the same held for the theme as a whole: *"`<html
+data-theme="dark">` — or no attribute at all — picks it up exactly as
+before."* That was false for every custom property, and false silently.
+
+Measured on a page with no attribute: `--color-base-100` resolved to
+`#0a0b0d` while `--muted-foreground`, `--edge` and `--subtle-foreground`
+resolved to the **empty string**. Every `text-muted-foreground`,
+`border-edge` and `bg-surface-3` on that page computed to nothing — text
+with no colour, borders with no colour. It is precisely the failure
+`theme-tokens.test.ts` exists to prevent, arriving through the one door
+that test does not watch: the tokens *are* declared, they were just not
+reachable.
+
+The dark block is now `:root, [data-theme="dark"]`. `:root` and
+`[data-theme="light"]` are both specificity (0,1,0) and the light block is
+later in the file, so an explicit light theme still wins and nothing about
+`[data-theme="dark"]` changes.
+
+Found on Storybook's own documentation pages, which render outside the
+decorator that stamps the attribute — the one place in this repository
+that renders the library the way a consumer following that README
+sentence would. Which is the argument for the documentation having been
+written at all: it was the first thing to exercise that path.
+
+`contrast.test.ts` gained three cases for it, mutation-checked — removing
+`:root` fails them and nothing else.
+
+### Documentation, a real-browser gate, and the bugs both found
+
+Long-form docs in Storybook under `Docs/`, written as `.mdx` beside the
+code they describe, and `e2e/` — **60 Playwright tests** against the built
+Storybook, covering the four things `a11y.test.tsx`'s own doc names as its
+blind spots: contrast in situ, focus-ring visibility, overflow clipping,
+and hit-target size. Plus eleven Storybook play functions for interaction
+semantics.
+
+`AGENTS.md` collects the traps that are not derivable from reading the
+source in order. `CLAUDE.md` is a symlink to it.
+
+**Writing documentation against the source, and assertions against a real
+browser, is what found everything below.** None of it was visible to 511
+passing tests.
+
+#### Fixed
+
+- **`RadioGroup` folded each option's description into its name.** Both
+  spans render inside the `role="radio"` element, so content naming
+  concatenated them: the shipped fixture's option was named
+  `"ApproveThe provider accepted it."`, and a screen-reader user heard the
+  whole description again on every arrow press. axe reports nothing — the
+  radio has a role and a non-empty name, it is just the wrong text.
+
+  Two obvious fixes do not work, both checked rather than assumed:
+  Headless UI's `Radio` drops `aria-labelledby`/`aria-describedby` passed
+  to it, and nested `Label`/`Description` wire nothing without a `Field`
+  ancestor. A per-option `<Field className="contents">` fixes it while
+  keeping the whole card clickable. `ThemeSwitcher` is fixed with it.
+
+- **`DropdownMenuCheckboxItem`'s checked state reached nobody.** It asked
+  for `role="menuitemcheckbox"`; Headless UI owns `role` and rendered
+  `menuitem` regardless. `aria-checked` survived onto a role that does not
+  permit it — invalid ARIA, and a tick that was visual only. The state is
+  now an `sr-only` ", checked" after the label, which is what the role
+  would have announced and does not depend on out-arguing the library.
+
+- **`Tooltip`'s `position` prop was only accidentally alive.** The class
+  was built as `` `tooltip-${position}` `` — a name appearing nowhere as
+  text, so Tailwind generated it only when something else in the scanned
+  tree happened to spell it. In a real build where nothing did, the
+  stylesheet had `.tooltip` and nothing else and **all four bubbles
+  rendered above their trigger**, prop silently accepted. The four names
+  are a literal lookup now.
+
+- **`SideNav` took width below `xl`, which its own comment forbids.**
+  Three wrapper `<div>`s carried `px-2` and laid out even with every child
+  `display: none`: a 16×510px strip at 375 and 900, and 40px at 1262 where
+  it also painted two hairlines beside the floating rail. `e2e/` now
+  asserts the in-flow nav is exactly 0px wide below the sidebar band.
+
+#### Claims that were false, corrected where they were made
+
+Every one was a comment asserting something about the code beside it.
+That is the one job these comments exist for, so each correction says
+what was measured:
+
+- `theme.css` argued `filter: blur()` *is* correct for the aurora glow.
+  The argument is sound and was never applied — the glow is four offset
+  `box-shadow`s and `grep blur` returns comments only. The 0.1.2 entry
+  repeated it and is corrected in place.
+- `theme.css` §3.6 claimed "one focus-ring definition, every focusable
+  element, no exceptions". daisyUI's own rules win on `.btn` and
+  `.input`, which ring in `currentColor` while `--ring` is `#5b8def`.
+  Proven by mutation: zeroing our rule left those two ringed and stripped
+  only a rail link and a tab. Both clear WCAG 1.4.11, so it is a
+  consistency gap, not an accessibility one — but a reader of the old
+  sentence would have hunted a bug elsewhere.
+- `contrast.test.ts`'s header disclaimed composited grounds as future
+  work, in a file whose third `describe` block does exactly that.
+- `side-nav.tsx` asserted twice that the rail renders a `<div>` and that
+  exactly one `<nav>` exists in the file, while its own test asserts
+  three; and its band table still described the `1024–1279px` icon rail
+  0.1.2 removed.
+- `dialog.tsx` and `drawer.tsx` said their close button is "roughly
+  32×32px". Measured: **24×24** — exactly WCAG 2.2 §2.5.8's floor with
+  nothing to spare. `e2e/` pins it against shrinking.
+- `tooltip.stories.tsx` said the clipped bubble is "clipped to nothing".
+  With `position` actually working, 44.3px of a 276.6px bubble still
+  paints — a fragment, which is worse to read than nothing and is the
+  real argument for the native `title` fallback.
+
+#### Known and not fixed
+
+- Vertical floating-rail links are 38×32px. The bottom rail forces 44px
+  because it is the touch band; the vertical one inherits content size and
+  is asserted only against a 24px floor.
+- Markdown pipe tables do not compile in this MDX pipeline — they render
+  as literal text. Three pages hit it; all docs tables are JSX now. Biome
+  does not check `.mdx` at all, so nothing but `build-storybook` and a
+  reader will catch a bad one.
+
 ### Releasing is one button
 
 `.github/workflows/version.yml` — run it from the Actions tab. It
@@ -455,9 +582,11 @@ signature — every break below is in **defaults and pixels**.
   holds above 5.29:1. Enforced in the component rather than documented as
   a rule, the same move `StatusPill` already makes for a loud tint.
 
-  `filter: blur()` is used for the glow, and is still banned on the
-  skeleton — ruinous at two hundred table cells, free on six cards. Same
-  analysis, opposite answer.
+  *(Corrected after release — see Unreleased. This entry originally said
+  `filter: blur()` is used for the glow. It is not: the glow is four
+  offset `box-shadow`s and the shipped stylesheet contains no `filter` at
+  all. The argument for why blur would be affordable on six cards and
+  ruinous on two hundred table cells is sound, and was never applied.)*
 
 - **`--aurora-*` is one ramp, bound to the system's own hues.** The first
   version declared it "named rather than borrowed"; all four values were

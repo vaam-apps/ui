@@ -319,7 +319,7 @@ function NavRow({
  *   only changes what happens below `lg`. The header/rail-divider split
  *   (small-caps text at `≥1280px`, a hairline divider instead in the
  *   `1024–1279px` icon rail band) is the same CSS-toggle technique
- *   `NavLink`'s own `"responsive"` variant uses.
+ *   `NavLink`'s own `"labelled"` and `"rail"` variants use.
  */
 function GroupSection({
   group,
@@ -728,14 +728,19 @@ function HorizontalRail({
  * tree, this rail ends up a descendant of `document.body`, a sibling of
  * `SideNav`'s ancestors, not a descendant of the `<nav>` element `SideNav`
  * renders. That sounds like it could produce a second landmark, so it was
- * checked rather than assumed: `FloatingRail` itself renders a `<div>`,
- * never a `<nav>` — there is exactly one `<nav>` element anywhere in this
- * file, in `SideNav` itself — so moving this subtree elsewhere in the DOM
- * cannot add a second "Primary" landmark. Verified directly: render
- * `SideNav` with `smallScreen="floating"` in jsdom and query the whole
- * document (not just the component's own return value) for
- * `nav[aria-label="Primary"]` — one match, at every width, portal
- * included.
+ * checked rather than assumed — and the answer changed. This paragraph
+ * used to say `FloatingRail` rendered a `<div>`, so the portal could not
+ * add a second landmark. That was true and it was also the bug: below
+ * `sm` the in-flow `<nav>` is `display: none`, so a phone got its
+ * navigation in a plain div, outside any landmark at all. `a11y.test.tsx`
+ * found it by auditing `document.body`, which it has to do precisely
+ * because a portal escapes the host every other fixture is audited in.
+ *
+ * So all three shapes are `<nav aria-label="Primary">` now, and there are
+ * three of them in the DOM at once. That is safe only because exactly one
+ * is ever displayed — the breakpoint gates are complements — which is
+ * what `side-nav.portal.test.tsx` pins, on the class gates themselves,
+ * since jsdom applies no CSS and cannot observe the result.
  */
 function FloatingRailPortal({
   collapsed,
@@ -780,41 +785,63 @@ function FloatingRailPortal({
  * Breakpoint behaviour (§6.1 is the authoritative table here — see that
  * section's own reasoning for why it supersedes §4's looser "Tablet
  * (768–1024px)" prose, which pre-dates that table and was never updated to
- * match it) — entirely CSS-driven (`lg:`/`xl:` Tailwind variants), never a
- * JS breakpoint read:
- *   - `<1024px` (phone and tablet alike): `smallScreen` chooses the
- *     shape. Default `"floating"`: a detached icon-only pill, permanently
- *     on screen, layered over the content (`FloatingRail`). Opt-in
- *     `"off-canvas"`: the original off-canvas tree, full labels,
- *     collapsible accordion groups, for a caller that already wraps this
- *     component in its own drawer.
- *   - `1024–1279px`: persistent icon-only rail, label on hover via a
- *     native tooltip (hover only — a keyboard user gets the same label
- *     from the row's `sr-only` text, which is what a screen reader reads
- *     and what focus announces). Unaffected by `smallScreen`.
- *   - `≥1280px`: persistent full sidebar with labels. Unaffected by
- *     `smallScreen`.
+ * match it) — entirely CSS-driven (`sm:`/`xl:` Tailwind variants), never a
+ * JS breakpoint read.
  *
- * Exactly one `<nav aria-label="Primary">` exists at any width, in either
- * mode: there is only ever one `<nav>` element in this file, full stop —
- * every band except `FloatingRail` is a subtree of it, shown or hidden by
- * CSS (`display: none` removes a subtree from the accessibility tree, so
- * a hidden band is genuinely absent, not merely invisible). `smallScreen`
- * only decides, per render, which below-`lg` subtree exists at all — the
- * off-canvas tree is never mounted in `"floating"` mode, and
- * `FloatingRail` is never mounted in `"off-canvas"` mode — so there is
- * never a moment with two competing below-`lg` trees, mounted or hidden.
- * `FloatingRail` itself is the one exception to "subtree of the `<nav>`":
- * `FloatingRailPortal` moves it to `document.body`, so in the live DOM it
- * ends up a sibling of this component's own ancestors, not a descendant
- * of the `<nav>` element below. That does not create a second landmark —
- * `FloatingRail` renders a `<div>`, never a `<nav>` — but it was checked,
- * not assumed (see `FloatingRailPortal`'s doc for how).
+ * **The band table changed in 0.1.2, and the old shape is the reason for
+ * the current one.** There used to be a fourth band: an in-flow 64px icon
+ * rail from `1024–1279px`. It was the only shape that took space out of
+ * the page while its neighbours floated over it, so a caller's layout
+ * could suit the rail or the sidebar but not both — and at exactly 1024px
+ * a layout built for the floating rail got a full-height strip wherever
+ * `SideNav` sat in its DOM, which in practice meant below all the
+ * content. It is gone from `"floating"` mode and survives only in
+ * `"off-canvas"`, where every band is in flow anyway.
  *
- * This means every breakpoint's shape *except one* is present in the
- * server-rendered HTML on first paint: the `1024–1279px` icon rail, the
- * `≥1280px` full sidebar, and — for a caller who opts into
- * `smallScreen="off-canvas"` — the off-canvas accordion tree below `lg`,
+ * Default (`smallScreen="floating"`):
+ *   - `<640px`: a horizontal pill along the bottom — four destinations
+ *     and an overflow menu (`HorizontalRail`). A 52px column is 14% of a
+ *     375px screen and sits where a thumb cannot reach, so the rail turns
+ *     rather than shrinks.
+ *   - `640–1279px`: the vertical floating rail, detached from the edge
+ *     (`FloatingRail`), label on hover via a native tooltip — hover only,
+ *     and a keyboard user gets the same label from the row's `sr-only`
+ *     text, which is what a screen reader reads and what focus announces.
+ *   - `≥1280px`: the full sidebar with labels, in flow — the one shape
+ *     that takes a lane. With `collapsed`, this band uses the vertical
+ *     rail too, which is the only version that gives the content its
+ *     width back.
+ *
+ * Opt-in `smallScreen="off-canvas"` is unchanged: the off-canvas tree
+ * below `lg` (full labels, collapsible accordion groups) for a caller
+ * that already wraps this component in its own drawer, then the
+ * `1024–1279px` in-flow icon rail, then the sidebar.
+ *
+ * # Landmarks
+ *
+ * All three floating-mode shapes are `<nav aria-label="Primary">`, so
+ * three exist in the DOM at once. That is safe only because exactly one
+ * is ever displayed — the gates are complements — and `display: none`
+ * removes a subtree from the accessibility tree, so a hidden band is
+ * genuinely absent rather than merely invisible.
+ * `side-nav.portal.test.tsx` pins the complementarity on the class gates
+ * themselves, because jsdom applies no CSS and cannot observe the result.
+ *
+ * This used to read "there is only ever one `<nav>` element in this file,
+ * full stop", and that was true right up until it was the bug: below
+ * `sm` the in-flow `<nav>` is `display: none`, so a phone's navigation
+ * sat in a plain portalled `<div>`, outside any landmark. See
+ * `FloatingRailPortal`.
+ *
+ * `smallScreen` still decides, per render, which subtree is mounted at
+ * all — the off-canvas tree is never mounted in `"floating"` mode and the
+ * rails are never mounted in `"off-canvas"` mode — so there is never a
+ * moment with two competing small-screen trees.
+ *
+ * This means every shape *except the rails* is present in the
+ * server-rendered HTML on first paint: the `≥1280px` full sidebar, and —
+ * for a caller who opts into `smallScreen="off-canvas"` — its icon-rail
+ * band and off-canvas accordion tree,
  * all render with no JS at all. No `next/dynamic({ ssr: false })`, no
  * client-only mount flash, for any of those. Verify that directly, not by
  * trusting this comment: `curl` a page rendered with `smallScreen`
@@ -839,6 +866,16 @@ export function SideNav({
   collapsed,
   className,
 }: SideNavProps) {
+  // In floating mode the in-flow tree exists only at `xl`. The `<nav>`
+  // itself already knew that; its children did not, and a wrapper with
+  // `px-2` lays out whether or not everything inside it is
+  // `display: none`. Measured: at 375px and 900px the in-flow nav was a
+  // **16px wide by 510px tall** box with zero visible descendants, and at
+  // 1262px a 40px one painting two `border-t` hairlines beside the
+  // floating rail. This file's own comment says this element "must not
+  // draw a box of its own down here"; it was drawing a thin one.
+  const inFlow = smallScreen === "floating" ? "hidden xl:flex" : "flex";
+
   return (
     <nav
       aria-label="Primary"
@@ -896,7 +933,7 @@ export function SideNav({
         />
       )}
 
-      <div className="flex flex-col gap-0.5 px-2">
+      <div className={cn(inFlow, "flex-col gap-0.5 px-2")}>
         <NavRow
           item={topItem}
           active={isActive(topItem.href, currentPath)}
@@ -904,7 +941,7 @@ export function SideNav({
         />
       </div>
 
-      <div className="flex flex-1 flex-col gap-4 px-2">
+      <div className={cn(inFlow, "flex-1 flex-col gap-4 px-2")}>
         {groups.map((group) => (
           <GroupSection
             key={group.label}
@@ -917,12 +954,12 @@ export function SideNav({
 
       <div
         className={cn(
-          "flex flex-col gap-2 border-edge-subtle border-t px-2 pt-3",
-          // In floating mode there is no off-canvas footer below `lg` —
-          // `FloatingRail` renders its own footer rows instead — so this
-          // whole block (including its hairline `border-t`) would
-          // otherwise render as an empty, pointless line at that width.
-          smallScreen === "floating" && "hidden lg:flex",
+          inFlow,
+          "flex-col gap-2 border-edge-subtle border-t px-2 pt-3",
+          // In floating mode the rails render their own footer rows, so
+          // this block — hairline `border-t` included — would otherwise
+          // be an empty line at every width below the sidebar. It used to
+          // say `lg`, which stopped being the handover point in 0.1.2.
         )}
       >
         <div className="flex flex-col gap-0.5">

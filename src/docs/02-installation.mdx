@@ -1,0 +1,267 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+<Meta title="Docs/Installation" />
+
+# Installation
+
+The README's **Setup** section is the source of truth for this; what follows
+expands it rather than replacing it. Nothing here contradicts it, and if you
+find that it does, the README wins and this page is the bug.
+
+```sh
+pnpm add @vaam-apps/ui
+```
+
+Node 18 or newer. React 18.3+ or 19, Tailwind CSS v4, daisyUI v5.
+
+## Peer dependencies
+
+Four, and they are peers rather than dependencies because a consuming
+application already has all of them and two copies of any of them is a bug:
+
+<table>
+  <thead>
+    <tr>
+      <th>Peer</th>
+      <th>Range</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>
+        <code>react</code>
+      </td>
+      <td>
+        <code>^18.3.0 || ^19</code>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <code>react-dom</code>
+      </td>
+      <td>
+        <code>^18.3.0 || ^19</code>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <code>tailwindcss</code>
+      </td>
+      <td>
+        <code>^4.1.0</code>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <code>daisyui</code>
+      </td>
+      <td>
+        <code>^5</code>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+Everything else the library uses ships as an ordinary dependency and installs
+itself: `@headlessui/react`, `@radix-ui/react-dialog`, `class-variance-authority`,
+`clsx`, `cmdk`, `lucide-react`, `react-day-picker`, `tailwind-merge` and `vaul`.
+You do not install those, and you should not import from them directly to reach
+a component this package already wraps.
+
+Tailwind v4 is a hard floor rather than a preference. The token layer is written
+as `@theme` / `@theme inline` blocks and daisyUI v5 theme plugins, neither of
+which exists in v3.
+
+## 1. Wire up the stylesheet
+
+In your application's own global stylesheet, in this order:
+
+```css
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: false;
+}
+@import "@vaam-apps/ui/styles/theme.css";
+@source "../node_modules/@vaam-apps/ui/dist";
+```
+
+Three things in five lines are each load-bearing.
+
+### `themes: false` is not tidiness
+
+This package registers its two themes under daisyUI's **own** built-in names,
+`dark` and `light`. daisyUI's built-ins emit at a higher specificity than any
+custom theme block can:
+
+```css
+/* daisyUI's built-in — specificity (0,3,1) */
+:is(:root:has(input.theme-controller[value=dark]:checked),[data-theme=dark]) { … }
+/* a custom theme block — specificity (0,1,0) */
+:where(:root),[data-theme=dark] { … }
+```
+
+The built-in therefore wins on every token it also declares — `base-100`,
+`base-200`, `base-300`, `base-content` — regardless of import order. The page
+background, card surfaces and body text silently come out as stock daisyUI
+rather than as this theme, and nothing anywhere reports a problem. Turning the
+built-ins off leaves nothing to collide with.
+
+This was found by measuring a rendered page, not by reading the cascade:
+`--color-base-100` resolved to `oklch(25.33% .016 252.42)` where the theme
+declares `#0a0b0d`.
+
+### The theme import must come after the plugin
+
+`theme.css` contains `@plugin "daisyui/theme"` blocks, which need an
+already-loaded plugin to register against. That puts a CSS `@import` after a
+non-import rule, which linters flag. Tailwind's `@import` and `@plugin`
+handling is a preprocessing step rather than spec CSS, so the ordering rule
+does not describe how the file actually builds. This repository's own Storybook
+entry point (`.storybook/preview.css`) hits the identical case and suppresses
+the identical lint with the identical reason — it is a working example of the
+setup a consumer has to replicate.
+
+### `@source` is the step people skip
+
+Tailwind v4 generates only the utilities it can see used, and it does not look
+inside `node_modules` on its own. Omit the `@source` line and **every component
+renders with no styling at all** — no error, no warning, just a page that looks
+broken in a way that is miserable to debug. Adjust the relative path so it
+reaches your own `node_modules` from the stylesheet's location.
+
+The failure has no signal of its own, which is why it is worth a deliberate
+check after first install rather than a glance: mount a `Button` and confirm it
+has a background.
+
+## 2. Set `data-theme`
+
+Two themes register, under daisyUI's `dark` and `light` names. `dark` carries
+`default: true` and `prefersdark`, so `<html data-theme="dark">` — or no
+attribute at all — picks it up. Light emits only `[data-theme="light"]`: no
+`:root` rule and no `prefers-color-scheme` query, so a dark-only application is
+unaffected by its existence.
+
+```html
+<html data-theme="dark">
+```
+
+**One upgrade caveat.** If your `<html>` already carries `data-theme="light"`
+from daisyUI boilerplate, that attribute previously matched nothing and now
+matches. Set `data-theme="dark"` explicitly if that is you.
+
+**Set the attribute even for a dark-only application**, and the reason is
+narrower than "it is tidier". daisyUI's own `--color-base-*` tokens do resolve
+correctly with no attribute present, because of `default: true`. Every *custom*
+property this package declares lives under `[data-theme="dark"] { … }` with no
+`:root` fallback — measured with the attribute removed, `--surface-3` resolves
+to empty and `text-subtle-foreground` collapses to inherited `base-content`. An
+attribute-less page is the dark theme for daisyUI's tokens and not for this
+package's.
+
+## 3. Load the faces, or accept the fallback
+
+`theme.css` names four roles — `--font-display` (IBM Plex Serif), `--font-sans`
+(IBM Plex Sans), `--font-italic` (IBM Plex Serif) and `--font-mono` (JetBrains
+Mono) — as **stacks, not `@font-face` rules**. This package ships no font files
+and has consistently declined to: roughly 200KB of woff2 for four faces is a
+packaging decision, not a styling one, and it belongs to the application.
+
+Load them however you already load fonts:
+
+```html
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Serif:ital,wght@0,500;0,600;1,400;1,500&family=JetBrains+Mono:wght@400;500&display=swap">
+```
+
+The weights are not arbitrary. Sans carries 400/500/600 plus a 400 italic;
+Serif carries 500/600 for display headings plus 400/500 italic for the
+annotation voice; Mono carries 400/500. That is what this Storybook loads, and
+Storybook is acting as a consumer here rather than as the package — its
+presence in `.storybook/preview.css` is not evidence that the package bundles
+fonts.
+
+Skipping this step is not a failure. The stacks fall back through `ui-serif` /
+`system-ui` / `ui-monospace` and every screen still works. It is a quieter loss
+than the two steps above: the display and italic roles collapse into the same
+system serif, and the four-voice distinction goes with them —
+see [Typography](?path=/docs/docs-typography--docs) for what that distinction is
+carrying.
+
+## 4. The theme init script
+
+Only relevant if you let an operator choose a theme. If your application is
+dark-only with a hard-coded `data-theme="dark"`, skip this section.
+
+`ThemeSwitcher` and `useTheme` persist a preference to `localStorage`, and no
+React component can apply it before the browser's first paint — React has not
+run yet. The server emits no `data-theme`, so the browser paints `theme.css`'s
+`default: true` theme (dark) first, and a visitor who chose light sees a dark
+flash on every full page load until hydration corrects the attribute.
+
+The fix has to be a synchronous, blocking script in the document `<head>`,
+before any stylesheet that paints a surface colour. `themeInitScript` is
+exactly that script, exported so it can be inlined verbatim:
+
+```tsx
+import { themeInitScript } from "@vaam-apps/ui";
+
+// app/layout.tsx (Next.js)
+<html lang="en" suppressHydrationWarning>
+  <head>
+    <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+  </head>
+  <body>{children}</body>
+</html>
+```
+
+**`suppressHydrationWarning` on `<html>` is required, not defensive habit.**
+The script mutates `data-theme` on that exact element before React runs, so the
+attribute React observes during hydration never matches the server-rendered
+markup. Omit the prop and every load logs a hydration-mismatch warning for an
+attribute React did not put there. The prop suppresses the warning only for
+that one element's own attributes and text — it does not disable hydration
+checking for anything nested inside it, so scoping it to `<html>` costs nothing
+else.
+
+Skipping the script is a real, visible regression rather than a cosmetic nit:
+**without it, every visitor who has chosen a non-default theme sees a flash of
+the other one on every full page load.**
+
+### Why it is one literal string
+
+Read the exported value and it looks like something that should obviously be
+built from the module's own constants — `THEME_STORAGE_KEY`, the attribute
+name, the media query. It used to be, interpolated through `JSON.stringify`,
+and that was advertised as what kept it in lockstep.
+
+CodeQL flagged all three interpolations as code construction from a non-literal
+value, and it was right to. The string is handed to `dangerouslySetInnerHTML`
+and executed, so every interpolation into it is a script-injection sink.
+Nothing was exploitable — all three were module constants — but the exposure is
+one plausible refactor away: *let a consumer namespace the storage key* is an
+obvious future request, and the day `THEME_STORAGE_KEY` becomes a parameter,
+the template starts writing caller input into executable code. Removing the
+sink is cheaper than remembering not to create it.
+
+The lockstep guarantee did not go away with the interpolation; it got stronger.
+`theme-switcher.init.test.ts` asserts the literal contains each constant's
+exact JSON form, so a renamed key fails the build rather than silently shipping
+a script that reads the wrong one. A test where there used to be a comment,
+which is this package's habit everywhere else a fact is written down twice.
+
+The script never throws. The same private-window and blocked-storage cases the
+rest of the module guards against apply here too, and on failure it leaves the
+attribute unset, which falls through to `theme.css`'s own default theme.
+
+## Checking the install
+
+Four failure modes, in the order they are worth ruling out:
+
+1. **Everything is unstyled.** The `@source` line is missing or its relative
+   path does not reach your `node_modules`.
+2. **Surfaces and body text look like stock daisyUI, but components are
+   otherwise styled.** `themes: false` is missing from the `@plugin` block.
+3. **Some tokens resolve and some do not — `bg-surface-3` is transparent,
+   `text-subtle-foreground` inherits.** No `data-theme` attribute on `<html>`.
+4. **Headings and annotations render in the same serif.** The font stacks are
+   falling back; the faces are not loaded. Harmless — everything still works —
+   and "Load the faces" above is the fix.

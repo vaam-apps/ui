@@ -204,7 +204,11 @@ export function DialogContent({ className, children, ...props }: ComponentPropsW
           {...props}
         >
           <div className="min-h-0 flex-1 overflow-y-auto p-6">{children}</div>
-          {/* `-m-1 p-1`: grows the hit target to roughly 32×32px without
+          {/* `-m-1 p-1`: grows the hit target to **24×24px** — a 16px icon
+              plus 4px of padding each side. This comment said 32×32px
+              until a browser measured it; 24 is exactly WCAG 2.2
+              §2.5.8's floor with nothing to spare, and `e2e/geometry.spec.ts`
+              pins it so it cannot shrink. Without
               moving the icon itself — the button's visual position (and
               therefore the `right-4`/`top-4` offset every dialog author
               sees) is unchanged, only its padding/margin box grows to

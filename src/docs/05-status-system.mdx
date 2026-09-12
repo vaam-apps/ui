@@ -1,0 +1,319 @@
+import { Meta, Canvas } from "@storybook/addon-docs/blocks";
+import * as StatusPillStories from "../components/status/status-pill.stories";
+import * as StateChipStories from "../components/status/state-chip.stories";
+
+<Meta title="Docs/Status system" />
+
+# The status system
+
+An operator console exists to answer one question about one record out of
+a hundred thousand: *what happened to it, and does anybody need to do
+something?* Every screen in such a console answers that question
+somewhere — in a table column, in a detail header, on a timeline row, in
+a toast. The status system is how those answers stay the same answer.
+
+The premise is narrow and it is the reason the rest of this page is
+possible: **a state's presentation is declared once, as data, and several
+components render it.** The alternative — each call site picking a colour
+and a word — is not a style problem. It is how the same failure appears
+as an amber chip on one screen, a red badge on another, and the word
+"error" on a third, and how a reader learns that the console's colours
+cannot be trusted and starts reading every label instead.
+
+## A status system is one state machine's presentation
+
+`defineStatusSystem` takes a table mapping every state a machine can be
+in to nine fields. The library owns the vocabulary and the rendering.
+**The table belongs to the application**, because what a state *means* is
+domain knowledge and this package has none.
+
+```tsx
+import { createStatusPill, defineStatusSystem } from "@vaam-apps/ui";
+
+export const ORDER_STATUS = defineStatusSystem({
+  authorising: {
+    family: "in-flight", silhouette: "circle", mark: "ring",
+    hue: "parked", filled: false, attention: "quiet",
+    label: "Authorising",
+    tooltip: "Sent to the payer's bank. Waiting for them to approve it.",
+  },
+  disputed: {
+    family: "unresolved", silhouette: "diamond", mark: "question",
+    hue: "uncertain", filled: false, attention: "loud",
+    label: "Disputed", tooltip: "The payer opened a chargeback.",
+  },
+});
+
+export const OrderStatusPill = createStatusPill(ORDER_STATUS);
+```
+
+`defineStatusSystem` is the identity function at runtime. It exists
+purely so `S` is inferred from the object's own keys — without it a
+caller writes `const X: StatusSystem<"a" | "b"> = {…}` and repeats every
+key in the annotation. `createStatusPill` then binds the table to a
+component whose `state` prop accepts exactly those literals, so passing a
+job state to an order pill is a compile error rather than an
+`undefined` dereference at render time.
+
+## The nine axes
+
+Three of them decide what the reader sees, three are redundancy, one is
+metadata, two are copy.
+
+<table style={{ borderCollapse: "collapse", width: "100%", margin: "1rem 0" }}>
+  <thead>
+    <tr>
+      <th style={{ textAlign: "left", padding: "0.4rem 0.75rem", borderBottom: "2px solid currentColor", opacity: 0.9 }}>Field</th>
+      <th style={{ textAlign: "left", padding: "0.4rem 0.75rem", borderBottom: "2px solid currentColor", opacity: 0.9 }}>What it controls</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}><code>hue</code></td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>The colour, from a closed set of eight. What kind of state this is.</td>
+    </tr>
+    <tr>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}><code>attention</code></td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}><code>quiet</code> or <code>loud</code>. Whether the row should pull the eye.</td>
+    </tr>
+    <tr>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}><code>filled</code></td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>Whether the silhouette is solid. Answers &quot;is it over?&quot; in grayscale.</td>
+    </tr>
+    <tr>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}><code>silhouette</code></td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}><code>circle</code> / <code>diamond</code> / <code>square</code>.</td>
+    </tr>
+    <tr>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}><code>mark</code></td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>The interior glyph — eleven of them.</td>
+    </tr>
+    <tr>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}><code>label</code></td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>The human-facing name. Sentence case, never the raw enum literal.</td>
+    </tr>
+    <tr>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}><code>tooltip</code></td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>One or two sentences: what this state means and what happens next.</td>
+    </tr>
+    <tr>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}><code>family</code></td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}><code>in-flight</code> / <code>unresolved</code> / <code>terminal</code>. Metadata; nothing renders it.</td>
+    </tr>
+    <tr>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>— <code>literal</code></td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>Not a field: the enum key itself, which <code>createStatusPill</code> passes through.</td>
+    </tr>
+  </tbody>
+</table>
+
+Choosing a hue and choosing a mark are the two decisions that go wrong,
+and the README's two tables are the reference for them — including the
+observation that both axes split on the same question (*who is holding
+this record?*) and are meant to agree. What belongs here is why there are
+so many axes at all.
+
+### Why redundancy, not just colour
+
+Colour alone fails for the roughly 8% of men with a colour-vision
+deficiency, and it fails completely in a screenshot pasted into a
+monochrome ticket — which is how a state reaches a second person most of
+the time. So each state differs in silhouette, interior mark and fill as
+well as hue: three channels, none of them load-bearing on its own.
+
+That redundancy is doing measurable work rather than being a gesture. The
+closest two hues in the system, `neutral` and `expired`, are **ΔE00 8.7**
+apart — inside a 14px glyph the *mark* is carrying much of the job of
+telling them apart, and `expired`'s `clock` against `neutral`'s absence
+of one is what the reader actually resolves.
+
+`filled` is the same argument on a different axis: fill answers "is it
+over?" with no colour at all. A terminal state is solid and its mark
+knocks out of the fill in `--state-mark-knockout`; an in-flight or
+unresolved one is stroked on an empty silhouette. In a grayscale print
+of a table the finished rows are still visibly the finished rows.
+
+<Canvas of={StatusPillStories.Grayscale} />
+
+### `family` is presentational, never authorisation
+
+Nothing in the rendering reads `family`. It drives exactly one predicate,
+`isTerminalStatus`, which answers "should this row stop polling".
+
+Never use it — or anything else in a `StatusMeta` — to decide whether an
+action is permitted. A UI that greys out "cancel" because its own table
+says `terminal` will be wrong the first time the state machine changes
+and nobody remembers the table exists. Propose the action; let the server
+refuse it.
+
+## Three components, one table
+
+<Canvas of={StatusPillStories.EveryState} />
+
+**`StatusPill`** is the canonical representation: glyph, label, attention
+treatment, and optionally the raw literal and a short mono `detail`
+(`failed · 4xx`). It is typically the most-reused component in a console.
+It takes a `StatusMeta`, not a state literal, which is what lets one
+implementation serve every state machine in an application — it replaced
+three hand-written, near-identical pills that differed only in which
+table they indexed and had already drifted (one set `role="img"`, one did
+not; one supported `interactive`, two did not).
+
+**`StateMark`** is the SVG underneath it: silhouette × interior mark ×
+fill, parameterised on the same `StatusMeta`, pure, and `aria-hidden`.
+The accessible name belongs to the pill, which has the words. Below 12px
+it should not be used at all — the interior mark stops resolving and a
+plain dot would be the more honest thing to draw.
+
+**`StateChip`** is deliberately *not* a status pill. It is the generic
+state-toned chip for everything that is coloured by the status vocabulary
+but is not a state machine: a capability flag, a derived verdict, a
+one-word qualifier. It has no glyph and no per-instance `attention` — its
+`tone` *is* the hue.
+
+<Canvas of={StateChipStories.EveryTone} />
+
+Tone comes from the shared `StatusHue` vocabulary rather than a second
+private list, and that is a repair rather than a design. `StateChip` used
+to carry its own four-tone table transcribed by hand from the same tokens
+`HUE_CLASSES` already held — two copies of one mapping, and the chip's
+copy was missing three hues, so a caller wanting `expired` or `parked`
+had no way to ask and reached for `className` instead. That is the shape
+of every drift this system exists to prevent: a second table, slightly
+behind the first.
+
+## Quiet and loud, and what `attention` costs
+
+`attention` is the one axis that is about the *reader's* attention rather
+than the record. Quiet is a glyph and a word. Loud paints the hue's tint
+behind the pill, gives it a border, and hands the 12px label the hue
+itself.
+
+<Canvas of={StatusPillStories.QuietVersusLoud} />
+
+Two of the eight hues are quiet *by construction*: `neutral` and
+`success` declare `transparent` for their own `--state-*-bg` and
+`--state-*-border`. A screen where most rows succeeded should be a column
+of glyphs and words, not a wall of green boxes. `isQuietHue` is the
+predicate, and it lives beside `HUE_CLASSES` because it is a property of
+the hue vocabulary and not of any one surface. Painting the quiet tokens
+as unconditional chrome produces an invisible box, and it has now done so
+four separate times — in `RadioGroup`, `ChipSelect`, `StateChip` and
+`InlineBanner`. A component that needs a box for a quiet hue draws
+ordinary `border-edge` / `bg-surface-2` chrome and keeps only the hue's
+foreground, which is exactly what `StateChip` does now.
+
+The cost of `loud` is contrast budget, and it is measured rather than
+assumed:
+
+- A **quiet** glyph is a non-text graphic, so its bar is 3:1. Across the
+  palette and all four surface steps they run **6.34:1 to 13.65:1**.
+- A **loud** pill's label is 12px text on a composited tint, so its bar
+  is 4.5:1. They run **5.53:1 to 11.71:1**, worst case `expired`, loud,
+  on a hovered row.
+
+Those numbers are current because a gate was extended to find where they
+were not. `contrast.test.ts` originally measured foregrounds on *bare*
+surfaces and said so in its own header. Measuring the light palette over
+its own translucent tint instead found `expired` at **4.27:1** and
+`danger` at **4.36:1** on `--surface-3`, the row-hover fill — both below
+AA, both invisible to the flat check, and invisible to axe as well,
+because no story renders a loud pill on a hovered row. In dark the tint
+lightens the ground under an already-light foreground and the ratios stay
+comfortable; in light it darkens the ground under an already-dark one,
+which is why the same palette logic does not transfer between themes.
+
+`StatusPill` makes one more concession to the tint: once a pill is loud,
+its `literal` and `detail` step from `--subtle-foreground` up to
+`--muted-foreground`. `subtle` does not reach 4.5:1 on a tint over
+anything lighter than the page — 4.36:1 over a card, 3.85:1 over a
+hovered row — and the value that *would* clear AA on a tint sits ΔE 2
+from `--muted-foreground`, which collapses the three-tier text ladder
+into two. So the tier changes with the background instead of the token
+changing for everyone.
+
+### `pending` is a border, not opacity
+
+The optimistic-transition treatment used to be `opacity-60`, which took
+the pill's own text to **2.71:1** against the page — below AA, and
+unreadable at exactly the moment a reader most wants to know what is
+happening. The opacity that keeps that text at AA is 0.90, by which point
+the dimming conveys nothing. So `pending` is a dashed border at full text
+contrast, and a quiet pill grows the same box a loud one has, because
+otherwise `pending` would be invisible on the majority of pills.
+
+Use it only for a transition *this client has itself just requested*.
+Never for "we think this is probably the state".
+
+<Canvas of={StatusPillStories.DetailLiteralAndPending} />
+
+## The accessible name is content, not an attribute
+
+This is the part of the status system most worth reading, because the
+bug it describes passes every automated check there is.
+
+`StatusPill` used to render its non-interactive case as `role="img"` with
+a synthetic `aria-label` built from `literal` and `meta.label`. Per the
+`img` role's own semantics that makes the whole subtree a single opaque
+node. So once `detail` and `showLiteral`'s mono text were added, both
+rendered visually and were announced to **nobody** — the `aria-label`
+never grew to include them. `detail` is "4xx", the HTTP code that is the
+entire reason a reader is looking at a failed pill. The interactive case
+was worse in a sharper way: `aria-label` on a focusable element overrides
+content-derived naming outright, so an `interactive` pill's `detail` was
+unreachable even though nothing there claimed a subtree-flattening role
+at all.
+
+The fix drops the role and the synthetic label entirely, and lets the
+name fall out of the pill's actual content the way a `<span>` or
+`<button>` with visible text normally works. `StateMark` is already
+`aria-hidden`; the label, literal and detail spans are read in render
+order; and because `literal` is documented as always part of the name
+whether or not it is *visible*, an `sr-only` span carries it on the
+complementary path.
+
+The alternative — keep `role="img"` and fold everything into a bigger
+`aria-label` — does not survive contact with the API: `detail` is a
+`ReactNode`, arbitrary markup, and there is no reliable way to serialise
+arbitrary children into an attribute. Content-based naming has no such
+limit.
+
+### Why the test asserts the mechanism
+
+**axe reports zero violations on both the broken and the fixed version.**
+Every rule it has is satisfied either way: the element has a role, the
+role has a name, the name is non-empty. "The name omits a fact the
+sighted reader can see" is not a rule, and it cannot be one in general —
+only the component's own contract says `detail` belongs in the name.
+
+So `src/lib/a11y.test.tsx` covers this path twice: once structurally, as
+an axe fixture, and once as a contract, by asserting the *mechanism*
+rather than the outcome — no flattening role, no synthetic label, and the
+two pieces of text reachable as content.
+
+That block is mutation-checked rather than merely green. Restoring
+`role="img"` and the synthetic `aria-label` fails exactly the first two
+cases in it and **nothing else in the suite** — every axe fixture,
+including the `StatusPill` ones, stays green. That measurement is the
+claim, not a prediction about it.
+
+## The gap this system does not close
+
+`meta.tooltip` — the full sentence saying what a state means — is carried
+only by a native `title`. That is mouse-hover-only and reaches neither
+keyboard nor touch users, and it is left that way deliberately rather
+than by omission. `aria-describedby` content is announced automatically
+alongside the name, not on request, so wiring a sentence per state into
+the most-rendered component in a console would make every screen-reader
+pass over a table read a paragraph per row.
+
+What makes that acceptable is the redundancy the rest of this page is
+about: **the state is never solely carried by the tooltip.** Glyph, hue,
+label and `detail` already say what happened through independent
+channels. The tooltip adds the *explanation*, and losing an explanation
+is a smaller failure than losing the fact.
+
+It is still a gap. A real fix is an on-demand disclosure a keyboard or
+touch user can actually reach — this package's own `Popover`, opened on
+focus rather than only on hover — and it is follow-up work, not something
+to bolt onto every row silently.

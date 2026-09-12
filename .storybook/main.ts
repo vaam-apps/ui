@@ -17,7 +17,12 @@ import tailwindcss from "@tailwindcss/vite";
  * makes it visible in the same diff.
  */
 const config: StorybookConfig = {
-  stories: ["../src/**/*.stories.@(ts|tsx)"],
+  // `.mdx` alongside the stories: the long-form documentation lives in
+  // `src/docs/`, next to the code it describes rather than in a wiki that
+  // ages out of sight. Same reasoning as colocating a story with its
+  // component — a doc that contradicts the source should do it in a diff
+  // somebody reviews.
+  stories: ["../src/**/*.mdx", "../src/**/*.stories.@(ts|tsx)"],
   // `@storybook/addon-essentials` does not exist past 8.6.14; `addon-docs`
   // replaces its docs half, and the controls/actions/viewport panels are
   // core Storybook 9+ features rather than addons. Same set the sibling

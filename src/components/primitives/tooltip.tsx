@@ -57,9 +57,40 @@ export interface TooltipProps {
   children: ReactNode;
 }
 
+/**
+ * The four side classes, written out, because a template literal is
+ * invisible to Tailwind.
+ *
+ * This was `` `tooltip-${position}` `` — a class name that appears
+ * nowhere in the source as text. Tailwind v4 generates only the
+ * utilities it can *see*, so whether `tooltip-bottom` exists in the
+ * output depended on whether something else in the scanned tree happened
+ * to spell it. Measured in a real build where nothing did: the stylesheet
+ * contained `.tooltip`, `.tooltip-content` and `.tooltip-open` and
+ * nothing else, and all four bubbles in the `Positions` story rendered
+ * *above* their trigger — every one of them, silently, with the prop
+ * apparently accepted.
+ *
+ * It is the same failure the README warns consumers about for a missing
+ * `@source` line: no error, no warning, just styling that is not there.
+ * A lookup makes the four names literal text in this file, so they are
+ * always generated and the prop cannot quietly stop working between
+ * builds.
+ */
+const POSITION_CLASS = {
+  top: "tooltip-top",
+  bottom: "tooltip-bottom",
+  left: "tooltip-left",
+  right: "tooltip-right",
+} as const satisfies Record<NonNullable<TooltipProps["position"]>, string>;
+
 export function Tooltip({ label, position = "top", className, children }: TooltipProps) {
   return (
-    <div className={cn("tooltip", `tooltip-${position}`, className)} data-tip={label} title={label}>
+    <div
+      className={cn("tooltip", POSITION_CLASS[position], className)}
+      data-tip={label}
+      title={label}
+    >
       {children}
     </div>
   );

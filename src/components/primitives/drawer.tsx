@@ -273,7 +273,10 @@ function DetailDrawerContent({
             </div>
             {/* `-m-1 p-1`: same hit-area fix as `dialog.tsx`'s close button
                 (§ that file's own `DialogContent` comment) — grows the
-                clickable box to roughly 32×32px without moving the 16px
+                clickable box to **24×24px** — 16px icon plus 4px each side,
+                not the 32×32 this said before it was measured, and
+                exactly WCAG 2.2 §2.5.8's floor. `dialog.tsx` shares the
+                pattern and the number. Without moving the 16px
                 icon itself, so the two close buttons agree. `rounded-full`
                 and the `hover:bg-surface-3` affordance agree with it too —
                 see that comment for why (icon-only controls are circular;
