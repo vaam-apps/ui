@@ -103,7 +103,7 @@ import { createStatusPill, defineStatusSystem } from "@vaam-apps/ui";
 export const ORDER_STATUS = defineStatusSystem({
   pending: {
     family: "in-flight", silhouette: "circle", mark: "pie-1",
-    hue: "neutral", filled: false, attention: "quiet",
+    hue: "progress", filled: false, attention: "quiet",
     label: "Pending", tooltip: "Awaiting payment.",
   },
   paid: {
@@ -143,6 +143,46 @@ Three things about it are deliberate:
 - **`unresolved` is a first-class outcome**, distinct from success and
   failure. Systems that model only two outcomes end up reporting "we
   never learned what happened" as whichever is more convenient.
+
+### Mapping an in-flight state
+
+Every state machine has a state that is *running and not yet resolved* —
+a payment the rail has, a job a worker claimed, a deploy underway, a
+webhook mid-delivery. It maps like this, and the two adjacent hues are
+both wrong for it:
+
+```tsx
+processing: {
+  family: "in-flight", silhouette: "circle", mark: "pie-2",
+  hue: "progress", filled: false, attention: "quiet",
+  label: "Processing", tooltip: "The rail has the charge. Nothing is decided yet.",
+},
+```
+
+- **`hue: "progress"`**, not `uncertain`. `uncertain` means the outcome
+  is unknowable — sent, and the answer never came back. A payment that is
+  merely *in flight* is entirely normal, and colouring it `uncertain`
+  gives an operator scanning for real problems a false positive on every
+  healthy row.
+- **`hue: "progress"`**, not `neutral` either. `neutral` is for a state
+  where nothing is happening and nothing is expected to — a queued item
+  nobody has claimed, a refunded order that is over. An in-flight record
+  has to stay tellable-apart from a settled one in a peripheral scan of a
+  hundred thousand rows, which is the scan this library exists for.
+- **`attention: "quiet"`.** The hue makes the row *identifiable*; the
+  attention level makes it *demand a human*. An in-flight payment demands
+  nobody. Go `loud` on a detail screen showing one record, not down a
+  column.
+- **`filled: false`, and a `pie-*` mark.** Fill answers "is it over?" on
+  its own, in grayscale and in a monochrome screenshot — the redundancy
+  that keeps hue from being load-bearing. `pie-1`/`pie-2`/`pie-3` are the
+  progress wedge; use them in order if your machine has several in-flight
+  states, and `ring` for one that is handed off and awaiting an external
+  answer.
+
+`family: "in-flight"` is metadata, not a channel — nothing in the
+rendering reads it. It drives `isTerminalStatus`, which answers "should
+this row stop polling", and that is all it does.
 
 ## Money
 

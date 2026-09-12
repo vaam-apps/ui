@@ -1,5 +1,70 @@
 # Changelog
 
+## Unreleased
+
+### `StatusHue` gains `progress` (minor, additive)
+
+**The hue axis had no value for "running, outcome not yet known"** — the
+one state every state machine spends most of its time in. Of the seven
+hues, five meant trouble or stasis and one (`success`) was terminal, so
+an in-flight state had to borrow `neutral`: the same hue this package's
+own README gave a *refunded* order. "Still moving" and "over, and there
+is nothing to see" are opposites on the only question an operator is
+asking, and they rendered identically.
+
+The two workarounds are both wrong, which is what made this a gap rather
+than a preference. `uncertain` means the outcome is *unknowable* and puts
+a "something may be wrong" marker on every healthy in-flight row — a
+false positive a hundred thousand times over, on exactly the scan an
+operator console exists for. `neutral` understates it, and an in-flight
+record stops being tellable apart from a settled one.
+
+`progress` is `#67e8f9` (cyan-300), with its 400-level neighbour at
+10%/28% for the fill and border — the construction every tinted sibling
+here already uses. Chosen by measurement, not by eye:
+
+- Nearest status sibling is `neutral` at ΔE2000 25.3; `success` is 31.0
+  away. Teal-300 was rejected at 16.9 from `success` — near enough to be
+  the same colour inside a 14px glyph, and "processing" against
+  "succeeded" is the one pair on a payments table that must never be
+  confusable. That is the same failure `--state-warning-fg`'s own comment
+  records from the first value tried for it.
+- Contrast measured on a **rendered** pill, not from the class names:
+  11.71:1 loud on `base-100` and 10.90:1 on `base-200` (the demanding
+  case, where the label is composited over the hue's own 10% tint),
+  13.58:1 / 12.93:1 quiet. Second-highest of the eight hues, against
+  `uncertain` 11.64, `warning` 10.28, `expired` 6.89.
+- **This sits close to the theme's own "blue is selection-only, never a
+  status hue" rule, and is a judgement call a maintainer may want to
+  overrule.** The cyan gap is 71° of Lab hue and ΔE2000 32.2 from the
+  selection ring's `#5b8def`, wider than the `warning`/`uncertain`
+  separation this theme already accepts, and `--ring` only ever paints a
+  2px outline offset outside a focused element — never a glyph or text.
+
+Nothing existing changes colour. `StatusHue` is a union, so a consumer's
+own `Record<StatusHue, …>` — anyone mirroring `HUE_CLASSES` — needs the
+new key; a `StatusSystem` table does not.
+
+- `HUE_CLASSES` gains the matching `state-progress-*` entry, and
+  `theme.css` the `--state-progress-{fg,bg,border}` trio plus its
+  `@theme inline` aliases.
+- New `StatusPill` story **EveryHue**: every hue × quiet/loud × page and
+  card. This is the surface the contrast numbers above were measured on.
+- `StateChip`'s story now derives its tone list from `HUE_CLASSES`
+  instead of retyping it. That literal had already fallen behind the
+  vocabulary once.
+- New `src/components/status/status-tokens.test.ts`. `HUE_CLASSES` is a
+  `Record<StatusHue, …>`, so the compiler catches a *missing* hue but not
+  a *wrong* one — and a hue is added by copying the block above it, so
+  the natural bug is an entry keyed `progress` whose classes still say
+  `neutral`. It compiles, satisfies the existing token guard, and renders
+  a plausible grey. The tests pin that a hue's classes are its own name,
+  and that each `--state-<hue>-*` is declared with a value rather than
+  only aliased in `@theme inline` — the half `theme-tokens.test.ts`
+  cannot see, where the utility is emitted but resolves to nothing.
+- The README documents the in-flight mapping concretely, so a consumer
+  does not have to make this choice by guessing.
+
 ## 0.1.1
 
 **The 0.1.0 tarball shipped the whole source tree** — `dist/` plus a
