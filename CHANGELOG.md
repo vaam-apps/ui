@@ -2,6 +2,94 @@
 
 ## Unreleased
 
+### The nav has one in-flow shape, and the rail turns on a phone
+
+**The bug:** at 1024–1279px the floating rail vanished and a full-height
+strip appeared below the page content instead. `SideNav` stopped being
+`fixed` at `lg` and became an in-flow flex child — so it landed wherever
+it happened to sit in the caller's DOM, which in a layout built for a
+rail that floats is "after everything".
+
+That band is gone, and its removal is the fix rather than a
+simplification. It was the only shape that needed a flex-row parent while
+its neighbours needed none, so **no single layout could satisfy both**. A
+caller had to build one for the floating rail and another for the icon
+rail, and get the crossover exactly right, to avoid what the bug report
+showed.
+
+Now only one shape takes space out of the page — the sidebar — and
+everything narrower floats over it:
+
+- **Below 640px:** a horizontal pill along the bottom. Four destinations
+  and a menu for the rest. A 52px column is 14% of a 375px screen,
+  permanently, down the side the writing starts on, and it sits where a
+  thumb cannot reach — both are problems with the *axis*, so the rail
+  turns rather than shrinks.
+- **640–1279px:** the vertical floating rail.
+- **≥1280px:** the sidebar, in flow — or, with the new **`collapsed`**
+  prop, the vertical rail again. Collapsing does not mean "a narrower
+  sidebar": the sidebar stops existing and the rail takes over, which is
+  the only version that actually gives the content its width back.
+
+`smallScreen="off-canvas"` is unchanged, icon-rail band included, for a
+caller who already owns a drawer and wants every band in flow.
+
+Three things found by building it rather than by reasoning about it:
+
+- **The tiny rail's tap targets were 16×32px.** `NavLink`'s rail variant
+  is `px-0` and takes its width from the parent, which works in the
+  vertical rail because `items-stretch` hands it the full column. In a
+  horizontal row there is nothing to stretch to, so it collapsed to the
+  glyph — on the one form factor where that matters most. Measured, not
+  noticed: they are an explicit 44px now, and so is the menu button.
+- **The rails had no landmark.** They were `<div>`s portalled to
+  `document.body`, and below `sm` the in-flow `<nav>` is `display: none`
+  — so a phone got its navigation outside any landmark at all. Found by
+  extending the a11y gate to audit `document.body`, which it had to do
+  because a portal escapes the host every other fixture is audited
+  inside. All three shapes are `<nav aria-label="Primary">` now.
+- That made axe report `landmark-unique` instead, which **is** a false
+  positive: only one of the three is ever displayed, and jsdom applies no
+  CSS. That one rule is disabled for that one block, with the reason
+  written down, and the invariant it would have checked is pinned on the
+  breakpoint gates themselves in `side-nav.portal.test.tsx`.
+
+**`DropdownMenuLinkItem`** is new, and exported. `DropdownMenuItem` is a
+`<button>`, which is right for a command and wrong for a destination: a
+menu of places built from buttons silently loses middle-click,
+cmd-click, "open in new tab" and "copy link address". The overflow items
+must not be worse links for having landed fifth in the order.
+
+### The skeleton aurora actually moves now
+
+It was animating the whole time — 23s and 31s, `ease-in-out`, ±12%. That
+is real motion and it is also indistinguishable from a still image at any
+timescale a person watches a loading state for. The periods are 9s and
+13s now, the amplitude is wider, and the stack visibly churns.
+
+Two things the wider motion broke, both caught by watching the render:
+
+- **Hard diagonal edges swept across rows.** The drift layers were twice
+  their element (`inset: -50%`), sized for the old amplitude; the new one
+  walked the layer's own straight edge into frame. They are three times
+  the element now, and the comment carries the arithmetic so the next
+  amplitude change has a number to check against.
+- **`rotate()` and `skewY()` had to go, for geometric reasons rather than
+  taste.** A skeleton is a very wide, very short box — the shipped stack
+  is 576×44, 13:1. Rotating its layer by θ sweeps the long edge
+  vertically by `(layerWidth / 2) × sin θ`: 120px at 8°, against 44px of
+  overhang. Widening the inset cannot fix it in general, because the
+  requirement scales with the element's aspect ratio, which a stylesheet
+  cannot know — `1.5 × boxWidth × sin θ ≤ boxHeight` caps a 13:1 box
+  under 3°. `skewX()` has the mirrored maths and is safe on exactly the
+  shape that breaks the other two, so the chaos is translate + scale +
+  `skewX` across eight irregular stops on coprime periods.
+
+The `.aurora-mesh` panel background is deliberately **not** animated. It
+sits behind numbers people are reading; the skeleton stands in for
+content that is not there yet, which is the whole reason motion is
+appropriate in one and not the other.
+
 ### Three layout bugs that needed a scrollbar to see
 
 - **A tall `Dialog` hid its own footer.** `DialogPanel` had no `max-h`

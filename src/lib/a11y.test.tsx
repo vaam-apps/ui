@@ -23,6 +23,7 @@ import { Input } from "../components/primitives/input";
 import { Pagination } from "../components/primitives/pagination";
 import { Progress } from "../components/primitives/progress";
 import { RadioGroup } from "../components/primitives/radio-group";
+import { SideNav } from "../components/primitives/side-nav";
 import { Spinner } from "../components/primitives/spinner";
 import { SwitchField } from "../components/primitives/switch";
 import {
@@ -506,6 +507,103 @@ describe("StatusPill's accessible name is built from content", () => {
       const svg = host.querySelector("svg");
       expect(svg).not.toBeNull();
       expect(svg?.getAttribute("aria-hidden")).toBe("true");
+    });
+  });
+});
+
+/**
+ * `SideNav` needs its own block, because the fixture list above cannot
+ * reach it.
+ *
+ * Every other component is audited inside the `<main>` host `mount`
+ * creates. `SideNav`'s two floating rails are `createPortal`ed to
+ * `document.body` — deliberately, so their `fixed` positioning survives a
+ * transformed ancestor — which puts them outside that host. Adding
+ * `SideNav` to `FIXTURES` would therefore have audited the in-flow
+ * sidebar and silently skipped both rails: a fixture that passes by
+ * looking at the wrong half of the component, which is worse than no
+ * fixture, because it reads as coverage.
+ *
+ * So these audit `document.body` instead. What they are actually
+ * protecting:
+ *
+ * - The rail links are icon-only. Their accessible name comes from an
+ *   `sr-only` span, with the glyph `aria-hidden` and the visible `title`
+ *   on an `aria-hidden` wrapper — a chain with several ways to go quiet.
+ * - The tiny-screen rail's overflow control is a `<button>` whose only
+ *   content is an icon, so its name is an `aria-label` and nothing else.
+ * - Both rails are in the DOM at once, so any duplicate-`id` bug in the
+ *   menu wiring shows up here and nowhere else.
+ */
+describe("SideNav, including the portalled rails", () => {
+  const Icon = () => null;
+  const NAV = {
+    topItem: { label: "Dashboard", href: "/", icon: Icon },
+    groups: [
+      {
+        label: "Messaging",
+        items: [
+          { label: "Composer", href: "/composer", icon: Icon },
+          { label: "Messages", href: "/messages", icon: Icon },
+          { label: "Providers", href: "/providers", icon: Icon },
+          { label: "Routes", href: "/routes", icon: Icon },
+        ],
+      },
+    ],
+    footerItems: [{ label: "Settings", href: "/settings", icon: Icon }],
+    currentPath: "/messages",
+  };
+
+  /**
+   * `landmark-unique` is disabled here, and only here.
+   *
+   * All three shapes — the in-flow sidebar and the two rails — are
+   * `<nav aria-label="Primary">`, and **exactly one is ever displayed**:
+   * their breakpoint gates are complements. jsdom applies no CSS, so
+   * every one of them is "visible" to axe, and it reports three
+   * identically-named landmarks that no browser will ever show at once.
+   *
+   * That is the definition of a false positive, and the rule this file's
+   * own doc sets is that a gate which cries wolf gets switched off
+   * wholesale — so the narrow rule is switched off instead of the gate.
+   * The invariant it would otherwise be checking is not dropped: it is
+   * pinned in `side-nav.portal.test.tsx`, on the class gates themselves,
+   * which is the only place it is observable without a real layout.
+   *
+   * Everything else stays on. `region` in particular — the rule that
+   * caught the rails being plain `<div>`s outside any landmark, which is
+   * why they are `<nav>` at all — is exactly the check this block exists
+   * for, and disabling `landmark-unique` does not weaken it.
+   */
+  const SIDE_NAV_AXE_OPTIONS: axe.RunOptions = {
+    ...AXE_OPTIONS,
+    rules: { ...AXE_OPTIONS.rules, "landmark-unique": { enabled: false } },
+  };
+
+  async function auditBody(node: React.ReactElement): Promise<axe.Result[]> {
+    return mount(node, async () => (await axe.run(document.body, SIDE_NAV_AXE_OPTIONS)).violations);
+  }
+
+  it.each([
+    ["floating (default)", <SideNav key="a" {...NAV} />],
+    ["collapsed", <SideNav key="b" {...NAV} collapsed />],
+    ["off-canvas", <SideNav key="c" {...NAV} smallScreen="off-canvas" />],
+  ])("%s", async (_name, element) => {
+    const violations = await auditBody(element);
+    expect(violations, `\n${describeViolations(violations)}\n`).toHaveLength(0);
+  });
+
+  it("names every rail link and the overflow control", async () => {
+    await mount(<SideNav {...NAV} />, () => {
+      for (const rail of document.querySelectorAll("[data-floating-rail]")) {
+        for (const link of rail.querySelectorAll("a")) {
+          // Icon-only: the name has to come from somewhere that is not
+          // the visible content, because there is no visible text.
+          expect(link.textContent?.trim()).not.toBe("");
+        }
+      }
+      const more = document.querySelector('[data-floating-rail-axis="horizontal"] button');
+      expect(more?.getAttribute("aria-label")).toBe("More destinations");
     });
   });
 });

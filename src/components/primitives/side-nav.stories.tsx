@@ -121,8 +121,22 @@ const meta = {
     // band no story ever rendered.
     viewport: {
       options: {
+        tiny: {
+          name: "Tiny — horizontal rail (375px)",
+          styles: { width: "375px", height: "720px" },
+        },
         offCanvas: { name: "Off-canvas (390px)", styles: { width: "390px", height: "720px" } },
-        iconRail: { name: "Icon rail (1100px)", styles: { width: "1100px", height: "640px" } },
+        medium: {
+          name: "Medium — floating rail (900px)",
+          styles: { width: "900px", height: "640px" },
+        },
+        // The band that used to draw an in-flow 64px icon rail, kept as a
+        // named viewport because it is where the old shape lived and is
+        // the first place anyone will look to check it is really gone.
+        iconRail: {
+          name: "Was icon rail — now floating (1100px)",
+          styles: { width: "1100px", height: "640px" },
+        },
         fullSidebar: {
           name: "Full sidebar (1440px)",
           styles: { width: "1440px", height: "640px" },
@@ -132,13 +146,28 @@ const meta = {
     docs: {
       description: {
         component:
-          "Three bands, all of them plain CSS — no `useMediaQuery`, no client-only mount, " +
-          "so the whole nav is in the server-rendered HTML on first paint. Below 1024px it " +
-          'is, by default, a floating icon rail detached from the edge (`smallScreen="floating"`); ' +
-          'the opt-in `smallScreen="off-canvas"` restores the original full-label accordion tree ' +
-          "for a caller that already owns a drawer. From 1024px it is a 64px icon rail; from " +
-          "1280px a 256px sidebar with labels — unaffected by `smallScreen` either way. Resize " +
-          "the preview to cross them.",
+          "**Only one shape takes space out of the page: the sidebar.** Everything narrower " +
+          "floats over the content, which is what lets a caller build one layout instead of " +
+          "one per band.\n\n" +
+          "- **Below 640px** — a horizontal pill along the bottom: four destinations and a menu " +
+          "for the rest. A 52px column costs 14% of a 375px screen and sits where a thumb " +
+          "cannot reach, so the rail turns rather than shrinks.\n" +
+          "- **640–1279px** — the vertical floating rail, detached from the edge.\n" +
+          "- **1280px and up** — a 256px sidebar with labels, in flow. Pass `collapsed` and " +
+          "this band uses the vertical rail too, which is the only way to actually give the " +
+          "content its width back.\n\n" +
+          "There used to be a fourth band: an in-flow 64px icon rail from 1024–1279px. It is " +
+          "gone, and its removal is the point rather than a simplification. It was the one " +
+          "shape that needed a flex-row parent while its neighbours needed none, so a caller " +
+          "whose layout suited the floating rail got, at exactly 1024px, a full-height strip " +
+          "wherever `SideNav` happened to sit in their DOM — below the content, usually. " +
+          "One layout could not satisfy both.\n\n" +
+          'The opt-in `smallScreen="off-canvas"` is unchanged and keeps the original ' +
+          "full-label accordion tree, plus that icon-rail band, for a caller who already owns " +
+          "a drawer and wants every band in flow.\n\n" +
+          "All of it is plain CSS — no `useMediaQuery`, no viewport read — so the bands are " +
+          "server-rendered. The one exception is the floating rails themselves, which are " +
+          "portalled to `document.body` and therefore appear only after hydration.",
       },
     },
   },
@@ -211,33 +240,106 @@ export const OffCanvasDrawer: Story = {
 };
 
 /**
- * The default below-`lg` shape: a floating icon rail, detached from the
- * edge, layered over the page instead of hidden behind a hamburger the
- * caller has to build. Rendered over a page-like stage — a heading, some
- * body copy, a couple of content blocks — rather than an empty canvas,
- * because the rail is `fixed` and the whole point is that it floats over
- * real content instead of reserving a lane for itself.
+ * The default shape from 640px up to the sidebar: a floating icon rail,
+ * detached from the edge, layered over the page instead of hidden behind
+ * a hamburger the caller has to build.
  *
- * Hover (or focus) an icon for its native-`title` label — the same
- * mechanism the `1024–1279px` icon rail relies on, and for the same
- * reason: nothing here is a CSS tooltip, so nothing here can be clipped.
+ * **Resize this story across every band.** That instruction used to be a
+ * trap: the stage below was a plain block, which suited a rail that
+ * floats and broke the instant the component became an in-flow box at
+ * 1024px — the rail appeared as a full-height strip *below* all the
+ * content, because that is where `SideNav` sits in this DOM. The stage
+ * is a flex row now, and the in-flow band it was failing at no longer
+ * exists: nothing between 640px and 1280px takes space out of the page
+ * any more.
+ *
+ * The content column carries `xl:pl-0 pl-16` rather than a fixed inset,
+ * because which side the rail is on changes at 640px — below that it is
+ * along the bottom and the left gutter would be reserving space for
+ * nothing.
+ *
+ * Hover (or focus) an icon for its native-`title` label: nothing here is
+ * a CSS tooltip, so nothing here can be clipped by an ancestor.
  */
 export const FloatingRail: Story = {
-  globals: { viewport: { value: "offCanvas" } },
+  globals: { viewport: { value: "medium" } },
   render: (args) => (
-    <div className="h-[45rem] overflow-y-auto bg-base-100 p-6">
-      <div className="flex flex-col gap-4 pl-16">
+    <div className="flex h-[32rem] overflow-hidden rounded-md border border-edge">
+      <SideNav {...args} />
+      <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto bg-base-100 p-6 pl-16 sm:pl-20 xl:pl-6">
         <div className="h-7 w-48 rounded-sm bg-surface-3" />
         <div className="h-4 w-full max-w-xs rounded-sm bg-surface-2" />
-        <div className="h-4 w-full max-w-[200px] rounded-sm bg-surface-2" />
-        <div className="mt-4 h-40 rounded-md bg-surface-2" />
-        <div className="h-24 rounded-md bg-surface-2" />
+        <div className="mt-2 h-40 rounded-md bg-surface-2" />
         <div className="h-24 rounded-md bg-surface-2" />
         <p className="text-body text-muted-foreground">
-          The rail sits over this content — it is `fixed`, not laid out in the column above.
+          The rail floats over this column — it is `fixed`, not laid out beside it. Cross 640px and
+          1280px: horizontal pill, vertical rail, then a real sidebar that does take a lane.
         </p>
       </div>
+    </div>
+  ),
+};
+
+/**
+ * Below 640px the rail turns: a horizontal pill along the bottom, four
+ * destinations, and everything else behind the menu on its right.
+ *
+ * The fixture has more destinations than slots on purpose — open the menu
+ * and note that its rows are real anchors, so middle-click and
+ * "open in new tab" still work on them. A destination should not become a
+ * worse link for having landed fifth in the order.
+ *
+ * The menu button takes the active treatment when the current page is one
+ * of the hidden ones, so the rail never shows nothing as current.
+ */
+export const TinyScreenRail: Story = {
+  globals: { viewport: { value: "tiny" } },
+  // `/routes` is deliberately one of the *overflowed* destinations in this
+  // fixture, so the menu button carries the active treatment and the
+  // story demonstrates that rather than describing it.
+  args: { currentPath: "/routes" },
+  render: (args) => (
+    <div className="flex h-[40rem] overflow-hidden bg-base-100">
       <SideNav {...args} />
+      <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-5 pb-24">
+        <div className="h-7 w-40 rounded-sm bg-surface-3" />
+        <div className="h-4 w-full rounded-sm bg-surface-2" />
+        <div className="h-32 rounded-md bg-surface-2" />
+        <div className="h-32 rounded-md bg-surface-2" />
+        <p className="text-body text-muted-foreground">
+          `pb-24` on this column is the caller's job, not the rail's: the rail is `fixed`, so it
+          cannot reserve its own space, and content that scrolls under it would otherwise end
+          beneath the pill.
+        </p>
+      </div>
+    </div>
+  ),
+};
+
+/**
+ * `collapsed` at desktop width. The sidebar is the only shape that takes
+ * a lane, so collapsing it means handing the band to the floating rail —
+ * not drawing a narrower sidebar. Compare with `FullSidebar`: the content
+ * column here starts at the page edge.
+ *
+ * The prop is a boolean rather than a breakpoint because it is a
+ * preference, not a measurement. The caller owns it, persists it, and
+ * usually puts a toggle beside it.
+ */
+export const CollapsedOnDesktop: Story = {
+  globals: { viewport: { value: "fullSidebar" } },
+  args: { collapsed: true },
+  render: (args) => (
+    <div className="flex h-[32rem] overflow-hidden rounded-md border border-edge">
+      <SideNav {...args} />
+      <div className="flex min-w-0 flex-1 flex-col gap-4 bg-base-100 p-6 pl-20">
+        <div className="h-7 w-64 rounded-sm bg-surface-3" />
+        <div className="h-4 w-96 rounded-sm bg-surface-2" />
+        <div className="mt-2 h-40 rounded-md bg-surface-2" />
+        <p className="text-body text-muted-foreground">
+          No 256px lane — the rail floats, and the content has the width back.
+        </p>
+      </div>
     </div>
   ),
 };

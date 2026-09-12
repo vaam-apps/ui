@@ -1,11 +1,17 @@
 "use client";
 
 import { Disclosure, DisclosureButton, DisclosurePanel } from "@headlessui/react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, MoreHorizontal } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "../../lib/cn";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLinkItem,
+  DropdownMenuTrigger,
+} from "./dropdown-menu";
 
 /**
  * The console's information architecture (console-redesign.md §4), as data.
@@ -90,6 +96,23 @@ export interface SideNavProps {
    * it rather than float over it.
    */
   smallScreen?: "floating" | "off-canvas" | undefined;
+  /**
+   * Collapses the `≥1280px` sidebar into the same floating rail the
+   * narrower bands already use.
+   *
+   * The sidebar is the only shape in this component that takes space out
+   * of the page — every other band floats over it. So "collapsed" here
+   * does not mean "the sidebar, narrower": it means the sidebar stops
+   * existing and the rail takes over, which is the one change that
+   * actually gives the content its width back.
+   *
+   * This is a JS boolean rather than a breakpoint because it is a
+   * *preference*, not a measurement — the caller owns it, persists it,
+   * and usually puts a toggle next to it. It only means anything in the
+   * default `smallScreen="floating"` mode; `"off-canvas"` has its own
+   * in-flow tree at every width and ignores it.
+   */
+  collapsed?: boolean | undefined;
   className?: string;
 }
 
@@ -250,12 +273,18 @@ function NavRow({
         variant="labelled"
         className={cn(smallScreen === "off-canvas" ? "flex" : "hidden", "lg:hidden xl:flex")}
       />
+      {/* The in-flow `1024–1279px` icon rail is an off-canvas-mode shape
+          only. In the default floating mode that band is served by the
+          portalled rail instead — see `SideNav`'s own doc for the band
+          table and why the in-flow version had to go: it is the one
+          shape that needs a flex-row parent, and a caller cannot build a
+          layout that satisfies both it and a rail that floats. */}
       <NavLink
         item={item}
         active={active}
         dim={dim}
         variant="rail"
-        className="hidden lg:flex xl:hidden"
+        className={smallScreen === "off-canvas" ? "hidden lg:flex xl:hidden" : "hidden"}
       />
     </>
   );
@@ -432,11 +461,13 @@ function FloatingRail({
   groups,
   footerItems,
   currentPath,
+  collapsed,
 }: {
   topItem: NavItem;
   groups: NavGroup[];
   footerItems: NavItem[];
   currentPath: string;
+  collapsed: boolean;
 }) {
   // No group headers survive at this width (see doc comment above), so
   // there is nothing left to group by — every group's rows become one
@@ -444,7 +475,11 @@ function FloatingRail({
   const flatGroupItems = groups.flatMap((group) => group.items);
 
   return (
-    <div
+    // A `<nav>` for the same reason `HorizontalRail` is one: between
+    // `sm` and the sidebar, this pill is the navigation and the in-flow
+    // `<nav>` is `display: none`.
+    <nav
+      aria-label="Primary"
       // A stable hook, not a test-only wart. This subtree is portalled to
       // `document.body`, so it is the one part of `SideNav` a caller
       // cannot reach through the element they rendered — `side-nav.portal.test.tsx`
@@ -460,7 +495,15 @@ function FloatingRail({
         // The one deliberate exception to "borders, not shadows" — see
         // this function's own doc comment for why.
         "shadow-[var(--shadow-popover)]",
-        "lg:hidden",
+        // Vertical rail band: `640px` up to wherever the sidebar takes
+        // over. Below `sm` the horizontal rail replaces it — a 52px
+        // column down the side of a 375px phone spends 14% of the
+        // width on chrome, and does it in the thumb's dead zone.
+        "hidden sm:flex",
+        // Collapsed, the sidebar never renders, so this rail is the
+        // navigation at every width above `sm` — including `≥1280px`,
+        // where it would otherwise hand over.
+        collapsed ? "sm:flex" : "xl:hidden",
       )}
     >
       <NavLink item={topItem} active={isActive(topItem.href, currentPath)} variant="rail" />
@@ -486,7 +529,161 @@ function FloatingRail({
           ))}
         </>
       )}
-    </div>
+    </nav>
+  );
+}
+
+/** How many destinations the horizontal rail shows before the rest go
+ * behind the overflow menu. Four, and the number is a thumb measurement
+ * rather than a taste one: five 44px targets (four slots plus the menu
+ * button), four 4px gaps and the pill's own 12px of padding come to
+ * 248px. At 375px — the narrowest phone this library targets — that
+ * leaves the rail visibly detached from both edges. Five slots would be
+ * 292px, which still fits but reads as a bar rather than a pill, and six
+ * only fits by shrinking the targets below 44px, which is the one
+ * dimension not available to trade. */
+const HORIZONTAL_RAIL_SLOTS = 4;
+
+/**
+ * The tiny-screen shape: a horizontal pill along the bottom, four
+ * destinations and a menu for the rest.
+ *
+ * # Why the vertical rail could not simply get narrower
+ *
+ * A 52px column is 14% of a 375px viewport, permanently, down the side
+ * the writing starts on — and it sits where a thumb cannot comfortably
+ * reach on a phone held one-handed. Both problems are about the *axis*,
+ * not the width, so the fix is to turn the rail rather than shrink it.
+ * Along the bottom it costs height in the region every mobile OS already
+ * reserves for chrome, and it lands under the thumb.
+ *
+ * # Why four, and why a menu rather than scrolling
+ *
+ * The vertical rail scrolls once it outgrows `max-h-[80vh]`, and that
+ * works because a vertical list that scrolls vertically is a thing
+ * people recognise. The horizontal equivalent — a strip of icons that
+ * scrolls sideways with no scrollbar and no affordance — is the pattern
+ * where destinations simply go unfound, and it is also the exact class
+ * of unwanted horizontal scroll this library has spent two rounds
+ * removing. A menu is the honest version: everything past the fourth
+ * slot sits *visibly* behind one control rather than invisibly past an
+ * edge.
+ *
+ * The menu's rows are real anchors (`DropdownMenuLinkItem`, added for
+ * this), not buttons that navigate — a destination behind a menu must
+ * still support middle-click, cmd-click and "copy link address", or the
+ * overflow items become second-class links purely because of where they
+ * landed in the order.
+ *
+ * # What goes where
+ *
+ * Order is `topItem`, then every group's items flattened — the same
+ * flattening the vertical rail does, for the same reason (no group
+ * headers survive at this size, so there is nothing left to group by).
+ * The first four are slots; the remainder and **all** footer items go to
+ * the menu. Footer items are "administrivia, not content" per this
+ * file's own doc, so they lose to any destination for a slot, and they
+ * keep their labels in the menu where there is room for them.
+ */
+function HorizontalRail({
+  topItem,
+  groups,
+  footerItems,
+  currentPath,
+}: {
+  topItem: NavItem;
+  groups: NavGroup[];
+  footerItems: NavItem[];
+  currentPath: string;
+}) {
+  const destinations = [topItem, ...groups.flatMap((group) => group.items)];
+  const slots = destinations.slice(0, HORIZONTAL_RAIL_SLOTS);
+  const overflow = [...destinations.slice(HORIZONTAL_RAIL_SLOTS), ...footerItems];
+  // If the current page is behind the menu, the menu button is what is
+  // "current" as far as anyone scanning the rail can tell — so it takes
+  // the active treatment rather than leaving nothing marked at all.
+  const activeIsHidden = overflow.some((item) => isActive(item.href, currentPath));
+
+  return (
+    // A `<nav>`, not a `<div>`. Below `sm` this pill *is* the navigation
+    // — the in-flow `<nav>` is `display: none` at that width, so a plain
+    // div here left a phone with no navigation landmark at all and every
+    // rail link sitting outside any landmark (axe `region`, caught by
+    // `a11y.test.tsx`'s `SideNav` block, which audits `document.body`
+    // precisely because these rails portal out of the component).
+    //
+    // All three shapes carry the same `aria-label="Primary"`, and exactly
+    // one is ever displayed — the gates are complements, pinned by
+    // `side-nav.portal.test.tsx`.
+    <nav
+      aria-label="Primary"
+      data-floating-rail=""
+      data-floating-rail-axis="horizontal"
+      className={cn(
+        // `left-1/2 -translate-x-1/2` rather than `inset-x-3`: the pill is
+        // content-width, so stretching it edge to edge would make a
+        // three-item nav look like a broken five-item one.
+        "-translate-x-1/2 fixed bottom-3 left-1/2 z-40 flex items-center gap-1",
+        "max-w-[calc(100vw-1.5rem)]",
+        "rounded-full border border-edge bg-surface-2/90 p-1.5 backdrop-blur-md",
+        "shadow-[var(--shadow-popover)]",
+        // Below `sm` only — above it the vertical rail takes over.
+        "sm:hidden",
+      )}
+    >
+      {/* `size-11` (44px), explicitly, on every slot.
+          `NavLink`'s `"rail"` variant is `px-0` and takes its width from
+          the parent — which works in the vertical rail, whose
+          `items-stretch` hands it the full 52px column. In a horizontal
+          row with `items-center` there is nothing to stretch to, so the
+          anchor collapses to its own content: a **16×32px** tap target,
+          measured, on the one form factor where that is least
+          acceptable. Sized here rather than in `NavLink` so the vertical
+          rail keeps behaving exactly as it did. */}
+      {slots.map((item) => (
+        <NavLink
+          key={item.href}
+          item={item}
+          active={isActive(item.href, currentPath)}
+          variant="rail"
+          className="size-11 shrink-0 justify-center rounded-full"
+        />
+      ))}
+      {overflow.length > 0 && (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            aria-label="More destinations"
+            className={cn(
+              // Matches the slots at 44px, not the 40px it started at —
+              // a row of equal-weight controls with one odd one out reads
+              // as a mistake before it reads as a distinction.
+              "flex size-11 shrink-0 items-center justify-center rounded-full transition-colors",
+              activeIsHidden
+                ? "bg-base-300 text-foreground"
+                : "text-muted-foreground hover:bg-base-300/60 hover:text-foreground",
+            )}
+          >
+            <MoreHorizontal size={16} aria-hidden="true" />
+          </DropdownMenuTrigger>
+          {/* `anchor="top end"`: this rail is pinned to the bottom of the
+              viewport, so `DropdownMenuContent`'s own `bottom start`
+              default would open the menu off-screen. */}
+          <DropdownMenuContent anchor="top end">
+            {overflow.map((item) => (
+              <DropdownMenuLinkItem
+                key={item.href}
+                href={item.href}
+                aria-current={isActive(item.href, currentPath) ? "page" : undefined}
+                className={isActive(item.href, currentPath) ? "bg-base-300 font-medium" : undefined}
+              >
+                <item.icon size={16} className="shrink-0" aria-hidden="true" />
+                <span className="min-w-0 truncate">{item.label}</span>
+              </DropdownMenuLinkItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </nav>
   );
 }
 
@@ -540,18 +737,36 @@ function FloatingRail({
  * `nav[aria-label="Primary"]` — one match, at every width, portal
  * included.
  */
-function FloatingRailPortal(props: {
+function FloatingRailPortal({
+  collapsed,
+  ...props
+}: {
   topItem: NavItem;
   groups: NavGroup[];
   footerItems: NavItem[];
   currentPath: string;
+  collapsed: boolean;
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
   }, []);
   if (!mounted) return null;
-  return createPortal(<FloatingRail {...props} />, document.body);
+  // Both rails are portalled and both are always in the DOM; CSS decides
+  // which one is visible, exactly as `NavRow` and `GroupSection` do for
+  // their own two shapes. That is deliberate rather than lazy: choosing
+  // in JS means reading a viewport width, which means the server cannot
+  // know it, which means a flash of the wrong rail on every load. The
+  // cost is one extra copy of the links in the markup, and `display:
+  // none` keeps the hidden copy out of the accessibility tree entirely,
+  // so a screen reader still reaches each destination exactly once.
+  return createPortal(
+    <>
+      <HorizontalRail {...props} />
+      <FloatingRail {...props} collapsed={collapsed} />
+    </>,
+    document.body,
+  );
 }
 
 /**
@@ -621,6 +836,7 @@ export function SideNav({
   currentPath,
   accountSlot,
   smallScreen = "floating",
+  collapsed,
   className,
 }: SideNavProps) {
   return (
@@ -644,13 +860,19 @@ export function SideNav({
             // wherever `document.body` puts it). It becomes the real
             // rail/sidebar box starting at `lg`, identically to the
             // off-canvas branch.
-            "lg:flex lg:h-full lg:shrink-0 lg:flex-col lg:gap-4 lg:overflow-y-auto lg:overflow-x-hidden lg:bg-base-200 lg:py-4",
-        // The `1024–1279px`/`≥1280px` widths as real widths, so the rail
-        // is a rail and not "however wide a 16px icon plus its padding
-        // happens to be" — true regardless of `smallScreen`. A
-        // `className` width from the caller still wins — `cn()` resolves
-        // the conflict in call order.
-        "lg:w-16 xl:w-64",
+            // `xl:`, not `lg:`. The in-flow box now appears only where
+            // the *sidebar* appears; the `1024–1279px` band that used to
+            // draw a 64px in-flow icon rail is served by the floating
+            // rail instead. Collapsed, it never appears at all.
+            collapsed
+            ? "hidden"
+            : "xl:flex xl:h-full xl:shrink-0 xl:flex-col xl:gap-4 xl:overflow-y-auto xl:overflow-x-hidden xl:bg-base-200 xl:py-4",
+        // Real widths rather than "however wide a 16px icon plus its
+        // padding happens to be". `lg:w-16` is off-canvas-only now,
+        // because that is the only mode with an in-flow icon rail left.
+        // A `className` width from the caller still wins — `cn()`
+        // resolves the conflict in call order.
+        smallScreen === "off-canvas" ? "lg:w-16 xl:w-64" : !collapsed && "xl:w-64",
         // `overflow-x-hidden` (unconditional off-canvas, `lg:` off in
         // floating mode below `lg` where nothing scrolls) is a guard, not
         // a fix. The fix is that nothing in here overflows horizontally
@@ -670,6 +892,7 @@ export function SideNav({
           groups={groups}
           footerItems={footerItems}
           currentPath={currentPath}
+          collapsed={collapsed === true}
         />
       )}
 
