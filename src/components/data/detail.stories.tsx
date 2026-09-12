@@ -88,7 +88,7 @@ export const Tiles: Story = {
  * them is how the status language erodes. */
 export const CardsAndBadges: Story = {
   render: () => (
-    <Card className="w-[28rem]">
+    <Card className="w-full max-w-[28rem]">
       <CardHeader
         title="orange-cm-primary"
         meta="provider · orange_cm"

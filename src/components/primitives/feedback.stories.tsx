@@ -29,7 +29,7 @@ export const Waiting: Story = {
         <Spinner size="md" />
         <Spinner size="lg" label="Loading" />
       </div>
-      <div className="flex w-80 flex-col gap-2">
+      <div className="flex w-full max-w-80 flex-col gap-2">
         <Skeleton className="h-4 w-full" />
         <Skeleton className="h-4 w-3/4" />
         <Skeleton className="h-4 w-1/2" />
@@ -43,7 +43,7 @@ export const Waiting: Story = {
  * a value it cannot reach is a lie, and `Spinner` is the honest option. */
 export const ProgressBars: Story = {
   render: () => (
-    <div className="flex w-96 flex-col gap-3">
+    <div className="flex w-full max-w-96 flex-col gap-3">
       <Progress value={2} max={5} label="Delivery attempts" showValue />
       <Progress value={4} max={5} tone="warning" label="Delivery attempts" showValue />
       <Progress value={5} max={5} tone="danger" label="Delivery attempts" showValue />
@@ -65,7 +65,7 @@ export const Paging: Story = {
     const pageSize = 25;
     const total = 137;
     return (
-      <div className="flex w-[36rem] flex-col gap-4">
+      <div className="flex w-full max-w-[36rem] flex-col gap-4">
         {/* Distinct labels: three `<nav>` landmarks sharing one name is
             what a real screen with a pager above and below a table would
             also produce, and a screen-reader user cannot tell them
@@ -132,4 +132,33 @@ export const Confirming: Story = {
       </>
     );
   },
+};
+
+/**
+ * `busy` and a failed-attempt `children` block, both pinned open rather
+ * than reached through the 1200ms `setTimeout` in `Confirming` above —
+ * that timeout makes the in-flight state real but impossible to inspect
+ * statically or catch in an axe scan (it is gone again before either can
+ * look). This story renders it as a fixed state instead: both buttons
+ * disabled, the confirm button's spinner showing, and the error message
+ * `children` is documented for (`ConfirmDialogProps.children`: "the place
+ * for a failed attempt's message") actually in view.
+ */
+export const ConfirmingBusyWithError: Story = {
+  render: () => (
+    <ConfirmDialog
+      open
+      onOpenChange={() => undefined}
+      tone="destructive"
+      title="Delete this endpoint?"
+      description="Queued attempts for it are abandoned. This cannot be undone."
+      confirmLabel="Delete endpoint"
+      busy
+      onConfirm={() => undefined}
+    >
+      <p className="text-body text-state-danger-fg">
+        The last attempt failed: 3 attempts still queued against this endpoint.
+      </p>
+    </ConfirmDialog>
+  ),
 };

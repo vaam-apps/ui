@@ -37,7 +37,7 @@ export const TableAndFull: Story = {
  * happy case with room to spare. */
 export const Constrained: Story = {
   render: () => (
-    <div className="w-[200px] rounded-sm border border-edge bg-surface-2 p-2">
+    <div className="w-full max-w-[200px] rounded-sm border border-edge bg-surface-2 p-2">
       <IdDisplay value={ID} variant="full" />
     </div>
   ),

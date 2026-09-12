@@ -33,10 +33,19 @@ function useDialogContext(component: string): DialogContextValue {
   return ctx;
 }
 
+/**
+ * Note the `| undefined` on the optional props below. This package
+ * compiles under `exactOptionalPropertyTypes`, where a bare `open?:
+ * boolean` means "you may omit this key" and NOT "you may pass
+ * `undefined`" — so the ordinary controlled pattern,
+ * `const [open, setOpen] = useState<boolean>()` followed by `open={open}`,
+ * was a type error here (see `Select` in `select.tsx` for the same rule
+ * spelled out in full, including where it was found).
+ */
 export interface DialogProps {
-  open?: boolean;
-  defaultOpen?: boolean;
-  onOpenChange?: (open: boolean) => void;
+  open?: boolean | undefined;
+  defaultOpen?: boolean | undefined;
+  onOpenChange?: ((open: boolean) => void) | undefined;
   children: ReactNode;
 }
 
@@ -145,11 +154,17 @@ export function DialogContent({ className, children, ...props }: ComponentPropsW
           {...props}
         >
           {children}
+          {/* `-m-1 p-1`: grows the hit target to roughly 32×32px without
+              moving the icon itself — the button's visual position (and
+              therefore the `right-4`/`top-4` offset every dialog author
+              sees) is unchanged, only its padding/margin box grows to
+              absorb it. Matches `drawer.tsx`'s close button, which needs
+              the same fix for the same reason. */}
           <button
             type="button"
             aria-label="Close"
             onClick={() => setOpen(false)}
-            className="absolute top-4 right-4 text-subtle-foreground hover:text-foreground"
+            className="-m-1 absolute top-4 right-4 rounded-sm p-1 text-subtle-foreground hover:text-foreground"
           >
             <X size={16} strokeWidth={1.5} />
           </button>
@@ -159,8 +174,19 @@ export function DialogContent({ className, children, ...props }: ComponentPropsW
   );
 }
 
+/**
+ * `pr-8` reserves a gutter for the close button rendered by `DialogContent`
+ * (`absolute top-4 right-4` around a 16px icon). `DialogPanel` is `p-6`
+ * (24px), so the content column already ends 24px from the panel's right
+ * edge, but the button's own box runs from 16px to 32px inset — 8px
+ * *inside* that column with no gutter here. Every existing story uses a
+ * short title, so the overlap has never rendered; `ConfirmDialog`'s
+ * `max-w-sm` panel makes it more likely once a title is long enough to
+ * wrap. `pr-8` (32px) puts the header's own right edge safely past the
+ * button's 32px-inset extent, with room to spare.
+ */
 export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("mb-4 flex flex-col gap-1", className)} {...props} />;
+  return <div className={cn("mb-4 flex flex-col gap-1 pr-8", className)} {...props} />;
 }
 
 /** #56: the confirm/requeue dialog's own action row. Mirrors `DialogHeader`'s

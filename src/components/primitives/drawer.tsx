@@ -262,9 +262,13 @@ function DetailDrawerContent({
                 {description ?? "Details panel."}
               </DrawerDescription>
             </div>
+            {/* `-m-1 p-1`: same hit-area fix as `dialog.tsx`'s close button
+                (§ that file's own `DialogContent` comment) — grows the
+                clickable box to roughly 32×32px without moving the 16px
+                icon itself, so the two close buttons agree. */}
             <DrawerPrimitive.Close
               aria-label="Close"
-              className="shrink-0 text-subtle-foreground hover:text-foreground"
+              className="-m-1 shrink-0 rounded-sm p-1 text-subtle-foreground hover:text-foreground"
             >
               <X size={16} strokeWidth={1.5} />
             </DrawerPrimitive.Close>

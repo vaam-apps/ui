@@ -32,8 +32,15 @@
  * **The scaling is string surgery, never division.** The minor-unit
  * integer is split into whole and fractional parts by digit position and
  * handed to `Intl.NumberFormat` as a string, which accepts arbitrary
- * precision. No value is ever converted to a float, so an amount larger
- * than `Number.MAX_SAFE_INTEGER` formats exactly.
+ * precision. No value is ever converted to a float, so a `bigint` or a
+ * digit `string` larger than `Number.MAX_SAFE_INTEGER` formats exactly. A
+ * `number` cannot make the same promise past that point — not because
+ * every such value has lost precision (`1e16` and `1e20` are exact) but
+ * because a `number` no longer carries enough information to *tell* an
+ * exact value from one the caller's arithmetic already rounded. So
+ * `formatMoney` rejects any `number` that is not a *safe* integer rather
+ * than printing a figure that looks exact and might not be. Pass a
+ * `bigint` or a digit string instead.
  */
 
 /** An integer count of a currency's smallest unit. */
@@ -110,6 +117,15 @@ function shiftDecimal(digits: string, exponent: number): string {
  * amount is always a bug — usually a caller that already divided — and
  * silently rounding it here would hide the real error at the point where
  * it is least visible.
+ *
+ * @throws if `minorUnits` is a `number` that is not a *safe* integer.
+ * `Number.isInteger(1e21)` is `true`, but `(1e21).toFixed(0)` is
+ * `"1e+21"` — past `1e21`, `toFixed` falls back to `ToString` per spec —
+ * so the integer guard alone lets a value through that no longer
+ * round-trips through string surgery. A `number` that large has already
+ * lost precision before it arrived; widening it to `BigInt` here would
+ * launder that loss rather than surface it. Pass a `bigint` or a digit
+ * `string` for amounts this large instead.
  */
 export function formatMoney(
   minorUnits: MinorUnits,
@@ -126,6 +142,36 @@ export function formatMoney(
       throw new TypeError(
         `formatMoney expects an integer count of minor units, got ${minorUnits} (${currency}). ` +
           "Pass 1250 for USD 12.50, not 12.5.",
+      );
+    }
+    // Rejects the whole range past `Number.MAX_SAFE_INTEGER`, not only
+    // the `>= 1e21` range that visibly mangles.
+    //
+    // `1e21` is the value that breaks outright: it is an integer, so the
+    // guard above lets it through, but `(1e21).toFixed(0)` is `"1e+21"`
+    // (the spec falls back to `ToString` at that magnitude) and the
+    // decimal shift below turns that into `"1e+.21"`, which `Intl`
+    // formats as `NaN`. That was the reported bug: `formatMoney(1e21,
+    // "USD")` returned the string `"USDNaN"`.
+    //
+    // The guard is deliberately wider than that, and the reason is not
+    // "this number has already lost precision" — `1e16` and `1e20` are
+    // exactly representable and used to format correctly. It is that past
+    // `2^53` a `number` cannot represent every integer, so this function
+    // **cannot tell an exact value from one the caller's arithmetic
+    // already rounded**. Formatting it anyway would print a figure that
+    // looks exact and may not be, which is the one thing a money
+    // formatter must never do. `bigint` and digit strings carry the
+    // information needed to be sure, and are unaffected at any size.
+    //
+    // This does reject input that used to work, for callers holding large
+    // minor-unit amounts in zero-decimal currencies (XAF, VND, JPY) as
+    // `number`. That is a real break and is called out in the CHANGELOG.
+    if (!Number.isSafeInteger(minorUnits)) {
+      throw new TypeError(
+        `formatMoney expects a safe integer count of minor units, got ${minorUnits} (${currency}). ` +
+          "Past Number.MAX_SAFE_INTEGER a number cannot be checked for exactness — pass a " +
+          "bigint or a digit string instead.",
       );
     }
     digits = minorUnits.toFixed(0);

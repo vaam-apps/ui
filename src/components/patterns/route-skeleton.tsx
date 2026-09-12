@@ -23,10 +23,18 @@ import { ScreenStack } from "./screen-layout";
 //
 // One reusable component rather than nine bespoke skeletons — every
 // affected screen needs the same shape (a title bar, an optional filter
-// row, several table-row-shaped blocks), and `Skeleton` itself already
-// forbids shimmer (design doc §3.8/§5.2, see that primitive's own doc)
-// so there is no per-screen animation timing to keep in sync anyway. Per
-// R6, this lives in `@vaam-apps/ui`, not duplicated per route.
+// row, several table-row-shaped blocks), and `Skeleton` owns the drift
+// timing itself (see that primitive's own doc) so there is no per-screen
+// animation to keep in sync anyway. Per R6, this lives in
+// `@vaam-apps/ui`, not duplicated per route.
+//
+// This is also the one place in the library that *announces* a wait.
+// `Skeleton` is `aria-hidden` — a dozen empty boxes read aloud is worse
+// than silence — so a screen whose entire `<main>` is skeletons would
+// otherwise be completely silent to a screen reader for as long as the
+// boundary is suspended, which is indistinguishable from the broken-tab
+// case above. The `role="status"` region below says "Loading" once, and
+// goes quiet when the real tree replaces it.
 
 export interface RouteSkeletonProps {
   /** How many table-row-shaped blocks to render. Doesn't need to match the
@@ -44,7 +52,8 @@ export interface RouteSkeletonProps {
 
 export function RouteSkeleton({ rows = 6, withFilterBar = true }: RouteSkeletonProps) {
   return (
-    <ScreenStack>
+    <ScreenStack role="status" aria-busy="true">
+      <span className="sr-only">Loading…</span>
       {/* Not `ScreenHeader` here: its `title`/`description` slots render
        * inside `<h1>`/`<p>`, and `<p>` cannot contain a block-level
        * element like `Skeleton`'s own `<div>` — the browser's HTML parser

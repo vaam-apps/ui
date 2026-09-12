@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { Checkbox, CheckboxField } from "./checkbox";
 import { ChipSelect } from "./chip-select";
-import { FieldError, FormField } from "./form-field";
+import { FieldError, FormField, groupLabelId } from "./form-field";
 import { Input } from "./input";
 import { Label } from "./label";
 import { RadioGroup } from "./radio-group";
@@ -49,9 +49,32 @@ export const CheckboxAndSwitch: Story = {
           label="Mask the recipient in webhook payloads"
           description="The masked form is baked in when the attempt row is written, not at delivery."
         />
+        {/* Disabled: both the label and the description must dim and lose
+            their pointer cursor along with the control. Before this was
+            fixed, `disabled` landed only on the inner `Checkbox` —
+            Headless UI's `Label` reads disabled state from `Field`'s own
+            context only, never from a sibling control, so the label sat
+            at full brightness with a live `cursor-pointer` beside a
+            50%-dimmed box. */}
+        <CheckboxField
+          checked
+          disabled
+          onCheckedChange={() => undefined}
+          label="Mask the recipient in webhook payloads"
+          description="The masked form is baked in when the attempt row is written, not at delivery."
+        />
         <SwitchField
           checked={on}
           onCheckedChange={setOn}
+          label="Live updates"
+          description="Poll for new rows while this screen is open."
+        />
+        {/* Same fix, same component shape — see the CheckboxField note
+            above. */}
+        <SwitchField
+          checked={false}
+          disabled
+          onCheckedChange={() => undefined}
           label="Live updates"
           description="Poll for new rows while this screen is open."
         />
@@ -69,6 +92,15 @@ export const CheckboxAndSwitch: Story = {
  * The error line is `text-caption` (12px). If it renders at the browser
  * default, `cn()` has lost the font size to the colour beside it again —
  * a real bug this package shipped for months.
+ *
+ * The "Sender ID" field with both a hint and an error is also the
+ * `aria-describedby`/`aria-invalid` story: `FormField` clones the
+ * `Input` it wraps to add both, so a screen-reader user tabbing into
+ * `#sb-sender-bad` hears the label, then "Three to eleven characters.
+ * Must be at most 11 characters.", and `aria-invalid` triggers the
+ * `Input`/`Textarea` danger-tone border and text colour — none of which
+ * a plain unassociated `<p>` (the previous shape) could do, and none of
+ * which axe can see either way, so this story is the check.
  */
 export const FieldsAndErrors: Story = {
   render: () => (
@@ -93,24 +125,56 @@ export const FieldsAndErrors: Story = {
   ),
 };
 
-/** Small closed vocabularies. Neither portals, so both stay usable inside
+/**
+ * Small closed vocabularies. Neither portals, so both stay usable inside
  * a drawer — unlike a listbox, whose portalled options land outside the
- * drawer's focus trap. */
+ * drawer's focus trap.
+ *
+ * The message-class field is the `control="group"` pairing `FormField`'s
+ * own doc prescribes: the caller wires the group with
+ * `aria-labelledby={groupLabelId(htmlFor)}` rather than `htmlFor`, since
+ * a `<fieldset>` isn't a labelable element `for` can point at.
+ * `ChipSelectProps` didn't declare `aria-labelledby` until now, so this
+ * exact call was a type error even though the `<fieldset>` already
+ * spread the prop onto itself at runtime.
+ */
 export const SmallVocabularies: Story = {
   render: function Render() {
     const [classes, setClasses] = useState<string[]>(["otp"]);
     const [decision, setDecision] = useState<"approved" | "rejected">("approved");
     return (
       <div className="flex flex-col gap-5">
+        <FormField
+          label="Message class"
+          htmlFor="sb-message-class"
+          hint="Governs which senders may deliver this message."
+          control="group"
+        >
+          <ChipSelect
+            aria-labelledby={groupLabelId("sb-message-class")}
+            value={classes}
+            onValueChange={setClasses}
+            options={[
+              { value: "otp", label: "OTP" },
+              { value: "transactional", label: "Transactional" },
+              { value: "notification", label: "Notification" },
+              { value: "marketing", label: "Marketing" },
+            ]}
+          />
+        </FormField>
+        {/* Disabled: unlike `CheckboxField`/`SwitchField`, `ChipSelect`'s
+            `Label` is a *child* of the chip it toggles, not a sibling
+            outside it, so it already dims correctly with no separate fix
+            — the chip's own `opacity-50` covers everything painted
+            inside it, label text included. */}
         <ChipSelect
-          aria-label="Message class"
-          value={classes}
-          onValueChange={setClasses}
+          aria-label="Message class (disabled)"
+          disabled
+          value={["otp"]}
+          onValueChange={() => undefined}
           options={[
             { value: "otp", label: "OTP" },
             { value: "transactional", label: "Transactional" },
-            { value: "notification", label: "Notification" },
-            { value: "marketing", label: "Marketing" },
           ]}
         />
         <RadioGroup

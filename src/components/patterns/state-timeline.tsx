@@ -1,6 +1,7 @@
 import { Info } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "../../lib/cn";
+import { formatAbsolute, formatElapsed } from "../../lib/format-instant";
 import { Skeleton } from "../primitives/skeleton";
 import { StateMark } from "../status/state-mark";
 import type { StatusSystem } from "../status/status-tokens";
@@ -53,52 +54,14 @@ export interface StateTimelineProps<S extends string = string> {
 }
 
 /**
- * `2026-09-11 14:03:07 +01` — sortable, unambiguous, and carrying its own
- * offset so a screenshot pasted into a ticket is still interpretable.
- *
- * The offset is read out of `Intl`'s own `shortOffset` part rather than
- * assumed from the zone name: it is the only way to be right across DST
- * and across zones this component has never been told about. `UTC` keeps
- * its conventional `Z` rather than the `GMT` that `shortOffset` yields.
+ * `shortOffset`'s own grammar, verified against this repo's Node/ICU for
+ * `2026-09-11T14:03:07Z`: `"GMT"` (zero offset, e.g. `UTC`), `"GMT+1"` /
+ * `"GMT-4"` (whole hours), or `"GMT+5:30"` / `"GMT-9:30"` (hours and
+ * minutes) — never zero-padded, never the `"GMT-05:00"` shape that only
+ * `longOffset` produces. Capturing this rather than string-patching it
+ * means the sign-and-digit regex below can't silently stop matching the
+ * moment a zone needs two digits or a minutes component.
  */
-function formatAbsolute(iso: string, timezone: string): string {
-  const date = new Date(iso);
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
-    timeZoneName: "shortOffset",
-  });
-  const parts = formatter.formatToParts(date);
-  const stamp = parts
-    .filter((part) => part.type !== "timeZoneName" && part.type !== "literal")
-    .reduce<string[]>((acc, part) => {
-      acc.push(part.value);
-      return acc;
-    }, []);
-  const [year, month, day, hour, minute, second] = stamp;
-  // "GMT+1" / "GMT-05:00" / "GMT" → "+01" / "-05:00" / "Z".
-  const raw = parts.find((part) => part.type === "timeZoneName")?.value ?? "";
-  const offset = raw === "GMT" ? "Z" : raw.replace(/^GMT/, "").replace(/^([+-])(\d)$/, "$10$2");
-  return `${year}-${month}-${day} ${hour}:${minute}:${second} ${offset}`;
-}
-
-function formatElapsed(ms: number): string {
-  if (ms < 1000) return `+${ms}ms`;
-  if (ms < 60_000) return `+${(ms / 1000).toFixed(3)}s`;
-  const totalSeconds = Math.round(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  if (minutes < 60) return `+${minutes}m ${String(seconds).padStart(2, "0")}s`;
-  const hours = Math.floor(minutes / 60);
-  return `+${hours}h ${String(minutes % 60).padStart(2, "0")}m`;
-}
-
 function AnnotationNode({ text }: { text: string }) {
   return (
     <li className="relative flex gap-3 pb-4 pl-0">
@@ -164,7 +127,10 @@ export function StateTimeline<S extends string>({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
-            <p className="font-medium text-body text-foreground">
+            {/* The timestamp column on the right is fixed-width and must
+                stay whole — it is the thing being compared down the
+                column — so the label side is the half that gives way. */}
+            <p className="min-w-0 truncate font-medium text-body text-foreground">
               {meta.label}{" "}
               <span className="font-mono text-subtle-foreground">{transition.toState}</span>
             </p>

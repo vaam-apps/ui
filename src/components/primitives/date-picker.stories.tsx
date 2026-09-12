@@ -29,7 +29,7 @@ export const Single: Story = {
   render: function Render() {
     const [value, setValue] = useState<IsoDate | undefined>("2026-09-11");
     return (
-      <div className="flex w-64 flex-col gap-2">
+      <div className="flex w-full max-w-64 flex-col gap-2">
         <DatePicker value={value} onValueChange={setValue} />
         <p className="font-mono text-caption text-subtle-foreground">
           value: {value ?? "undefined"}
@@ -49,7 +49,7 @@ export const Range: Story = {
       to: "2026-09-14",
     });
     return (
-      <div className="flex w-80 flex-col gap-2">
+      <div className="flex w-full max-w-80 flex-col gap-2">
         <DateRangePicker value={value} onValueChange={setValue} />
         <p className="font-mono text-caption text-subtle-foreground">
           value: {value === undefined ? "undefined" : `${value.from ?? "…"} → ${value.to ?? "…"}`}
@@ -65,7 +65,7 @@ export const Bounded: Story = {
   render: function Render() {
     const [value, setValue] = useState<IsoDate | undefined>();
     return (
-      <div className="w-64">
+      <div className="w-full max-w-64">
         <DatePicker
           value={value}
           onValueChange={setValue}

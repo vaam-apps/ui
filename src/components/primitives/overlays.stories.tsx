@@ -21,7 +21,9 @@ import {
 } from "./dialog";
 import {
   Drawer,
+  DrawerClose,
   DrawerContent,
+  DrawerDescription,
   DrawerTitle,
   DrawerTrigger,
   MoreDetailDrawer,
@@ -77,6 +79,76 @@ export const DialogStory: Story = {
             Cancel
           </DialogClose>
           <Button size="sm">Rotate</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  ),
+};
+
+/**
+ * WP5 Task 2: proves `DialogHeader`'s `pr-8` gutter actually clears the
+ * close button. A ~90-character title plus a three-sentence description —
+ * every other dialog story here uses a short title, which is exactly why
+ * this overlap went unseen until now (see `dialog.tsx`'s own
+ * `DialogHeader` comment).
+ */
+export const DialogWithLongTitle: Story = {
+  render: () => (
+    <Dialog>
+      <DialogTrigger as={Button}>Open dialog</DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            Rotate the signing secret for every webhook endpoint currently subscribed to this
+            provider?
+          </DialogTitle>
+          <DialogDescription>
+            The current secret moves to `prevSecret` and keeps verifying for 24 hours. Any endpoint
+            that has not picked up the new secret by then starts failing signature checks. This
+            cannot be undone once the grace period ends.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <DialogClose as={Button} variant="ghost" size="sm">
+            Cancel
+          </DialogClose>
+          <Button size="sm">Rotate</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  ),
+};
+
+/**
+ * WP5 stories brief: a body taller than the viewport. **Finding, reported
+ * rather than fixed (out of this brief's scope — changing dialog geometry
+ * is a bigger decision than a stories pass covers):** `DialogPanel` (in
+ * `dialog.tsx`) has no `max-h` and no `overflow-y`, so a body this tall
+ * pushes `DialogFooter` off the bottom of the panel with no scrollbar
+ * anywhere — the footer (and its only way to close the dialog via a
+ * button) is genuinely unreachable, not merely below the fold. Resize this
+ * story's viewport short to see it clip.
+ */
+export const DialogWithTallBody: Story = {
+  render: () => (
+    <Dialog>
+      <DialogTrigger as={Button}>Open tall dialog</DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delivery attempts</DialogTitle>
+          <DialogDescription>Every attempt recorded for this message.</DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-3">
+          {Array.from({ length: 30 }, (_, i) => `attempt-${i + 1}`).map((key, i) => (
+            <p key={key} className="text-body text-muted-foreground">
+              Attempt {i + 1}: 200 OK, 118ms
+            </p>
+          ))}
+        </div>
+        <DialogFooter>
+          <DialogClose as={Button} variant="ghost" size="sm">
+            Close
+          </DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -147,6 +219,18 @@ export const Drawers: Story = {
 /** A plain drawer, for a one-off with no quick-vs-more distinction to
  * encode. `DrawerTitle` is required by the underlying dialog primitive —
  * omitting it is a runtime warning, not a type error. */
+/**
+ * The generic composition, for a one-off drawer with no quick-vs-more
+ * distinction to encode. `QuickDetailDrawer`/`MoreDetailDrawer` are a
+ * *second*, self-contained API on top of the same primitive; they do not
+ * replace this one.
+ *
+ * `DrawerTitle` and `DrawerDescription` are not optional decoration.
+ * `vaul` renders Radix `Dialog`'s `Content` underneath, so Radix's own
+ * "DialogContent requires a DialogTitle" warning applies here exactly as
+ * it does to `Dialog` — and without a description there is nothing for
+ * `aria-describedby` to point at.
+ */
 export const PlainDrawer: Story = {
   render: () => (
     <Drawer>
@@ -155,9 +239,18 @@ export const PlainDrawer: Story = {
           Open drawer
         </Button>
       </DrawerTrigger>
-      <DrawerContent>
+      <DrawerContent className="p-5">
         <DrawerTitle>A plain drawer</DrawerTitle>
-        <p className="mt-2 text-body text-muted-foreground">Whatever belongs here.</p>
+        <DrawerDescription className="mt-1">
+          Whatever belongs here — this composition has no opinion about it.
+        </DrawerDescription>
+        <div className="mt-auto flex justify-end pt-4">
+          <DrawerClose asChild>
+            <Button size="sm" variant="ghost">
+              Close
+            </Button>
+          </DrawerClose>
+        </div>
       </DrawerContent>
     </Drawer>
   ),
@@ -266,11 +359,32 @@ export const Toasts: Story = {
   ),
 };
 
+/**
+ * WP5 Task 3: fires five toasts in sequence so the four-toast cap (see
+ * `toast()`'s own doc comment in `toast.tsx`) is visible — the oldest of
+ * the five is dropped the moment the fifth lands, so only four cards ever
+ * show at once.
+ */
+export const ToastCap: Story = {
+  render: () => (
+    <Button
+      size="sm"
+      onClick={() => {
+        for (let i = 1; i <= 5; i++) {
+          toast({ title: `Toast ${i}`, description: "One of five fired in sequence." });
+        }
+      }}
+    >
+      Fire 5 toasts
+    </Button>
+  ),
+};
+
 /** ⌘K-style palette. Nothing here binds the shortcut — that is the
  * application's decision, not the library's. */
 export const Command: Story = {
   render: () => (
-    <div className="w-[28rem] overflow-hidden rounded-md border border-edge bg-surface-2">
+    <div className="w-full max-w-[28rem] overflow-hidden rounded-md border border-edge bg-surface-2">
       <CommandMenu>
         <CommandMenuInput placeholder="Search messages, routes, providers…" />
         <CommandMenuList>

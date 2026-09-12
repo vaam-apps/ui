@@ -54,21 +54,49 @@ export interface SwitchFieldProps extends Omit<SwitchProps, "aria-label" | "aria
   description?: ReactNode;
 }
 
-/** A switch with its label to the left, filling the available width — the
+/**
+ * A switch with its label to the left, filling the available width — the
  * settings-row layout, where the labels form a readable column and the
- * controls line up on the right. */
-export function SwitchField({ label, description, className, ...props }: SwitchFieldProps) {
+ * controls line up on the right.
+ *
+ * **`disabled` is hoisted out of the spread — see `CheckboxField`'s own
+ * note for why.** In short: Headless UI's `Label` renders purely from the
+ * `useDisabled()` *context* hook, and only `Field`'s own `disabled` prop
+ * seeds that context (confirmed by reading `field.js` and `label.js`
+ * directly). Leaving `disabled` inside `...props`, bound only for
+ * `Switch`, left the label beside a disabled switch at full brightness
+ * with a live `cursor-pointer`. It now goes to both.
+ */
+export function SwitchField({
+  label,
+  description,
+  className,
+  disabled,
+  ...props
+}: SwitchFieldProps) {
   return (
-    <Field className={cn("flex items-center justify-between gap-4", className)}>
-      <span className="flex flex-col gap-0.5">
+    <Field
+      disabled={disabled ?? false}
+      className={cn("flex min-w-0 items-center justify-between gap-4", className)}
+    >
+      <span className="flex min-w-0 flex-col gap-0.5">
         <HeadlessLabel className="cursor-pointer text-body text-foreground data-disabled:cursor-not-allowed data-disabled:opacity-50">
           {label}
         </HeadlessLabel>
+        {/* Clamped to two lines — see `CheckboxField`'s own note. A
+            settings list wants its toggles on one vertical rhythm.
+            `data-disabled` is set by hand: a plain `<span>` never reads
+            `useDisabled()` on its own. */}
         {description !== undefined && (
-          <span className="text-caption text-muted-foreground">{description}</span>
+          <span
+            data-disabled={disabled || undefined}
+            className="line-clamp-2 text-caption text-muted-foreground data-disabled:opacity-50"
+          >
+            {description}
+          </span>
         )}
       </span>
-      <Switch {...props} />
+      <Switch disabled={disabled} {...props} />
     </Field>
   );
 }

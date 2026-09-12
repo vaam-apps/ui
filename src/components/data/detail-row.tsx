@@ -57,29 +57,39 @@ export function DetailRow({ label, children, variant = "inline", className }: De
     return (
       <div
         className={cn(
-          "flex flex-col gap-0.5 border-edge-subtle border-b py-2 last:border-b-0",
+          "flex min-w-0 flex-col gap-0.5 border-edge-subtle border-b py-2 last:border-b-0",
           className,
         )}
       >
         <dt className="text-caption text-subtle-foreground">{label}</dt>
-        <dd className="text-body text-foreground">{children}</dd>
+        <dd className="min-w-0 break-words text-body text-foreground">{children}</dd>
       </div>
     );
   }
 
   if (variant === "stacked") {
     return (
-      <div className={cn("flex flex-col gap-1", className)}>
+      <div className={cn("flex min-w-0 flex-col gap-1", className)}>
         <dt className="text-muted-foreground">{label}</dt>
-        <dd className="text-caption">{children}</dd>
+        <dd className="min-w-0 break-words text-caption">{children}</dd>
       </div>
     );
   }
 
+  // `min-w-0` on both sides, and the label refuses to wrap.
+  //
+  // Without it the `inline` variant is the single most reliable way to
+  // make a drawer scroll sideways: a `dd` holding an unbroken 60-char
+  // provider reference has a `min-content` width of the whole string,
+  // flexbox honours that over the container, and the panel grows. The
+  // label is the half that must stay whole — "Provider reference"
+  // wrapping to two lines to spare a value that is about to be truncated
+  // anyway helps nobody — so it gets `shrink-0`, and the value gets the
+  // room and the `break-words`.
   return (
-    <div className={cn("flex items-center justify-between gap-3", className)}>
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd>{children}</dd>
+    <div className={cn("flex min-w-0 items-center justify-between gap-3", className)}>
+      <dt className="shrink-0 text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 break-words text-right">{children}</dd>
     </div>
   );
 }

@@ -79,14 +79,30 @@ CommandMenuGroup.displayName = "CommandMenuGroup";
 export const CommandMenuItem = forwardRef<
   React.ElementRef<typeof CommandPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Item>
->(({ className, ...props }, ref) => (
+>(({ className, children, ...props }, ref) => (
   <CommandPrimitive.Item
     ref={ref}
     className={cn(
-      "flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-body data-[selected=true]:bg-surface-3",
+      // `min-w-0`: command palettes are fed route names and record titles
+      // of no fixed length, and the list is already `overflow-x-hidden`,
+      // so without this a long item is simply cut off mid-word with no
+      // ellipsis to say so. `truncate` itself, though, used to sit right
+      // here on this row (`be63a70`) with a comment claiming it produced
+      // that ellipsis — it does not: `text-overflow: ellipsis` only
+      // applies to a block container, this row is `display: flex`, and a
+      // flex container is not one (verified live, side by side against a
+      // block element with the same class: the flex one hard-cuts
+      // mid-glyph, no ellipsis, only `overflow: hidden` takes effect).
+      // `min-w-0` stays here — it's what lets the label span below
+      // actually shrink instead of pushing the row wide — and `truncate`
+      // moves one level in, onto that span, the same fix as
+      // `dropdown-menu.tsx`'s items.
+      "flex min-w-0 cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-body data-[selected=true]:bg-surface-3",
       className,
     )}
     {...props}
-  />
+  >
+    <span className="min-w-0 flex-1 truncate text-left">{children}</span>
+  </CommandPrimitive.Item>
 ));
 CommandMenuItem.displayName = "CommandMenuItem";

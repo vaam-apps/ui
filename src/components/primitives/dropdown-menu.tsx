@@ -43,7 +43,13 @@ export function DropdownMenuContent({
       anchor="bottom start"
       transition
       className={cn(
-        "z-50 min-w-[180px] rounded-md border border-edge bg-surface-2 p-1 shadow-[var(--shadow-popover)] [--anchor-gap:4px] focus:outline-none",
+        // `max-w-[min(20rem,calc(100vw-2rem))]`: an item whose label is a
+        // sentence used to size the panel to the sentence, which at the
+        // right-hand edge of a screen meant a menu wider than the room
+        // left for it. Bounded here, truncated one level in on the item
+        // (see `DropdownMenuItem`'s own comment for why "on the item"
+        // itself — this component's row — does not work).
+        "z-50 min-w-[180px] max-w-[min(20rem,calc(100vw-2rem))] rounded-md border border-edge bg-surface-2 p-1 shadow-[var(--shadow-popover)] [--anchor-gap:4px] focus:outline-none",
         "origin-top transition duration-100 ease-out data-closed:scale-95 data-closed:opacity-0",
         className,
       )}
@@ -54,6 +60,7 @@ export function DropdownMenuContent({
 
 export function DropdownMenuItem({
   className,
+  children,
   ...props
 }: Omit<ComponentPropsWithoutRef<"button">, "type">) {
   return (
@@ -67,7 +74,44 @@ export function DropdownMenuItem({
         className,
       )}
       {...omitUndefined(props)}
-    />
+    >
+      {/*
+       * `truncate` used to sit directly on this row (`be63a70`), with a
+       * comment claiming it produced an ellipsis. Verified live, it does
+       * not: `text-overflow: ellipsis` only applies to a block container,
+       * this row is `display: flex`, and a flex container is not a block
+       * container — its anonymous block boxes don't inherit
+       * `text-overflow` either. `overflow: hidden` still applied, so the
+       * label was hard-cut mid-glyph, not ellipsized (checked side by side
+       * against a block element with the same class and against
+       * `payload-inspector.tsx`'s row, which truncates correctly for
+       * exactly the reason given below).
+       *
+       * Fix, one level in: `children` moves into this `<span>`, which is
+       * the flex *item* — an ordinary block box in its own right, so
+       * `truncate` on it works the same way it does on
+       * `payload-inspector.tsx`'s `<span class="min-w-0 truncate">`.
+       *
+       * Chosen contract (there were two ways to do this — see the task
+       * note this cites): wrap the whole `children` prop, not just a
+       * child the caller marks as "the label". Every call site in this
+       * repo today (`overlays.stories.tsx`) passes a bare text label with
+       * no icon, and wrapping unconditionally keeps every one of them
+       * working with no call-site change. The alternative — a
+       * `[&>span:last-child]:truncate` selector requiring the caller to
+       * wrap its own label in a `<span>` — would silently stop
+       * truncating (and stop constraining width at all) every existing
+       * caller, since none of them wrap their text today. The cost: an
+       * icon passed before the text (e.g. `<Icon
+       * className="size-4" />Label`) shares this same box, so on overflow
+       * the ellipsis can eat into content after the icon rather than
+       * stopping at the icon boundary — there's no live call site
+       * exercising that shape to verify against, so treat an
+       * icon-plus-label item as unverified until one exists and gets
+       * checked at 200px like the three cases above.
+       */}
+      <span className="min-w-0 flex-1 truncate text-left">{children}</span>
+    </MenuItem>
   );
 }
 
@@ -93,10 +137,15 @@ export function DropdownMenuCheckboxItem({
       )}
       {...omitUndefined(props)}
     >
-      <span className="flex h-3.5 w-3.5 items-center justify-center">
+      {/* Fixed-size checkmark slot, deliberately *outside* the truncating
+       * span below: it's rendered by this component, not passed as
+       * `children`, so it never competes with the label for the same
+       * overflow box. Same `truncate`-on-a-flex-row bug and fix as
+       * `DropdownMenuItem` above — see its comment for the full account. */}
+      <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
         {checked && <Check size={14} strokeWidth={1.5} aria-hidden="true" />}
       </span>
-      {children}
+      <span className="min-w-0 flex-1 truncate text-left">{children}</span>
     </MenuItem>
   );
 }

@@ -31,6 +31,15 @@ type Story = StoryObj<typeof meta>;
  * is also how teal was rejected for `progress`: at ΔE 17 from `success`
  * it read as a dim green here, and "processing" against "succeeded" is
  * the one pair on a payments table that must never be confusable.
+ *
+ * `neutral` and `success` are a third thing this arrangement caught: both
+ * borrow tokens `theme.css` declares `transparent` on purpose, and the
+ * chip used to paint them unconditionally, so those two rendered as bare
+ * text with no box while the others were bordered chips — legible only as
+ * "two of these are broken" once shown together. They now fall back to
+ * the same achromatic `border-edge`/`bg-surface-2` chrome
+ * `InlineBanner`'s `neutral` variant uses (see `isQuietHue` in
+ * `../status/status-tokens`), so all eight read as chips.
  */
 export const EveryTone: Story = {
   render: () => (
@@ -40,6 +49,22 @@ export const EveryTone: Story = {
           {tone}
         </StateChip>
       ))}
+    </div>
+  ),
+};
+
+/**
+ * A quiet tone and a loud tone side by side, so the difference in weight
+ * reads as a deliberate decision rather than an accident: `success`'s
+ * plain `border-edge`/`bg-surface-2` box is intentionally less present
+ * than `danger`'s tinted one, because a delivered/OK chip is meant to
+ * stay calm and an error chip is meant to draw the eye.
+ */
+export const QuietVsLoud: Story = {
+  render: () => (
+    <div className="flex flex-wrap items-center gap-2">
+      <StateChip tone="success">success (quiet)</StateChip>
+      <StateChip tone="danger">danger (loud)</StateChip>
     </div>
   ),
 };

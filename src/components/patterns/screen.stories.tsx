@@ -132,7 +132,7 @@ const FLOW = defineStatusSystem({
  */
 export const Timeline: Story = {
   render: () => (
-    <div className="w-[34rem]">
+    <div className="w-full max-w-[34rem]">
       <StateTimeline
         system={FLOW}
         currentState="unknown"

@@ -152,6 +152,31 @@ export function isTerminalStatus<S extends string>(system: StatusSystem<S>, stat
   return system[state].family === "terminal";
 }
 
+/**
+ * Whether a hue is *quiet* — carries no fill and no border of its own.
+ *
+ * `neutral` and `success` declare `transparent` for both `--state-*-bg`
+ * and `--state-*-border`, deliberately: a delivered pill should be a
+ * glyph and a word, not a green box, so a screen where most rows
+ * succeeded stays calm. `StatusPill` honours that by painting `bg`/
+ * `border` only when the state is `loud`.
+ *
+ * This predicate exists because two components did not, and painted the
+ * quiet tokens as unconditional chrome — rendering a `success` banner and
+ * a `neutral` chip with no box at all, *less* present than their loud
+ * siblings. That is the same root cause that had already been fixed twice
+ * in `RadioGroup` and `ChipSelect`, which is three times too many for a
+ * fact that was not written down anywhere.
+ *
+ * It lives here, beside [`HUE_CLASSES`] and [`StatusHue`], because it is
+ * a property of the hue vocabulary rather than of any one surface. A
+ * component that needs a box for a quiet hue should draw ordinary
+ * `border-edge`/`bg-surface-2` chrome and keep only the hue's foreground.
+ */
+export function isQuietHue(hue: StatusHue): boolean {
+  return hue === "neutral" || hue === "success";
+}
+
 /** Hue → the token classes every status surface renders through. */
 export const HUE_CLASSES: Record<StatusHue, { fg: string; bg: string; border: string }> = {
   neutral: {

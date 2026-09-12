@@ -65,6 +65,242 @@ new key; a `StatusSystem` table does not.
 - The README documents the in-flight mapping concretely, so a consumer
   does not have to make this choice by guessing.
 
+Visual-coherence pass. Four of the fixes below are latent rendering bugs
+that had been shipping since the components were written, and every one
+of them was found by looking at a rendered page — three of them in bands
+or states no story had ever drawn, which is also why the gallery grew
+from 59 stories to 92 and why there is now a test that fails when an
+export has none.
+
+### A second pass, and three API changes
+
+Same method as above — render it, look at it, check the comment against
+the code beneath it — run this time as six parallel implementers behind
+two adversarial reviewers on separate lenses. The reviewers found six
+defects in the fixes, including one that made its own target worse; those
+are folded in rather than listed separately. **Three of these can break a
+build or a screen, so they come first.**
+
+- **`formatMoney` throws for a `number` past `Number.MAX_SAFE_INTEGER`.**
+  `Number.isInteger(1e21)` is `true`, so the existing integer guard let it
+  through — but `(1e21).toFixed(0)` is `"1e+21"` (the spec falls back to
+  `ToString` at that magnitude) and the decimal shift turned that into
+  `NaN`. `formatMoney(1e21, "USD")` returned the string `"USDNaN"`.
+  The guard is deliberately wider than the range that mangles, and not
+  for the reason first written down: `1e16` and `1e20` are exactly
+  representable and used to format correctly. It is that past `2^53` a
+  `number` cannot be *checked* for exactness, and a money formatter must
+  not print a figure that only looks exact. `bigint` and digit strings
+  are unaffected at any size. This rejects input that used to work for
+  anyone holding large zero-decimal amounts (XAF, VND, JPY) as `number`.
+- **`Toaster` caps the stack at four, dropping the oldest.** Nothing
+  capped it before; ten rapid calls stacked 600px of cards with no
+  ceiling.
+- **`ValueTabsList` renders a scroll container, and takes a second prop.**
+  `className` still lands on the `role="tablist"` row it always did —
+  routing it to the new wrapper would have been a silent break, since a
+  caller's `gap-2` would have merged against nothing and quietly stopped
+  working. The wrapper has its own `wrapperClassName`.
+
+- **`StateTimeline` renders real offsets.** `Asia/Kolkata` came out as
+  `+5:30` rather than `+05:30` — the padding regex was anchored to a
+  single trailing digit and never matched a zone with minutes. UTC came
+  out as `+00`, because the `raw === "GMT"` test never fires: modern ICU
+  reports a zero offset as `"GMT+0"`. The offset is parsed now instead of
+  string-patched, so `Z` is reached by arithmetic rather than by luck, and
+  a shape `shortOffset` is not documented to emit renders verbatim rather
+  than defaulting to a plausible-looking `Z`. A backwards elapsed delta
+  renders with its real sign instead of `+-5000ms`, and a malformed one
+  renders an em dash instead of `+NaNh NaNm`; neither is clamped, because
+  clamping hides an ordering bug in the caller's data.
+- **`MaskedValue` stopped disclosing the length of the secret.** The dot
+  run was `Math.min(Math.max(hiddenCount, 6), 12)`, which reads as a clamp
+  and is the identity function on exactly [6, 12] — the common case for a
+  masked key. It is a fixed run of eight now.
+- **`InlineBanner`'s `success` variant and `StateChip`'s `success` and
+  `neutral` tones rendered with no box at all.** All three painted tokens
+  `theme.css` declares `transparent` on purpose, so they read as *less*
+  present than their loud siblings. Third and fourth instance of a mistake
+  already fixed twice, so the fact is written down once now — `isQuietHue`
+  in `status-tokens.ts` — and `theme-tokens.test.ts` asserts it against
+  the stylesheet rather than trusting the list.
+- **`truncate` on a flex row never ellipsized anything.** `text-overflow`
+  applies to block containers and a flex container is not one, so
+  `DropdownMenuItem`, `DropdownMenuCheckboxItem` and `CommandMenuItem`
+  hard-cut their labels mid-glyph under comments claiming an ellipsis —
+  a mistake introduced by the previous entry in this changelog. The label
+  moves one level in. `DatePicker`'s trigger was a fourth instance,
+  missing the `min-w-0` that lets a flex item shrink at all.
+- **A disabled `CheckboxField`, `SwitchField` or `ChipSelect` had a
+  live-looking label.** Headless UI's `Label` reads disabled state from
+  `Field`'s context and nowhere else, and `disabled` was reaching only the
+  inner control — so the `data-disabled:` classes already written on those
+  labels were dead.
+- **`FormField` wires the control to its own hint and error**, with
+  derived ids, a merged `aria-describedby` and `aria-invalid`; `Input` and
+  `Textarea` render an `aria-invalid:` danger treatment to match. What a
+  control actually emits is now pinned by a render test, because the first
+  version of this shipped a comment claiming it reached `Select` when it
+  did not. It reaches `Input`, `Textarea`, `DatePicker` and
+  `DateRangePicker`. **It cannot reach `Select`**: Headless UI's
+  `ListboxButton` builds `aria-describedby` into its own props and lets
+  them win, so `Select` does not accept a prop it could not honour.
+  Closing that gap means adopting Headless UI's `Field`/`Description`
+  pair library-wide, which is a design decision and not a patch.
+- **`ValueTabs` had no focus indicator at all** — the trigger carried
+  `outline-none` with no substitute. Deleting the utility is the whole
+  fix: the global `:focus-visible` rule is in `@layer base` and the
+  utility suppressing it is in `@layer utilities`, which wins. The list
+  also scrolls horizontally instead of wrapping triggers to two lines and
+  detaching the active underline from the rule beneath it — and the
+  `TabList` inside that scroller is `w-max`, without which its `border-b`
+  painted only across the first viewport-width and the last tabs had no
+  rule under them at all. That regression was introduced by the scroll fix
+  and caught in review.
+- **`LiveRow`'s wash faded in and vanished out.** The transition and the
+  tint were gated together, so the decay edge landed on a style with no
+  transition. Only the *duration* is gated now — making the whole
+  transition unconditional overshot and left every `LiveRow` hovering at
+  240ms beside plain rows at 90ms.
+- `Toaster` no longer re-announces the whole stack on every change:
+  `role="status"` carries an implicit `aria-atomic="true"`, so one expiry
+  re-read every toast on screen. The container keeps the live region with
+  an explicit `aria-atomic="false"`. An intermediate attempt also moved
+  `role="status"` onto each card; that is backwards — a live region must
+  exist *before* its content changes to announce it, and a populated
+  inserted region shadows the container that can — and was reverted.
+- Close buttons in `Dialog`, `Drawer` and `Toast` are ~32×32px hit targets
+  without moving; the toast's `×` glyph is the same Lucide `X` as the
+  others. `DialogHeader` reserves the gutter that long title had been
+  running under.
+- `SelectTrigger` accepts `aria-label`/`aria-labelledby`; `ChipSelect`
+  accepts the `aria-labelledby` that `FormField`'s own documentation had
+  been telling callers to pass to a component whose type did not declare
+  it; `Dialog`'s controlled props accept an explicit `undefined`, the same
+  `exactOptionalPropertyTypes` fix `Select` and `ValueTabs` already had.
+- `input-bordered`, `select-bordered` and `textarea-bordered` are gone —
+  daisyUI v4 modifiers that v5 ships no rule for, so they had been
+  matching nothing. Zero rendered pixels changed, checked by compiling the
+  Tailwind output with and without them and diffing.
+- `Progress`'s `tone` was documented as rendering an indeterminate bar
+  when unset. It defaults to `"neutral"` and always has.
+- `maskSecret` and the two instant formatters moved to `src/lib`, which
+  the public barrel does not re-export. All three had been exported purely
+  so a test could reach them, which had put `mask`, `formatAbsolute` and
+  `formatElapsed` on the published API under three of the most generic
+  names available.
+
+### Skeletons drift instead of standing still
+
+`Skeleton` plays a **chaotic gradient**: two oversized, very
+low-contrast gradient fields translating and scaling past each other on
+coprime periods (13s and 19s), with per-position phase offsets so a
+stack of them never brightens in unison.
+
+This does not reverse the "no skeleton shimmer" rule. A shimmer is a
+highlight that sweeps across the block on a fixed period — it reads as
+a progress indicator, implying the content is a knowable fraction of the
+way through arriving, and a column of them beats like a metronome. Both
+are properties of the *sweep*. The drift has no sweep, no direction and
+no edge; it says "still waiting, not stuck" and deliberately says
+nothing about how much longer. Transform-only, so a table of 200
+placeholder cells costs no layout and no repaint, and it stops dead
+under `prefers-reduced-motion` — leaving the gradients painted where
+they stand, so reduced motion degrades to a different still image
+rather than a broken one.
+
+- `Skeleton` takes `animated` (default `true`) for a placeholder sitting
+  inside something that is already moving.
+- New `SkeletonText`: a paragraph placeholder whose last line is short,
+  the way real prose ends.
+- `Skeleton` is now `aria-hidden` — a dozen empty boxes read aloud is
+  worse than silence — and `RouteSkeleton` carries the `role="status"`
+  live region that announces the wait once instead.
+
+### Four rendering bugs, all found by looking
+
+- **`SideNav`'s icon rail had a stray horizontal scrollbar, and its
+  tooltips had never once appeared.** One cause, two symptoms: daisyUI's
+  `.tooltip` draws its bubble as an absolutely positioned pseudo-element
+  at `left: 100%`, and the `<nav>` is a scroll container, so the bubble
+  was clipped away on every hover while still counting toward the
+  scrollable width. Measured at 1100px: `clientWidth 40`, `scrollWidth
+  212`, the bubble sitting at 32→115px entirely outside the clip box.
+  The rail's labels are native `title` attributes now, which the browser
+  paints outside the page and nothing can clip. The nav also has real
+  per-band widths (`w-full` / `lg:w-16` / `xl:w-64`) instead of sizing
+  itself to whatever a 16px icon plus padding happens to measure.
+- **`Select` rendered two disclosure indicators.** daisyUI's `.select`
+  paints its own arrow as a pair of `linear-gradient` background images
+  for a native `<select>`; this trigger also renders a real
+  `ChevronDown`. `bg-none` removes daisyUI's, and `pe-3` reclaims the
+  1.75rem it had reserved.
+- **`RadioGroup` and `ChipSelect` rendered their *selected* option with
+  no fill and no border.** Both used the `state-success-*` trio, and
+  `--state-success-bg`/`--state-success-border` are declared
+  `transparent` on purpose — `success` is one of the two quiet status
+  hues. The chosen option therefore read as *less* present than the ones
+  nobody had picked, and the focus ring was transparent for the same
+  reason. Selection is not a status: both now use the achromatic
+  `primary`/`surface-3` vocabulary every other checked control uses, and
+  `RadioGroup` draws a real radio dot so the choice survives with no
+  colour at all.
+- **`Checkbox` was a perfect circle, indistinguishable from a radio.** A
+  `border-radius` larger than half the box is clamped to half, and
+  `--radius-selector` (8px) is exactly half of the 16px box. New
+  `--radius-xs` (4px) makes the register a real four-step ladder —
+  4 / 8 / 12 / 20 — and the checkbox a square again.
+
+### Text that is meant to fit, fits
+
+Every slot with a line budget now ends in an ellipsis instead of
+growing: nav labels, select values and options, card titles and metadata,
+stat-tile labels and captions, checkbox/switch/radio/chip descriptions,
+dropdown and command-palette items, toast titles and bodies, and the
+screen header's description.
+
+- **`Card` and `StatTile` gained `min-w-0`, which is what made the
+  truncation real.** `white-space: nowrap` sets an element's min-content
+  width to the whole string — `overflow: hidden` hides the text, it does
+  not shrink the box — and a grid or flex item defaults to `min-width:
+  auto`. So a card with a long title refused to be narrower than that
+  title and pushed its own track, and the page, past the viewport:
+  measured at 375px, cards laid out at 617px each on a page that
+  scrolled sideways. A `truncate` that looks correct and silently does
+  nothing.
+- `DetailRow`'s inline variant keeps the label whole and gives the value
+  the room, so a 60-character provider reference no longer widens the
+  drawer it is in.
+- `DropdownMenuContent` is bounded at `min(20rem, 100vw - 2rem)`.
+
+### The gallery
+
+59 stories to 92, and a guard so the count cannot quietly fall behind
+the exports again.
+
+- **`src/lib/story-coverage.test.ts` fails when an exported component is
+  mentioned by no story.** The README already tells the story this
+  closes: the hand-written gallery this Storybook replaced claimed to
+  render every export and had silently missed thirteen, three of them
+  carrying live rendering bugs. Colocating stories made that drift
+  visible in a diff; this makes it a build failure. Exemptions are a
+  short, justified list, and a stale one fails too.
+- New: **Foundations/Tokens** (surfaces, edges, text tiers, the type
+  scale, the seven status hues, the radius register, the motion
+  tokens), **Primitives/Skeleton**, **Primitives/Card**,
+  **Primitives/Tooltip**.
+- `SideNav` pins each of its three bands to a named viewport, so a
+  breakpoint story can show its own breakpoint. `Select`, `Tabs` and
+  `Table` gained stories for the states that were breaking: a select
+  inside a drawer, long values, an empty table, a loading table, a
+  sticky header.
+- `Tooltip` has a story that *demonstrates* the scroll-container
+  clipping rather than describing it, so the next person meets the
+  limitation before they hit it.
+- Story fixtures use `max-w-*` rather than fixed widths, so the gallery
+  itself no longer scrolls sideways on a phone.
+
+
 ## 0.1.1
 
 **The 0.1.0 tarball shipped the whole source tree** — `dist/` plus a

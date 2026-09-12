@@ -36,6 +36,19 @@ import { cn } from "../../lib/cn";
  * Not a `<datalist>` or a tag input either: both still let a caller type
  * something outside the vocabulary, which is exactly the property being
  * removed.
+ *
+ * # Checked chips are achromatic, not green
+ *
+ * They used to be styled with the `state-success-*` trio, which is the
+ * same latent bug `RadioGroup`'s own doc records in full: `success` is a
+ * *quiet* status hue, so `--state-success-bg` and
+ * `--state-success-border` are both declared `transparent`, and a
+ * checked chip therefore rendered with no fill and no outline — less
+ * present than the chips nobody had picked. Same fix, same reason:
+ * selection is not a status, so it is spelled in the achromatic
+ * `primary`/`surface-3` vocabulary every other checked control in this
+ * library uses, and the filled box carries the signal rather than a
+ * tint.
  */
 export interface ChipOption<T extends string> {
   value: T;
@@ -50,6 +63,16 @@ export interface ChipSelectProps<T extends string> {
   options: readonly ChipOption<T>[];
   disabled?: boolean | undefined;
   "aria-label"?: string | undefined;
+  /**
+   * Pairs with `FormField`'s own doc, which tells callers that
+   * `control="group"` is for `RadioGroup`/`ChipSelect` and that "the
+   * caller wires the group with `aria-labelledby={groupLabelId(htmlFor)}`"
+   * — a call this type did not accept until now, even though the
+   * `<fieldset>` below already spreads `...aria` onto itself and would
+   * have honoured it at runtime. `RadioGroupProps` already declares both;
+   * this was the type missing, not the wiring.
+   */
+  "aria-labelledby"?: string | undefined;
   className?: string | undefined;
 }
 
@@ -66,7 +89,7 @@ export function ChipSelect<T extends string>({
       {options.map((option) => {
         const checked = value.includes(option.value);
         return (
-          <Field key={option.value}>
+          <Field key={option.value} disabled={disabled ?? false}>
             <Checkbox
               checked={checked}
               disabled={disabled ?? false}
@@ -76,24 +99,48 @@ export function ChipSelect<T extends string>({
                 );
               }}
               className={cn(
-                "flex cursor-pointer items-start gap-2 rounded-sm border border-edge bg-surface-2 px-3 py-2 text-body text-muted-foreground",
-                "data-checked:border-state-success-border data-checked:bg-state-success-bg data-checked:text-state-success-fg",
-                "data-focus:outline-none data-focus:ring-1 data-focus:ring-state-success-border",
+                "flex min-w-0 cursor-pointer items-start gap-2 rounded-sm border border-edge bg-surface-2 px-3 py-2 text-body text-muted-foreground transition-colors",
+                "data-checked:border-edge-strong data-checked:bg-surface-3 data-checked:text-foreground",
+                "data-focus:outline-none data-focus:ring-1 data-focus:ring-ring",
                 "data-disabled:cursor-not-allowed data-disabled:opacity-50",
               )}
             >
+              {/* Same box as the `Checkbox` primitive draws, down to the
+                  radius tier — a chip is a checkbox with its label inside
+                  the hit area, and two spellings of "checked" in one
+                  library is one too many. */}
               <span
                 className={cn(
-                  "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-xs border border-edge",
-                  checked && "border-state-success-fg",
+                  "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-xs border transition-colors",
+                  checked ? "border-primary bg-primary" : "border-edge-strong bg-surface-2",
                 )}
               >
-                {checked && <Check className="size-3" aria-hidden="true" />}
+                {checked && (
+                  <Check
+                    className="size-3 text-primary-content"
+                    strokeWidth={2.5}
+                    aria-hidden="true"
+                  />
+                )}
               </span>
-              <span className="flex flex-col gap-0.5">
-                <Label className="cursor-pointer font-mono font-medium">{option.label}</Label>
+              <span className="flex min-w-0 flex-col gap-0.5">
+                {/* `data-disabled:` works here because the `Field` above is
+                    given `disabled` too. Headless UI's `Label` reads that
+                    state from `Field`'s context and from nowhere else, so
+                    without it this class was dead and a disabled chip kept
+                    a `cursor-pointer` on its label — the same defect fixed
+                    in `CheckboxField`/`SwitchField`, and now fixed the
+                    same way rather than with a third mechanism. */}
+                <Label className="cursor-pointer truncate font-mono font-medium data-disabled:cursor-not-allowed">
+                  {option.label}
+                </Label>
                 {option.description !== undefined && (
-                  <span className="text-caption text-subtle-foreground">{option.description}</span>
+                  // Clamped for the same reason `RadioGroup`'s is: chips
+                  // wrap into rows and stretch to the tallest member, so
+                  // one long description pads the whole row.
+                  <span className="line-clamp-2 text-caption text-subtle-foreground">
+                    {option.description}
+                  </span>
                 )}
               </span>
             </Checkbox>

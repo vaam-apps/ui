@@ -107,15 +107,87 @@ export function ValueTabs({
 
 export function ValueTabsList({
   className,
+  wrapperClassName,
   children,
 }: {
+  /** Lands on the `role="tablist"` element — the flex row itself, as it
+   * always has. `gap-*`, `justify-*` and `border-b-*` belong here. */
   className?: string;
+  /** Lands on the horizontal scroll container wrapping the tablist.
+   *
+   * The wrapper is new, and routing `className` to it would have been a
+   * silent break: a caller's `gap-2` would have merged against nothing,
+   * landed on an element with no `display: flex`, and quietly stopped
+   * working while `gap-4` survived on the row it was meant to override.
+   * Both reviewers caught that independently. `className` therefore keeps
+   * its original target and the wrapper gets its own prop. */
+  wrapperClassName?: string;
   children: ReactNode;
 }) {
   return (
-    <TabList className={cn("flex items-center gap-4 border-edge border-b", className)}>
-      {children}
-    </TabList>
+    <div
+      className={cn(
+        // `overflow-x-auto` + `whitespace-nowrap`/`shrink-0` on each
+        // trigger (below): with ~8 tabs in a narrow container and neither,
+        // every trigger shrank to its longest word and a multi-word label
+        // wrapped to two lines — at which point the active tab's `-mb-px
+        // border-b-2` sat a line below the list's own `border-b` and the
+        // underline no longer read as attached to anything.
+        // `tabs.stories.tsx`'s `WithCounts` story already said this in
+        // prose without preventing it; `ManyTabsScrolling` there now
+        // exercises the fix at ~380px.
+        //
+        // This is a *separate* element from `TabList` below, not
+        // `overflow-x-auto` on `TabList` itself — found live, by tabbing
+        // into a scrolled list and watching the keyboard focus ring get
+        // clipped top and bottom. The CSS Overflow spec computes
+        // `overflow-y` to `auto` whenever `overflow-x` isn't `visible`
+        // (confirmed in the running story: `getComputedStyle` reported
+        // `overflow-y: auto` despite never setting it), so an
+        // `overflow-x-auto` list clips vertically too — and this list's
+        // triggers fill its height exactly (`items-center`, no vertical
+        // padding), so the focus outline's own `outline-offset` had zero
+        // clearance and was cut on the two sides that don't scroll. `py-1`
+        // here gives the outline's `2px` width + `2px` offset the 4px of
+        // room it needs on a plain, unclipped wrapper — confirmed by
+        // reading the focused trigger's and this element's
+        // `getBoundingClientRect()` side by side. It sits *outside*
+        // `TabList`, so `TabList`'s own border-box is untouched and the
+        // `-mb-px` trick below still lands exactly on `TabList`'s own
+        // `border-b` — padding this element instead of `TabList` was the
+        // difference between the underline staying flush and gaining a
+        // 4px gap (tried the latter first; it visibly detached).
+        //
+        // The `[scrollbar-width:none]`/`::-webkit-scrollbar` pair hide the
+        // scrollbar chrome while keeping it scrollable (mouse-wheel-shift,
+        // trackpad, drag, and arrow-key nav below all still work; only the
+        // visual bar is gone). No `tabIndex={0}` on this element — unlike
+        // `SideNav`'s flyout-clipping fix, nothing in here is absolutely
+        // positioned, so there's no clipped-content bug to reproduce, and
+        // the tabs themselves (each a real `<button>` from Headless UI's
+        // `Tab`) are already in the page's tab order and confirmed live to
+        // scroll themselves into view on focus (the browser's native
+        // behaviour for focusing an element outside a scroll container's
+        // visible area), so a `tabIndex` on the scroller itself would only
+        // add a second, redundant stop.
+        "overflow-x-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        wrapperClassName,
+      )}
+    >
+      {/* `w-max`, and this is not cosmetic. `TabList` is block-level
+          inside the scroller, so without it its border-box is the
+          *scroller's* content width (380px in the story) while its
+          content is 944px — and `border-b` paints only across the first
+          viewport-width of the strip. Scrolled to the end, the last three
+          tabs had no rule beneath them at all and the active tab's 2px
+          underline floated over nothing. Measured live before the fix:
+          `listW 380` against `listScrollW 944`. The failure is invisible
+          at scroll offset 0, which is the only state a screenshot shows —
+          and the story's own docstring asserted the opposite. */}
+      <TabList className={cn("flex w-max items-center gap-4 border-edge border-b", className)}>
+        {children}
+      </TabList>
+    </div>
   );
 }
 
@@ -138,7 +210,29 @@ export function ValueTabsTrigger({
     <Tab
       type="button"
       className={cn(
-        "-mb-px border-b-2 border-transparent px-1 py-2 font-medium text-body text-muted-foreground outline-none",
+        // No `outline-none` here — this used to end with it (matching every
+        // other stripped-outline component in this package) but, unlike
+        // those, never paired it with a substitute (`checkbox.tsx`,
+        // `switch.tsx`, `radio-group.tsx`, `chip-select.tsx`, `select.tsx`
+        // and `dropdown-menu.tsx` all pair `outline-none` with a
+        // `data-focus:ring-*`). Tabbing into the list showed nothing, and
+        // the selected tab's own underline gave no clue the list had focus
+        // at all.
+        //
+        // `theme.css`'s `:focus-visible` rule (`@layer base`) already
+        // draws a ring on every focusable element with no exceptions, and
+        // it uses `outline` rather than `box-shadow` so the ring costs no
+        // layout (an outline is not part of the box model) — which matters here,
+        // since `-mb-px`/`border-b-2` sits right where a clipped outline
+        // would have been cut. Tailwind's `outline-none` utility lives in
+        // `@layer utilities`, a layer that wins over `@layer base`
+        // regardless of selector specificity, so simply not emitting that
+        // utility is enough to let the global rule apply — no
+        // `data-focus:` override needed. (Headless UI's `Tab` does expose
+        // one, driven by `@react-aria/focus`'s keyboard-only
+        // `isFocusVisible`, as a fallback if the plain deletion had turned
+        // out not to fire — it did fire, so that fallback is unused here.)
+        "-mb-px shrink-0 whitespace-nowrap border-b-2 border-transparent px-1 py-2 font-medium text-body text-muted-foreground",
         "data-selected:border-foreground data-selected:text-foreground",
         className,
       )}

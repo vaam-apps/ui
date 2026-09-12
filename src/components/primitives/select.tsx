@@ -39,6 +39,37 @@ import { omitUndefined } from "../../lib/omit-undefined";
 interface SelectContextValue {
   value: string | undefined;
   itemLabel: (value: string) => ReactNode | undefined;
+  /**
+   * Validity wiring handed down from `Select` to `SelectTrigger`.
+   *
+   * `FormField` associates a control with its own hint and error by
+   * cloning its **direct child** with `aria-describedby`/`aria-invalid`.
+   * For a `Select` that child is `Select` itself, and the element that
+   * has to carry it is `SelectTrigger`'s button — a grandchild. `Select`
+   * used to destructure a closed prop list, so the cloned attribute was
+   * dropped with no type error and no runtime warning.
+   *
+   * # `aria-describedby` cannot be threaded the same way
+   *
+   * Headless UI's `ListboxButton` sets `"aria-describedby"` in its *own*
+   * props, from an internal `Description` context that is `undefined`
+   * when no `<Description>` is present — and its render helper lets its
+   * own props win over the caller's. So a value passed down here is
+   * overwritten with `undefined` before it reaches the DOM. Confirmed by
+   * reading `@headlessui/react/dist/components/listbox/listbox.js` (the
+   * button builds `aria-describedby: useDescribedBy()` into `ourProps`)
+   * and pinned by `form-field.render.test.tsx`, which asserts what each
+   * control actually emits.
+   *
+   * `aria-invalid` is not in that set, which is why it threads fine.
+   *
+   * Wiring a `Select`'s description properly means adopting Headless
+   * UI's own `Field`/`Description` pair in `FormField` — a real
+   * architectural change, not a patch, and a maintainer's call. Until
+   * then this component does not accept an `aria-describedby` it cannot
+   * honour.
+   */
+  invalid: boolean | undefined;
 }
 const SelectContext = createContext<SelectContextValue | null>(null);
 
@@ -80,10 +111,25 @@ export interface SelectProps {
   defaultValue?: string | undefined;
   onValueChange?: ((value: string) => void) | undefined;
   disabled?: boolean | undefined;
+  /**
+   * Forwarded to `SelectTrigger`'s button.
+   *
+   * There is deliberately **no `aria-describedby` here**, and the reason
+   * is a hard constraint rather than an oversight — see
+   * `SelectContextValue.invalid`.
+   */
+  "aria-invalid"?: boolean | undefined;
   children: ReactNode;
 }
 
-export function Select({ value, defaultValue, onValueChange, disabled, children }: SelectProps) {
+export function Select({
+  value,
+  defaultValue,
+  onValueChange,
+  disabled,
+  "aria-invalid": invalid,
+  children,
+}: SelectProps) {
   const [internalValue, setInternalValue] = useState(defaultValue);
   const isControlled = value !== undefined;
   const currentValue = isControlled ? value : internalValue;
@@ -109,7 +155,7 @@ export function Select({ value, defaultValue, onValueChange, disabled, children 
       onChange={handleChange}
       {...omitUndefined({ disabled })}
     >
-      <SelectContext.Provider value={{ value: currentValue, itemLabel }}>
+      <SelectContext.Provider value={{ value: currentValue, itemLabel, invalid }}>
         {children}
       </SelectContext.Provider>
     </Listbox>
@@ -125,29 +171,82 @@ export function SelectGroup({ children }: { children: ReactNode }) {
   return <fieldset className="contents border-0 p-0 m-0 min-w-0">{children}</fieldset>;
 }
 
+/**
+ * # One chevron, not two — `bg-none` is the fix, and it is not cosmetic
+ *
+ * daisyUI's `.select` draws its own disclosure arrow in CSS, as a pair of
+ * `linear-gradient` background images pinned near the trailing edge
+ * (read `daisyui/components/select.css`; the rule is literally
+ * `background-image: linear-gradient(45deg,#0000 50%,currentColor 50%),
+ * linear-gradient(135deg,currentColor 50%,#0000 50%)` with a
+ * `background-position` of `calc(100% - 20px)`). That arrow is meant for
+ * a native `<select>`, which has no room for a child element.
+ *
+ * This trigger is a `<button>` rendering a real `ChevronDown`, so both
+ * were painted: a lucide chevron and, 6px to its right, daisyUI's little
+ * solid triangle. Two disclosure indicators on one control, which reads
+ * as a rendering bug because it is one.
+ *
+ * `bg-none` removes daisyUI's. The lucide glyph is the one that stays,
+ * because it is the same icon at the same weight as every other chevron
+ * in the library (`DatePicker`, the nav disclosure, `Pagination`) — the
+ * CSS triangle matches nothing else.
+ *
+ * `pe-3` goes with it. daisyUI reserves `padding-inline-end: 1.75rem` for
+ * the arrow it is no longer drawing; left alone, the chevron would float
+ * 28px off the right edge while the leading edge sits at 12px, which
+ * looks like a mistake even to someone who cannot say why.
+ *
+ * No `select-bordered` here (or `input-bordered` on `DatePicker`'s
+ * trigger, styled the same way). It was daisyUI v4; in v5 `.select`/
+ * `.input` draw their own border via `--input-color` with nothing left
+ * for a `-bordered` modifier to add. Confirmed against the installed
+ * package, not assumed: `grep -rho '\b[a-z]*-bordered\b' node_modules/daisyui/`
+ * returns zero matches anywhere in the compiled CSS, so the class matched
+ * no selector and removing it changes nothing rendered.
+ */
 export function SelectTrigger({
   id,
   className,
   children,
+  "aria-label": ariaLabel,
+  "aria-labelledby": ariaLabelledBy,
 }: {
   id?: string;
   className?: string;
   children: ReactNode;
+  /** Accessible name for a `Select` rendered outside a `FormField` — which
+   * otherwise has no way to be named, since this trigger only ever renders
+   * its selected value, never a label. Purely additive; a `FormField`-
+   * wrapped `Select` keeps working unchanged without either prop. */
+  "aria-label"?: string | undefined;
+  /** Same, pointing at an existing label element instead of inlining the
+   * text. */
+  "aria-labelledby"?: string | undefined;
 }) {
-  useSelectContext("SelectTrigger");
+  const { invalid } = useSelectContext("SelectTrigger");
   return (
     <ListboxButton
       id={id}
+      {...omitUndefined({ "aria-invalid": invalid })}
+      aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy}
       className={cn(
-        "select select-bordered flex w-full items-center justify-between font-sans text-prose",
+        "select flex w-full items-center justify-between gap-2 bg-none pe-3 font-sans text-prose",
         className,
       )}
     >
-      {children}
+      {/* `min-w-0` + `truncate`: `.select` is `overflow: hidden` and
+          `white-space: nowrap`, so a label longer than the control used to
+          be sliced off mid-glyph at the border — and it took the chevron
+          with it, since a flex sibling with nothing to shrink pushes the
+          icon out of the box entirely. Now it ends in an ellipsis and the
+          chevron stays put. */}
+      <span className="min-w-0 flex-1 truncate text-left">{children}</span>
       <ChevronDown
         size={14}
         strokeWidth={1.5}
-        className="text-muted-foreground"
+        className="shrink-0 text-muted-foreground"
         aria-hidden="true"
       />
     </ListboxButton>
@@ -246,7 +345,13 @@ export function SelectItem({
           <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
             {selected && <Check size={14} strokeWidth={1.5} aria-hidden="true" />}
           </span>
-          {children}
+          {/* Two lines, then an ellipsis. An option whose label is a
+              sentence used to grow its own row to whatever height it
+              needed, so a list of otherwise uniform rows had one tall one
+              in the middle and the `max-h-80` scrollport showed a
+              different number of options depending on which happened to
+              be long. */}
+          <span className="line-clamp-2 min-w-0">{children}</span>
         </>
       )}
     </ListboxOption>
