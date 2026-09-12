@@ -129,16 +129,25 @@ export function PayloadInspector({
           className="rounded-sm border border-edge bg-surface-2"
         >
           <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-body">
-            <span className="font-mono text-micro text-muted-foreground">{exchange.direction}</span>
+            <span className="shrink-0 font-mono text-micro text-muted-foreground">
+              {exchange.direction}
+            </span>
             {exchange.method != null && (
-              <span className="font-mono text-caption text-foreground">{exchange.method}</span>
+              <span className="shrink-0 font-mono text-caption text-foreground">
+                {exchange.method}
+              </span>
             )}
+            {/* `min-w-0` is what makes the `truncate` work. A flex item
+                defaults to `min-width: auto`, so a long URL — and provider
+                endpoints are long — refused to shrink and pushed the
+                status chip and the duration out past the right edge of the
+                panel instead of clipping itself. */}
             {exchange.url != null && (
-              <span className="truncate font-mono text-caption text-subtle-foreground">
+              <span className="min-w-0 truncate font-mono text-caption text-subtle-foreground">
                 {exchange.url}
               </span>
             )}
-            <span className="ml-auto flex items-center gap-2">
+            <span className="ml-auto flex shrink-0 items-center gap-2">
               <StatusChip status={exchange.status} />
               {exchange.durationMs != null && (
                 <span className="font-mono text-caption text-subtle-foreground">

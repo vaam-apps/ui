@@ -21,7 +21,9 @@ import {
 } from "./dialog";
 import {
   Drawer,
+  DrawerClose,
   DrawerContent,
+  DrawerDescription,
   DrawerTitle,
   DrawerTrigger,
   MoreDetailDrawer,
@@ -147,6 +149,18 @@ export const Drawers: Story = {
 /** A plain drawer, for a one-off with no quick-vs-more distinction to
  * encode. `DrawerTitle` is required by the underlying dialog primitive —
  * omitting it is a runtime warning, not a type error. */
+/**
+ * The generic composition, for a one-off drawer with no quick-vs-more
+ * distinction to encode. `QuickDetailDrawer`/`MoreDetailDrawer` are a
+ * *second*, self-contained API on top of the same primitive; they do not
+ * replace this one.
+ *
+ * `DrawerTitle` and `DrawerDescription` are not optional decoration.
+ * `vaul` renders Radix `Dialog`'s `Content` underneath, so Radix's own
+ * "DialogContent requires a DialogTitle" warning applies here exactly as
+ * it does to `Dialog` — and without a description there is nothing for
+ * `aria-describedby` to point at.
+ */
 export const PlainDrawer: Story = {
   render: () => (
     <Drawer>
@@ -155,9 +169,18 @@ export const PlainDrawer: Story = {
           Open drawer
         </Button>
       </DrawerTrigger>
-      <DrawerContent>
+      <DrawerContent className="p-5">
         <DrawerTitle>A plain drawer</DrawerTitle>
-        <p className="mt-2 text-body text-muted-foreground">Whatever belongs here.</p>
+        <DrawerDescription className="mt-1">
+          Whatever belongs here — this composition has no opinion about it.
+        </DrawerDescription>
+        <div className="mt-auto flex justify-end pt-4">
+          <DrawerClose asChild>
+            <Button size="sm" variant="ghost">
+              Close
+            </Button>
+          </DrawerClose>
+        </div>
       </DrawerContent>
     </Drawer>
   ),
@@ -270,7 +293,7 @@ export const Toasts: Story = {
  * application's decision, not the library's. */
 export const Command: Story = {
   render: () => (
-    <div className="w-[28rem] overflow-hidden rounded-md border border-edge bg-surface-2">
+    <div className="w-full max-w-[28rem] overflow-hidden rounded-md border border-edge bg-surface-2">
       <CommandMenu>
         <CommandMenuInput placeholder="Search messages, routes, providers…" />
         <CommandMenuList>

@@ -97,18 +97,27 @@ export function Toaster() {
       {items.map((item) => (
         <div key={item.id} className={cn(toastVariants({ variant: item.variant ?? "default" }))}>
           <div className="flex items-start justify-between gap-2">
-            <p className="font-medium">{item.title}</p>
+            {/* Two lines for the title, three for the body, both ending in
+                an ellipsis. A toast is a fixed 20rem column in the corner
+                of the screen; one with a paragraph in it grows upward
+                over the content it is reporting on, and a stack of three
+                covers half the viewport. Anything that genuinely needs
+                more room than this is not a toast — see the module doc:
+                anything an operator must act on belongs inline. */}
+            <p className="line-clamp-2 min-w-0 font-medium">{item.title}</p>
             <button
               type="button"
               onClick={() => dismissToast(item.id)}
               aria-label="Dismiss"
-              className="text-subtle-foreground hover:text-foreground"
+              className="shrink-0 text-subtle-foreground hover:text-foreground"
             >
               ×
             </button>
           </div>
           {item.description != null && (
-            <p className="mt-1 text-caption text-muted-foreground">{item.description}</p>
+            <p className="mt-1 line-clamp-3 text-caption text-muted-foreground">
+              {item.description}
+            </p>
           )}
         </div>
       ))}

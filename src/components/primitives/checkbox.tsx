@@ -46,7 +46,13 @@ export function Checkbox({
       disabled={disabled ?? false}
       indeterminate={indeterminate}
       className={cn(
-        "group inline-flex size-4 shrink-0 items-center justify-center rounded-selector border border-edge-strong bg-surface-2",
+        // `rounded-xs` (4px), not `rounded-selector` (8px): 8px is exactly
+        // half of this 16px box, and a radius of half the box is a circle
+        // — which made the checkbox and the radio the same shape. See
+        // `theme.css`'s own note on `--radius-xs`. Shape is the only
+        // channel that tells "pick any" from "pick one" before the user
+        // clicks, so it has to survive.
+        "group inline-flex size-4 shrink-0 items-center justify-center rounded-xs border border-edge-strong bg-surface-2",
         "transition-colors data-checked:border-primary data-checked:bg-primary",
         "data-indeterminate:border-primary data-indeterminate:bg-primary",
         "data-focus:outline-none data-focus:ring-1 data-focus:ring-ring",
@@ -84,16 +90,20 @@ export interface CheckboxFieldProps extends Omit<CheckboxProps, "aria-label" | "
  */
 export function CheckboxField({ label, description, className, ...props }: CheckboxFieldProps) {
   return (
-    <Field className={cn("flex items-start gap-2", className)}>
+    <Field className={cn("flex min-w-0 items-start gap-2", className)}>
       <span className="mt-0.5">
         <Checkbox {...props} />
       </span>
-      <span className="flex flex-col gap-0.5">
+      <span className="flex min-w-0 flex-col gap-0.5">
         <HeadlessLabel className="cursor-pointer text-body text-foreground data-disabled:cursor-not-allowed data-disabled:opacity-50">
           {label}
         </HeadlessLabel>
+        {/* Two lines, then an ellipsis: this is the one-line explanation
+            slot, and a row of settings whose boxes are all 44px tall
+            except the one with a paragraph in it reads as broken rather
+            than as informative. */}
         {description !== undefined && (
-          <span className="text-caption text-muted-foreground">{description}</span>
+          <span className="line-clamp-2 text-caption text-muted-foreground">{description}</span>
         )}
       </span>
     </Field>

@@ -18,9 +18,31 @@ export type CardProps = HTMLAttributes<HTMLDivElement>;
 // `--radius-field` (12px) once Phase 0 rewrote the alias, one tier tighter
 // than the box-tier corners the reference lock (§1.1/§1.2/§1.5) shows for
 // card/drawer/panel chrome.
+/**
+ * `min-w-0` is load-bearing, and the reason is worth spelling out because
+ * the symptom appears three levels away from the cause.
+ *
+ * `CardHeader` truncates its title with `white-space: nowrap`, and
+ * `nowrap` makes an element's **min-content width the full length of the
+ * string** — `overflow: hidden` hides the text, it does not shrink the
+ * box. A grid item and a flex item both default to `min-width: auto`,
+ * i.e. "never shrink below min-content", so a card holding a long title
+ * refused to be narrower than that title and pushed its own grid track —
+ * and with it the page — wider than the viewport. Measured at 375px
+ * before the fix: a `grid-cols-1` of cards laid out at 617px each, on a
+ * 375px page that scrolled sideways.
+ *
+ * The `min-w-0` inside `CardHeader` could not help: it lets the *header's*
+ * inner div shrink, but nothing had told the card itself it was allowed
+ * to. This is the class of bug where a `truncate` that looks correct
+ * silently does nothing.
+ */
 export function Card({ className, ...props }: CardProps) {
   return (
-    <div className={cn("card border border-edge bg-base-300 shadow-none", className)} {...props} />
+    <div
+      className={cn("card min-w-0 border border-edge bg-base-300 shadow-none", className)}
+      {...props}
+    />
   );
 }
 

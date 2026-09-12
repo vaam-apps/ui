@@ -59,13 +59,15 @@ export interface SwitchFieldProps extends Omit<SwitchProps, "aria-label" | "aria
  * controls line up on the right. */
 export function SwitchField({ label, description, className, ...props }: SwitchFieldProps) {
   return (
-    <Field className={cn("flex items-center justify-between gap-4", className)}>
-      <span className="flex flex-col gap-0.5">
+    <Field className={cn("flex min-w-0 items-center justify-between gap-4", className)}>
+      <span className="flex min-w-0 flex-col gap-0.5">
         <HeadlessLabel className="cursor-pointer text-body text-foreground data-disabled:cursor-not-allowed data-disabled:opacity-50">
           {label}
         </HeadlessLabel>
+        {/* Clamped to two lines — see `CheckboxField`'s own note. A
+            settings list wants its toggles on one vertical rhythm. */}
         {description !== undefined && (
-          <span className="text-caption text-muted-foreground">{description}</span>
+          <span className="line-clamp-2 text-caption text-muted-foreground">{description}</span>
         )}
       </span>
       <Switch {...props} />

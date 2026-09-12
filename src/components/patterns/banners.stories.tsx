@@ -23,7 +23,7 @@ type Story = StoryObj<typeof meta>;
  */
 export const EveryVariant: Story = {
   render: () => (
-    <div className="flex w-[40rem] flex-col gap-2">
+    <div className="flex w-full max-w-[40rem] flex-col gap-2">
       {VARIANTS.map((variant) => (
         <InlineBanner key={variant} variant={variant}>
           {variant} — the quick brown fox jumps over the lazy dog
@@ -38,7 +38,7 @@ export const EveryVariant: Story = {
  * working rather than failing. Reloading resolves it. */
 export const StaleWrite: Story = {
   render: () => (
-    <div className="w-[40rem]">
+    <div className="w-full max-w-[40rem]">
       <StaleWriteBanner onReload={() => undefined} />
     </div>
   ),
@@ -49,7 +49,7 @@ export const StaleWrite: Story = {
  * else to do may centre a single line plus one action. */
 export const Empty: Story = {
   render: () => (
-    <div className="flex w-[40rem] flex-col gap-4">
+    <div className="flex w-full max-w-[40rem] flex-col gap-4">
       <div className="rounded-sm border border-edge bg-surface-2 px-3">
         <InlineEmptyState message="No messages match these filters." />
         <InlineEmptyState

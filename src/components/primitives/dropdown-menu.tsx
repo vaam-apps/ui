@@ -43,7 +43,11 @@ export function DropdownMenuContent({
       anchor="bottom start"
       transition
       className={cn(
-        "z-50 min-w-[180px] rounded-md border border-edge bg-surface-2 p-1 shadow-[var(--shadow-popover)] [--anchor-gap:4px] focus:outline-none",
+        // `max-w-[min(20rem,calc(100vw-2rem))]`: an item whose label is a
+        // sentence used to size the panel to the sentence, which at the
+        // right-hand edge of a screen meant a menu wider than the room
+        // left for it. Bounded here, truncated on the item.
+        "z-50 min-w-[180px] max-w-[min(20rem,calc(100vw-2rem))] rounded-md border border-edge bg-surface-2 p-1 shadow-[var(--shadow-popover)] [--anchor-gap:4px] focus:outline-none",
         "origin-top transition duration-100 ease-out data-closed:scale-95 data-closed:opacity-0",
         className,
       )}
@@ -61,7 +65,7 @@ export function DropdownMenuItem({
       as="button"
       type="button"
       className={cn(
-        "flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-body text-foreground outline-none",
+        "flex w-full cursor-pointer items-center gap-2 truncate rounded-sm px-2 py-1.5 text-left text-body text-foreground outline-none",
         "data-focus:bg-surface-3",
         "data-disabled:pointer-events-none data-disabled:opacity-50",
         className,
@@ -87,7 +91,7 @@ export function DropdownMenuCheckboxItem({
       role="menuitemcheckbox"
       aria-checked={checked}
       className={cn(
-        "flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-body text-foreground outline-none",
+        "flex w-full cursor-pointer items-center gap-2 truncate rounded-sm px-2 py-1.5 text-left text-body text-foreground outline-none",
         "data-focus:bg-surface-3",
         className,
       )}

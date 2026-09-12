@@ -319,6 +319,25 @@
  * rather than reintroducing a fourth, disconnected scale.
  */
 @theme {
+  /*
+   * `--radius-xs` is the one step D8's three-tier register does not have,
+   * and it exists because of a fact about how `border-radius` resolves
+   * rather than a change of taste: **a radius larger than half the box is
+   * clamped to half, and the result is a circle.** `--radius-selector`
+   * (8px) is exactly half of the 16px checkbox every form in this system
+   * renders, so `rounded-selector` on a `size-4` box produced a perfectly
+   * round checkbox — visually identical to a radio button, in a library
+   * that ships both. Found by looking at the two side by side in
+   * Storybook, not by reading the token.
+   *
+   * 4px is the largest value that still reads as a *square with softened
+   * corners* at 16px, and it keeps the ladder honest: 4 → 8 → 12 → 20,
+   * each step visibly distinct from its neighbour. It overrides
+   * Tailwind's stock `--radius-xs` (2px) for the same reason `--radius-sm`
+   * and `--radius-md` below override theirs — one register, no fourth
+   * disconnected scale.
+   */
+  --radius-xs: 4px;
   --radius-sm: 12px;
   --radius-md: 20px;
   /* --radius-full (9999px) is already Tailwind's default; not redeclared. */
@@ -377,5 +396,193 @@
   :focus-visible {
     outline: 2px solid var(--color-ring);
     outline-offset: 2px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * The skeleton's chaotic gradient.
+ *
+ * `Skeleton` used to be flatly static, on a house rule that read "no
+ * skeleton shimmer". That rule is kept, and this is not a shimmer: the
+ * thing it bans is the diagonal highlight that sweeps left-to-right on a
+ * fixed period, which reads as a progress bar — it implies the content is
+ * a predictable fraction of the way through arriving, which a placeholder
+ * cannot know, and a grid of them beats in unison like a metronome.
+ *
+ * What replaces it is a *drift*: two soft, oversized gradient fields
+ * translating and scaling past each other on coprime periods (13s and
+ * 19s, so the pair only returns to its starting arrangement every 247s).
+ * There is no sweep, no direction, no edge, and no shared phase between
+ * two skeletons mounted a moment apart — which is what "chaotic" is
+ * buying. It says "alive, still waiting" without saying anything about
+ * how much longer.
+ *
+ * Three properties are deliberate and worth not undoing:
+ *
+ * - **Transform only.** Both layers animate `transform`, never
+ *   `background-position` or `background-image`, so the whole effect is
+ *   composited and a table of 200 skeleton cells costs no layout and no
+ *   repaint.
+ * - **Low amplitude, low contrast.** The blobs are `--color-base-content`
+ *   at 5–9%, over `--surface-3`. At a glance it should read as a texture,
+ *   not as a moving object — "silent".
+ * - **Off under `prefers-reduced-motion`, and still correct.** Pausing
+ *   leaves the gradients painted where they stand, so a reduced-motion
+ *   reader gets a static mottled surface rather than a flat one: the
+ *   component degrades to a different still image, not to a broken one.
+ *
+ * `@layer components`, not unlayered, so a caller's own `bg-*` utility on
+ * a `<Skeleton className="…">` still wins — an unlayered rule here would
+ * outrank every utility and silently ignore the override.
+ * ------------------------------------------------------------------------- */
+@layer components {
+  .skeleton-chaos {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+  }
+
+  .skeleton-chaos::before,
+  .skeleton-chaos::after {
+    content: "";
+    position: absolute;
+    /* Twice the box in each direction: the layer can translate by a fifth
+       of its own size and still cover every corner, so no hard edge ever
+       crosses the visible area. */
+    inset: -50%;
+    pointer-events: none;
+    /* Promote both layers once, rather than letting the compositor decide
+       per-frame for what may be hundreds of cells at a time. */
+    will-change: transform;
+  }
+
+  .skeleton-chaos::before {
+    background-image:
+      radial-gradient(
+        42% 64% at 26% 34%,
+        color-mix(in oklab, var(--color-base-content) 9%, transparent),
+        transparent 70%
+      ),
+      radial-gradient(
+        34% 56% at 78% 68%,
+        color-mix(in oklab, var(--color-base-content) 6%, transparent),
+        transparent 72%
+      );
+    animation: skeleton-drift-a 13s ease-in-out infinite;
+  }
+
+  .skeleton-chaos::after {
+    background-image:
+      radial-gradient(
+        50% 72% at 64% 22%,
+        color-mix(in oklab, var(--color-base-content) 7%, transparent),
+        transparent 68%
+      ),
+      radial-gradient(
+        30% 48% at 14% 82%,
+        color-mix(in oklab, var(--color-base-content) 5%, transparent),
+        transparent 74%
+      );
+    animation: skeleton-drift-b 19s ease-in-out infinite;
+  }
+
+  /*
+   * Break the lockstep.
+   *
+   * Coprime periods keep the *two layers* of one skeleton out of phase,
+   * but every skeleton on a screen mounts in the same frame, so a column
+   * of eight of them would otherwise brighten and dim together — the
+   * metronome this whole approach exists to avoid, just at a slower
+   * tempo. Negative delays start each one part-way into its own cycle,
+   * so a stack reads as eight independent surfaces.
+   *
+   * Five buckets, by position, with irregular offsets: enough that a
+   * realistic group never repeats, and deterministic, so the server and
+   * the client agree — a `Math.random()` inline style would be a
+   * hydration mismatch and would also re-roll on every render.
+   */
+  .skeleton-chaos:nth-child(5n + 1)::before {
+    animation-delay: -1.7s;
+  }
+  .skeleton-chaos:nth-child(5n + 2)::before {
+    animation-delay: -5.2s;
+  }
+  .skeleton-chaos:nth-child(5n + 3)::before {
+    animation-delay: -8.9s;
+  }
+  .skeleton-chaos:nth-child(5n + 4)::before {
+    animation-delay: -11.4s;
+  }
+  .skeleton-chaos:nth-child(5n)::before {
+    animation-delay: -3.1s;
+  }
+
+  .skeleton-chaos:nth-child(5n + 1)::after {
+    animation-delay: -13.8s;
+  }
+  .skeleton-chaos:nth-child(5n + 2)::after {
+    animation-delay: -2.6s;
+  }
+  .skeleton-chaos:nth-child(5n + 3)::after {
+    animation-delay: -17.1s;
+  }
+  .skeleton-chaos:nth-child(5n + 4)::after {
+    animation-delay: -7.9s;
+  }
+  .skeleton-chaos:nth-child(5n)::after {
+    animation-delay: -10.4s;
+  }
+
+  /* §3.8 rule 3: the signal survives, the motion does not. */
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton-chaos::before,
+    .skeleton-chaos::after {
+      animation: none;
+    }
+  }
+}
+
+/* Irregular keyframe offsets on purpose — evenly spaced stops produce a
+   visible, countable rhythm, which is the metronome the drift exists to
+   avoid. */
+@keyframes skeleton-drift-a {
+  0% {
+    transform: translate3d(-7%, -5%, 0) scale(1.06);
+  }
+  23% {
+    transform: translate3d(6%, 4%, 0) scale(1.18);
+  }
+  41% {
+    transform: translate3d(-2%, 8%, 0) scale(1.02);
+  }
+  68% {
+    transform: translate3d(9%, -6%, 0) scale(1.14);
+  }
+  86% {
+    transform: translate3d(-8%, 1%, 0) scale(1.08);
+  }
+  100% {
+    transform: translate3d(-7%, -5%, 0) scale(1.06);
+  }
+}
+
+@keyframes skeleton-drift-b {
+  0% {
+    transform: translate3d(8%, 6%, 0) scale(1.12);
+  }
+  19% {
+    transform: translate3d(-6%, -3%, 0) scale(1.02);
+  }
+  47% {
+    transform: translate3d(3%, -8%, 0) scale(1.2);
+  }
+  63% {
+    transform: translate3d(-9%, 5%, 0) scale(1.05);
+  }
+  91% {
+    transform: translate3d(5%, 2%, 0) scale(1.16);
+  }
+  100% {
+    transform: translate3d(8%, 6%, 0) scale(1.12);
   }
 }

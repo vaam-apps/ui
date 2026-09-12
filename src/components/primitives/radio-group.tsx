@@ -30,6 +30,31 @@ import { cn } from "../../lib/cn";
  * Deliberately not built on `Select`'s CVA table: there are no visual
  * variants to parameterise, and every option renders identically apart
  * from its checked state.
+ *
+ * # The checked state used to be invisible
+ *
+ * Measured on a real render, not inferred — the checked option came back
+ * `border-color: rgba(0,0,0,0)` and `background-color: rgba(0,0,0,0)`.
+ * It was styled `data-checked:border-state-success-border
+ * data-checked:bg-state-success-bg`, and both of those tokens are
+ * declared `transparent` in `theme.css`, on purpose: `success` and
+ * `neutral` are the two *quiet* status hues, which carry no fill and no
+ * border by design so a delivered/OK pill is a glyph and a word rather
+ * than a green box. Borrowed for a selection control that meant the
+ * chosen option lost its outline and its fill entirely and read as
+ * *less* present than the ones nobody had picked — the exact inverse of
+ * what it was supposed to say. The focus ring
+ * (`data-focus:ring-state-success-border`) was transparent for the same
+ * reason, so keyboard focus on this control was invisible too.
+ *
+ * It is fixed by not using a status hue at all. Status hues answer "what
+ * did the system decide"; this control answers "what did *you* pick",
+ * and those are different vocabularies — mixing them is what §1.3's
+ * "one accent, never a hue" rule exists to prevent. Selection is spelled
+ * the way every other checked control in this library spells it: the
+ * achromatic `primary` fill in a real radio glyph, on a `surface-3` row
+ * with a `edge-strong` border. That also makes it legible with no colour
+ * at all, which a tint alone never was.
  */
 export interface RadioGroupOption<T extends string> {
   value: T;
@@ -73,16 +98,40 @@ export function RadioGroup<T extends string>({
           key={option.value}
           value={option.value}
           className={cn(
-            "flex cursor-pointer flex-col gap-0.5 rounded-sm border border-edge bg-surface-2 px-3 py-2 text-body text-muted-foreground",
-            "data-checked:border-state-success-border data-checked:bg-state-success-bg data-checked:text-state-success-fg",
-            "data-focus:outline-none data-focus:ring-1 data-focus:ring-state-success-border",
+            "group flex min-w-0 cursor-pointer items-start gap-2 rounded-sm border border-edge bg-surface-2 px-3 py-2 text-body text-muted-foreground transition-colors",
+            "data-checked:border-edge-strong data-checked:bg-surface-3 data-checked:text-foreground",
+            "data-focus:outline-none data-focus:ring-1 data-focus:ring-ring",
             "data-disabled:cursor-not-allowed data-disabled:opacity-50",
           )}
         >
-          <span className="font-medium">{option.label}</span>
-          {option.description !== undefined && (
-            <span className="text-caption text-subtle-foreground">{option.description}</span>
-          )}
+          {/* A real radio glyph, not just a tinted box. The same three
+              redundant channels the status system insists on (shape,
+              fill, colour) apply to a control whose entire job is to say
+              which one is chosen: a reader looking at a greyscale
+              screenshot, or anyone who does not perceive the surface-2 →
+              surface-3 step, can still see the filled dot. */}
+          <span
+            aria-hidden="true"
+            className={cn(
+              "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border border-edge-strong bg-surface-2 transition-colors",
+              "group-data-checked:border-primary group-data-checked:bg-primary",
+            )}
+          >
+            <span className="size-1.5 rounded-full bg-primary-content opacity-0 transition-opacity group-data-checked:opacity-100" />
+          </span>
+          <span className="flex min-w-0 flex-col gap-0.5">
+            <span className="truncate font-medium">{option.label}</span>
+            {option.description !== undefined && (
+              // Two lines, then an ellipsis. Options sit side by side in a
+              // wrap container and stretch to the tallest one, so an
+              // unclamped three-line description silently pads every
+              // sibling — measured at 112px against 94px for the pair in
+              // this component's own story before the clamp.
+              <span className="line-clamp-2 text-caption text-subtle-foreground">
+                {option.description}
+              </span>
+            )}
+          </span>
         </Radio>
       ))}
     </HeadlessRadioGroup>

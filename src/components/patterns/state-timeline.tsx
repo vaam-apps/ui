@@ -164,7 +164,10 @@ export function StateTimeline<S extends string>({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
-            <p className="font-medium text-body text-foreground">
+            {/* The timestamp column on the right is fixed-width and must
+                stay whole — it is the thing being compared down the
+                column — so the label side is the half that gives way. */}
+            <p className="min-w-0 truncate font-medium text-body text-foreground">
               {meta.label}{" "}
               <span className="font-mono text-subtle-foreground">{transition.toState}</span>
             </p>

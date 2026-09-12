@@ -72,7 +72,8 @@ picks it up.
 `DatePicker` · `DateRangePicker` · `Dialog` · `ConfirmDialog` · `Drawer` ·
 `Popover` · `DropdownMenu` · `CommandMenu` · `Tooltip` · `Toast` ·
 `Table` · `Tabs` · `Pagination` · `Card` · `Badge` · `Separator` ·
-`Skeleton` · `Spinner` · `Progress` · `SideNav` · `InlineConfirm`
+`Skeleton` / `SkeletonText` · `Spinner` · `Progress` · `SideNav` ·
+`InlineConfirm`
 
 ### Data display
 
@@ -206,6 +207,19 @@ Worth knowing before you fight them:
   them is how a status language erodes.
 - **Empty states are inline status lines, not centred placards** — see
   `InlineEmptyState`.
+- **A slot with a line budget clips; it never grows.** Nav labels, card
+  titles, select values, tile captions, option descriptions and toast
+  bodies all end in an ellipsis rather than wrapping, because a row of
+  cards where one is taller reads as broken rather than as informative.
+  Values a reader must be able to *match* — ids, phone numbers, amounts
+  — are never truncated, which is the whole distinction `Code` and
+  `IdDisplay` exist to draw.
+- **Skeletons drift; they do not shimmer.** A shimmer sweeps on a fixed
+  period, which reads as progress a placeholder cannot know about, and a
+  column of them beats like a metronome. `Skeleton` runs a chaotic
+  gradient instead — two soft fields on coprime periods, no sweep, no
+  direction, out of phase with its neighbours — and stops entirely under
+  `prefers-reduced-motion`.
 - **Dark only.** There is one theme, and no toggle. A second theme is a
   real amount of work to keep honest and nothing here pretends to have
   done it.
@@ -256,6 +270,12 @@ A few guards are worth knowing about before you trip one:
 - **`src/lib/cn.test.ts`** pins the merge behaviour, including the case
   where `tailwind-merge` deletes a custom font size because it mistakes
   it for a colour.
+- **`src/lib/story-coverage.test.ts`** fails when an exported component
+  is mentioned by no story. Colocation makes the drift visible in a
+  diff; this makes it a build failure, because "added a component,
+  forgot the story" is one file and passes every other check. Exemptions
+  live in that file as a short list with reasons, and a stale exemption
+  fails too.
 
 ## Releasing
 

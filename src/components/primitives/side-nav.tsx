@@ -48,63 +48,135 @@ function isActive(href: string, currentPath: string): boolean {
 }
 
 /**
- * One nav row.
+ * One nav row, in one of the two shapes the sidebar ever needs.
  *
  * **CSS-driven, not `useMediaQuery`-driven — found live, corrected after
  * an earlier revision of this file used `@uidotdev/usehooks`' hook here
  * and wrapped `SideNav` in `next/dynamic({ ssr: false })` to work around
- * its SSR crash (see `console-shell.tsx`'s own history / this file's own
- * git log for the full finding).** That fix traded a real cost — the
- * sidebar never appeared in the server-rendered HTML, so every full page
- * load painted an empty slab and popped the real nav in after hydration —
- * for a problem the breakpoint switch itself never needed JS to solve:
- * `variant="responsive"` below expresses "full label off-canvas and at
- * `xl`, `sr-only` at the `lg` icon-rail band" purely with `lg:sr-only
- * xl:not-sr-only`, no hook, no client-only state, no hydration boundary.
+ * its SSR crash.** That fix traded a real cost — the sidebar never
+ * appeared in the server-rendered HTML, so every full page load painted
+ * an empty slab and popped the real nav in after hydration — for a
+ * problem the breakpoint switch never needed JS to solve.
  *
- * - **`"responsive"`**: the label is visible off-canvas (`<1024px`, where
- *   this row is never reached without the group around it already being
- *   fully expanded) and at `≥1280px`, `sr-only` in the `1024–1279px` icon
- *   rail band — a daisyUI `.tooltip`/`data-tip` (D5) carries the label
- *   back on hover/focus there. Used for every row that can appear in the
- *   *persistent* sidebar: `topItem`, `footerItems`, and each group's own
- *   "always expanded" desktop rows (`GroupSection` below).
- * - **`"always"`**: the label is always visible, no responsive classes at
- *   all. Used only inside the off-canvas accordion tree, which is itself
- *   gated to `<1024px` by its own `lg:hidden` wrapper — a per-row
- *   breakpoint switch would be redundant there, since that whole tree
- *   never renders at any width where a switch could matter.
+ * - **`"labelled"`**: icon and label side by side. The off-canvas tree
+ *   and the `≥1280px` full sidebar.
+ * - **`"rail"`**: icon centred, label `sr-only`, the visual label carried
+ *   by a native tooltip on an `aria-hidden` wrapper. The `1024–1279px`
+ *   icon rail.
+ *
+ * # Why the tooltip is a native `title` and not daisyUI's `.tooltip`
+ *
+ * Because daisyUI's cannot work here, and had not been working since the
+ * day this file was written. Measured on a real render at 1100px before
+ * changing anything:
+ *
+ * ```text
+ * nav.clientWidth   40      // the rail, content-sized
+ * nav.scrollWidth   212     // 172px of it unreachable
+ * ::before content  "Dashboard"
+ * ::before left     32px
+ * ::before width    82.6px  // i.e. 32→115px, entirely outside the clip box
+ * ```
+ *
+ * `.tooltip` renders its bubble as an **absolutely positioned
+ * pseudo-element at `left: 100%`**, and this `<nav>` is a scroll
+ * container (`overflow-y-auto`; CSS computes the other axis to `auto`
+ * too, since `visible` cannot pair with a scrolling axis). So the bubble
+ * was clipped away on every hover — no label ever appeared in the icon
+ * rail — while still counting toward the scrollable area, which is
+ * exactly the stray horizontal scrollbar under the rail that prompted
+ * this fix. One cause, two symptoms.
+ *
+ * There is no CSS-only way out: any flyout anchored inside a scroll
+ * container is clipped by it, and escaping needs either a portal or CSS
+ * anchor positioning — a floating-element dependency this package
+ * deliberately does not have (D5), or a feature not yet safe to require.
+ * A native `title` is painted by the browser *outside* the page entirely,
+ * so it cannot be clipped by anything, costs no CSS and no JS, and is the
+ * one mechanism that actually delivers the label the rail is missing.
+ *
+ * It sits on an `aria-hidden` wrapper rather than on the `<a>` so it
+ * stays purely visual: the link's accessible name comes from the
+ * `sr-only` label, and a `title` on the anchor itself would be announced
+ * a second time as its description.
  */
 function NavLink({
   item,
   active,
   variant,
   dim = false,
+  className,
 }: {
   item: NavItem;
   active: boolean;
-  variant: "responsive" | "always";
+  variant: "labelled" | "rail";
   dim?: boolean;
+  className?: string;
 }) {
   const Icon = item.icon;
-  const responsive = variant === "responsive";
+  const rail = variant === "rail";
+  const rowClass = cn(
+    "flex items-center gap-3 rounded-field px-3 py-2 transition-colors",
+    dim ? "text-caption" : "text-body",
+    rail && "justify-center px-0",
+    active && !dim && "bg-base-300 font-medium text-foreground",
+    active && dim && "text-foreground",
+    !active && "text-muted-foreground hover:bg-base-300/60 hover:text-foreground",
+    className,
+  );
+
+  if (rail) {
+    return (
+      <a href={item.href} aria-current={active ? "page" : undefined} className={rowClass}>
+        <span
+          title={item.label}
+          aria-hidden="true"
+          // Fills the row, so a hover anywhere on it answers with the
+          // label rather than only the 16px glyph.
+          className="flex flex-1 items-center justify-center"
+        >
+          <Icon size={16} className="shrink-0" aria-hidden="true" />
+        </span>
+        <span className="sr-only">{item.label}</span>
+      </a>
+    );
+  }
+
   return (
-    <a
-      href={item.href}
-      aria-current={active ? "page" : undefined}
-      data-tip={item.label}
-      className={cn(
-        "flex items-center gap-3 rounded-field px-3 py-2 transition-colors",
-        dim ? "text-caption" : "text-body",
-        responsive && "tooltip tooltip-right lg:justify-center lg:px-0 xl:justify-start xl:px-3",
-        active && !dim && "bg-base-300 font-medium text-foreground",
-        active && dim && "text-foreground",
-        !active && "text-muted-foreground hover:bg-base-300/60 hover:text-foreground",
-      )}
-    >
+    <a href={item.href} aria-current={active ? "page" : undefined} className={rowClass}>
       <Icon size={16} className="shrink-0" aria-hidden="true" />
-      <span className={cn(responsive && "lg:sr-only xl:not-sr-only")}>{item.label}</span>
+      {/* `truncate` + `min-w-0`: a label wider than the sidebar is cut
+          with an ellipsis instead of wrapping. Nav rows are a fixed-height
+          rhythm — one row growing to two lines shunts every row below it
+          and turns the active row's filled rectangle into a different
+          shape from all the others. No `title` here on purpose: the label
+          is already on screen, and a native tooltip repeating text the
+          reader can see is noise on every single row to spare the rare
+          one that is actually cut. */}
+      <span className="min-w-0 truncate">{item.label}</span>
     </a>
+  );
+}
+
+/**
+ * One row rendered as **both** persistent shapes, each visible only in its
+ * own band — the same "two parallel trees, not one tree whose content
+ * changes with a JS-read viewport width" technique `GroupSection` uses
+ * below, applied one level down.
+ *
+ * It has to be two elements rather than one with responsive classes,
+ * because the two shapes differ in an *attribute* (`title`) and in which
+ * text is `sr-only`, and neither is something a media query can switch.
+ * The cost is one extra `<a>` per row in the markup; `display: none`
+ * keeps the hidden one out of the accessibility tree entirely, so a
+ * screen reader still sees each destination exactly once.
+ */
+function NavRow(props: { item: NavItem; active: boolean; dim?: boolean }) {
+  return (
+    <>
+      <NavLink {...props} variant="labelled" className="flex lg:hidden xl:flex" />
+      <NavLink {...props} variant="rail" className="hidden lg:flex xl:hidden" />
+    </>
   );
 }
 
@@ -142,12 +214,12 @@ function GroupSection({ group, currentPath }: { group: NavGroup; currentPath: st
         <Disclosure defaultOpen={hasActiveItem}>
           {({ open }) => (
             <div className="flex flex-col gap-0.5">
-              <DisclosureButton className="flex items-center justify-between rounded-field px-3 py-1.5 text-left text-caption text-subtle-foreground uppercase tracking-wide hover:text-foreground">
-                {group.label}
+              <DisclosureButton className="flex items-center justify-between gap-2 rounded-field px-3 py-1.5 text-left text-caption text-subtle-foreground uppercase tracking-wide hover:text-foreground">
+                <span className="min-w-0 truncate">{group.label}</span>
                 <ChevronDown
                   size={14}
                   aria-hidden="true"
-                  className={cn("transition-transform", open && "rotate-180")}
+                  className={cn("shrink-0 transition-transform", open && "rotate-180")}
                 />
               </DisclosureButton>
               <DisclosurePanel className="flex flex-col gap-0.5">
@@ -156,7 +228,7 @@ function GroupSection({ group, currentPath }: { group: NavGroup; currentPath: st
                     key={item.href}
                     item={item}
                     active={isActive(item.href, currentPath)}
-                    variant="always"
+                    variant="labelled"
                   />
                 ))}
               </DisclosurePanel>
@@ -166,17 +238,12 @@ function GroupSection({ group, currentPath }: { group: NavGroup; currentPath: st
       </div>
 
       <div className="hidden lg:flex lg:flex-col lg:gap-0.5">
-        <p className="hidden px-3 py-1.5 text-caption text-subtle-foreground uppercase tracking-wide xl:block">
+        <p className="hidden truncate px-3 py-1.5 text-caption text-subtle-foreground uppercase tracking-wide xl:block">
           {group.label}
         </p>
         <div className="mx-3 my-1 border-edge-subtle border-t xl:hidden" aria-hidden="true" />
         {group.items.map((item) => (
-          <NavLink
-            key={item.href}
-            item={item}
-            active={isActive(item.href, currentPath)}
-            variant="responsive"
-          />
+          <NavRow key={item.href} item={item} active={isActive(item.href, currentPath)} />
         ))}
       </div>
     </>
@@ -198,7 +265,10 @@ function GroupSection({ group, currentPath }: { group: NavGroup; currentPath: st
  * JS breakpoint read:
  *   - `<1024px` (phone and tablet alike): off-canvas, full labels,
  *     collapsible accordion groups.
- *   - `1024–1279px`: persistent icon-only rail, tooltip on hover/focus.
+ *   - `1024–1279px`: persistent icon-only rail, label on hover via a
+ *     native tooltip (hover only — a keyboard user gets the same label
+ *     from the row's `sr-only` text, which is what a screen reader reads
+ *     and what focus announces).
  *   - `≥1280px`: persistent full sidebar with labels.
  *
  * This means the whole nav — every row, every group, every breakpoint's
@@ -218,10 +288,28 @@ export function SideNav({
   return (
     <nav
       aria-label="Primary"
-      className={cn("flex h-full flex-col gap-4 overflow-y-auto bg-base-200 py-4", className)}
+      className={cn(
+        "flex h-full flex-col gap-4 bg-base-200 py-4",
+        // The three §6.1 bands as real widths, so the rail is a rail and
+        // not "however wide a 16px icon plus its padding happens to be".
+        // `w-full` off-canvas: below `lg` this lives inside the caller's
+        // own drawer and should fill it. A `className` width from the
+        // caller still wins — `cn()` resolves the conflict in call order.
+        "w-full shrink-0 lg:w-16 xl:w-64",
+        // `overflow-x-hidden` is a guard, not a fix. The fix is that
+        // nothing in here overflows horizontally any more (see `NavLink`
+        // on the daisyUI tooltip this replaced, and `truncate` on every
+        // label). But `overflow-y: auto` forces the other axis to `auto`
+        // as well, which means *any* future stray absolutely-positioned
+        // child silently re-grows a horizontal scrollbar under the rail —
+        // the exact bug that was here. Pinning it to `hidden` makes that
+        // class of regression impossible instead of merely absent.
+        "overflow-y-auto overflow-x-hidden",
+        className,
+      )}
     >
       <div className="flex flex-col gap-0.5 px-2">
-        <NavLink item={topItem} active={isActive(topItem.href, currentPath)} variant="responsive" />
+        <NavRow item={topItem} active={isActive(topItem.href, currentPath)} />
       </div>
 
       <div className="flex flex-1 flex-col gap-4 px-2">
@@ -233,13 +321,7 @@ export function SideNav({
       <div className="flex flex-col gap-2 border-edge-subtle border-t px-2 pt-3">
         <div className="flex flex-col gap-0.5">
           {footerItems.map((item) => (
-            <NavLink
-              key={item.href}
-              item={item}
-              active={isActive(item.href, currentPath)}
-              variant="responsive"
-              dim
-            />
+            <NavRow key={item.href} item={item} active={isActive(item.href, currentPath)} dim />
           ))}
         </div>
         {/* Hidden in the icon rail band only (no room for the account

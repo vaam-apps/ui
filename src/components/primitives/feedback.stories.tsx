@@ -29,7 +29,7 @@ export const Waiting: Story = {
         <Spinner size="md" />
         <Spinner size="lg" label="Loading" />
       </div>
-      <div className="flex w-80 flex-col gap-2">
+      <div className="flex w-full max-w-80 flex-col gap-2">
         <Skeleton className="h-4 w-full" />
         <Skeleton className="h-4 w-3/4" />
         <Skeleton className="h-4 w-1/2" />
@@ -43,7 +43,7 @@ export const Waiting: Story = {
  * a value it cannot reach is a lie, and `Spinner` is the honest option. */
 export const ProgressBars: Story = {
   render: () => (
-    <div className="flex w-96 flex-col gap-3">
+    <div className="flex w-full max-w-96 flex-col gap-3">
       <Progress value={2} max={5} label="Delivery attempts" showValue />
       <Progress value={4} max={5} tone="warning" label="Delivery attempts" showValue />
       <Progress value={5} max={5} tone="danger" label="Delivery attempts" showValue />
@@ -65,7 +65,7 @@ export const Paging: Story = {
     const pageSize = 25;
     const total = 137;
     return (
-      <div className="flex w-[36rem] flex-col gap-4">
+      <div className="flex w-full max-w-[36rem] flex-col gap-4">
         {/* Distinct labels: three `<nav>` landmarks sharing one name is
             what a real screen with a pager above and below a table would
             also produce, and a screen-reader user cannot tell them

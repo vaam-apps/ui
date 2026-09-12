@@ -83,7 +83,11 @@ export const CommandMenuItem = forwardRef<
   <CommandPrimitive.Item
     ref={ref}
     className={cn(
-      "flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-body data-[selected=true]:bg-surface-3",
+      // `min-w-0` + `truncate`: command palettes are fed route names and
+      // record titles of no fixed length, and the list is already
+      // `overflow-x-hidden`, so without this a long item is simply cut
+      // off mid-word with no ellipsis to say so.
+      "flex min-w-0 cursor-pointer items-center gap-2 truncate rounded-sm px-2 py-1.5 text-body data-[selected=true]:bg-surface-3",
       className,
     )}
     {...props}

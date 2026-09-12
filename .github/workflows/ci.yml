@@ -60,6 +60,16 @@ jobs:
             && { echo "::error::src/ leaked into the tarball (see files: in package.json)"; exit 1; }
           grep -q '\.map$' /tmp/contents.txt \
             && { echo "::error::source maps leaked into the tarball; they dangle without src/"; exit 1; }
+          # `tsconfig.build.json` excludes stories from the compile, but
+          # `copy-styles.mjs` used to copy all of `src/styles/` verbatim —
+          # so the moment a story was added there, an uncompiled `.tsx`
+          # went straight into dist/ and into the tarball, under a path
+          # that starts with `dist/` and so passed every check above.
+          # Found by listing dist/ after a build. Assert the absence.
+          grep -qE '\.(tsx|jsx)$' /tmp/contents.txt \
+            && { echo "::error::uncompiled source (.tsx/.jsx) leaked into the tarball"; exit 1; }
+          grep -q '\.stories\.' /tmp/contents.txt \
+            && { echo "::error::stories leaked into the tarball"; exit 1; }
           echo "tarball contains $(wc -l < /tmp/contents.txt) files"
 
       - name: Build Storybook
