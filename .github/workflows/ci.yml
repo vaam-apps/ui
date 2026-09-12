@@ -45,12 +45,21 @@ jobs:
         run: |
           pnpm pack --pack-destination /tmp
           tar -tzf /tmp/vaam-apps-ui-*.tgz | sed 's|^package/||' | sort > /tmp/contents.txt
-          for required in dist/index.js dist/index.d.ts src/styles/theme.css README.md LICENSE; do
+          for required in dist/index.js dist/index.d.ts dist/styles/theme.css README.md LICENSE; do
             grep -qx "$required" /tmp/contents.txt \
               || { echo "::error::$required missing from the tarball"; exit 1; }
           done
           grep -q '\.test\.' /tmp/contents.txt \
             && { echo "::error::test files leaked into the tarball"; exit 1; }
+          # 0.1.0 shipped the whole source tree: `files` was unset, so npm's
+          # own defaults packed src/ alongside dist/, and the declaration
+          # maps pointed into it. Nothing here caught that, because every
+          # assertion above is about a file being present. Absence needs its
+          # own check.
+          grep -q '^src/' /tmp/contents.txt \
+            && { echo "::error::src/ leaked into the tarball (see files: in package.json)"; exit 1; }
+          grep -q '\.map$' /tmp/contents.txt \
+            && { echo "::error::source maps leaked into the tarball; they dangle without src/"; exit 1; }
           echo "tarball contains $(wc -l < /tmp/contents.txt) files"
 
       - name: Build Storybook
