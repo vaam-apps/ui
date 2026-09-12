@@ -536,11 +536,19 @@ Alongside a change, in the same PR:
 pnpm changeset
 ```
 
-At release time, on `main`:
+At release time, **run the `Version` workflow** from the Actions tab. It
+consumes the pending changesets, bumps the manifest, renames
+`## Unreleased` in `CHANGELOG.md` to the version it produced, commits,
+tags, and dispatches the publish. It has a `dry_run` input that does all
+of that and pushes nothing, and it refuses to release when
+`## Unreleased` is empty.
+
+By hand, the same thing:
 
 ```sh
-pnpm bump          # changeset version: collapses pending changesets into one bump
-pnpm changeset:status   # what is pending, and what version it would produce
+pnpm changeset:status              # what is pending, and what version it produces
+pnpm bump                          # changeset version
+node scripts/stamp-changelog.mjs 0.1.3
 ```
 
 Changesets' own changelog generator is **off** (`changelog: false`), and
@@ -552,9 +560,15 @@ for why there is no `changesets/action` bot.
 
 **Publishing is a tag.** Tag `vX.Y.Z` matching `package.json`;
 `.github/workflows/release.yml` publishes to npm through Trusted
-Publishing (OIDC), with no token stored in this repository. The workflow
-refuses a tag that disagrees with the manifest, so `pnpm bump` comes
-first and the tag follows the commit that lands it.
+Publishing (OIDC), with no token stored in this repository. It refuses a
+tag that disagrees with the manifest, and refuses to run on anything but
+a `v*` tag ref.
+
+`Version` pushes that tag and then *dispatches* the publish rather than
+relying on the tag push to trigger it — a tag pushed by a workflow's own
+`GITHUB_TOKEN` does not fire `on: push: tags`, by documented GitHub
+design. `.changeset/README.md` has the reasoning and what the
+alternatives cost.
 
 **Except the very first publish, which that workflow cannot do.** npm
 attaches a trusted publisher to an *existing* package, so there is
