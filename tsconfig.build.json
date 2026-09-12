@@ -3,8 +3,11 @@
   "compilerOptions": {
     "noEmit": false,
     "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
+    // No `declarationMap`/`sourceMap`. They are only useful when the
+    // sources they reference are present, and the package deliberately
+    // ships `dist` alone — emitting maps that point at an absent `src/`
+    // is worse than emitting none, because a debugger reports a broken
+    // map rather than simply falling back to the built output.
     "outDir": "dist",
     "rootDir": "src"
   },

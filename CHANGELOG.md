@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.1.1
+
+**The 0.1.0 tarball shipped the whole source tree** — `dist/` plus a
+second, complete copy of every component as `.tsx`, 285 files and 196KB
+for a package whose runtime is 117 files and 88KB.
+
+Two things had kept `src/` in `files`, and both are now addressed rather
+than overridden: the theme stylesheet was exported from
+`src/styles/theme.css`, so dropping the directory would have broken
+`@vaam-apps/ui/styles/theme.css`; and `declarationMap`/`sourceMap`
+emitted 112 maps pointing back into `src/`.
+
+- The build copies `src/styles/` into `dist/styles/`, and the published
+  `exports` points there. Everything published now lives in one
+  directory — the same one the README already tells Tailwind to scan.
+- Declaration and source maps are off. They are only useful when the
+  sources they reference are present, and a map pointing at an absent
+  `src/` is worse than none: a debugger reports it as broken rather than
+  falling back to the built output.
+
+No API change. Verified against the real tarball, not the working tree:
+both `@vaam-apps/ui` and `@vaam-apps/ui/styles/theme.css` resolve from a
+clean install, and a consumer typechecks against the shipped
+declarations.
+
 ## 0.1.0
 
 First release as `@vaam-apps/ui`, in its own repository. Previously
