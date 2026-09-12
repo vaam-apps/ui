@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { StateMark } from "./state-mark";
 import { createStatusPill, StatusPill } from "./status-pill";
-import { defineStatusSystem } from "./status-tokens";
+import { defineStatusSystem, HUE_CLASSES, type StatusHue, type StatusMeta } from "./status-tokens";
 
 /**
  * A demonstration state machine, not a real one.
@@ -10,8 +10,14 @@ import { defineStatusSystem } from "./status-tokens";
  * that drive a real `StatusPill` belong to the application that owns the
  * state machine, and a component library shipping one would be exactly
  * the coupling this package was split out to remove. Six states, chosen
- * to exercise all three silhouettes, both attention levels and five of
- * the seven hues.
+ * to exercise all three silhouettes, both attention levels and six of
+ * the eight hues.
+ *
+ * `pending` and `running` are both `in-flight` and deliberately do *not*
+ * share a hue: nothing is happening to a queued item, whereas a worker is
+ * actively holding a running one. That is the distinction `progress`
+ * exists for, and the restraint too — an in-flight state where nothing is
+ * actually moving is still `neutral`.
  */
 const DEMO = defineStatusSystem({
   pending: {
@@ -28,7 +34,7 @@ const DEMO = defineStatusSystem({
     family: "in-flight",
     silhouette: "circle",
     mark: "pie-3",
-    hue: "neutral",
+    hue: "progress",
     filled: false,
     attention: "quiet",
     label: "Running",
@@ -177,6 +183,58 @@ export const Glyphs: Story = {
     <div className="flex flex-wrap items-center gap-4">
       {STATES.map((state) => (
         <StateMark key={state} meta={DEMO[state]} size={16} className="text-foreground" />
+      ))}
+    </div>
+  ),
+};
+
+const HUES = Object.keys(HUE_CLASSES) as StatusHue[];
+
+/** A glyph that exists only to carry a hue into the matrix below. */
+function hueSample(hue: StatusHue, attention: "quiet" | "loud"): StatusMeta {
+  return {
+    family: "in-flight",
+    silhouette: "circle",
+    mark: "pie-2",
+    hue,
+    filled: false,
+    attention,
+    label: hue,
+    tooltip: `The ${hue} hue, ${attention}.`,
+  };
+}
+
+/**
+ * Every hue in both pill treatments, on the page background and on a card.
+ *
+ * This is the arrangement the contrast numbers in `theme.css` are checked
+ * against, and it has to be a *rendered* one: the tokens are authored in
+ * hex, so anything that reads the class names — or any helper that assumes
+ * the theme is oklch — measures nothing at all and reports success.
+ *
+ * The loud row is the demanding case. A loud pill paints the hue's own
+ * 10%-alpha tint behind its label, so the text is composited over
+ * `base-100` or `base-200` rather than sitting on either directly, and a
+ * foreground that clears AA on the bare page can still fail on its own
+ * fill.
+ */
+export const EveryHue: Story = {
+  render: () => (
+    <div className="flex flex-col gap-6">
+      {(["quiet", "loud"] as const).map((attention) => (
+        <div key={attention} className="flex flex-col gap-3">
+          <p className="text-caption text-subtle-foreground">{attention}</p>
+          <div className="flex flex-wrap items-center gap-4 bg-background p-3">
+            {HUES.map((hue) => (
+              <StatusPill key={hue} meta={hueSample(hue, attention)} />
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-4 rounded-sm border border-edge bg-surface-1 p-3">
+            {HUES.map((hue) => (
+              <StatusPill key={hue} meta={hueSample(hue, attention)} />
+            ))}
+          </div>
+        </div>
       ))}
     </div>
   ),
