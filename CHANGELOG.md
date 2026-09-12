@@ -2,8 +2,33 @@
 
 ## 0.1.0
 
-First release as `@vaam-apps/ui`. Previously `@vsms/ui`, a private
-workspace package.
+First release as `@vaam-apps/ui`, in its own repository. Previously
+`@vsms/ui`, a private package inside the vsms monorepo — extracted with
+its full history, back to the commit that created it.
+
+### Storybook replaces the gallery
+
+Stories live beside their components, and the `addon-a11y` panel runs
+axe on every one. The gallery this replaces lived in a consuming
+application and had drifted: it claimed to render every export and had
+missed thirteen, among them the three carrying live rendering bugs.
+
+### Accessibility
+
+- **`--subtle-foreground` failed WCAG AA on every surface** — 4.06:1 on
+  `--background` down to 3.40:1 on `--surface-3`, against the 4.5:1
+  normal text requires, across 38 usages all at 11–12px. Raised to
+  `#838a95`, the minimum that clears AA on the worst case. This
+  compresses the gap to `--muted-foreground` from ΔE 18.2 to 8.8 and is
+  a real, deliberate visual change. Found by the a11y addon, not by
+  inspection.
+
+### API
+
+- `Select` and `ValueTabs` accept an explicit `undefined` for their
+  controlled props. Under `exactOptionalPropertyTypes` a bare `value?:
+  string` rejects `useState<string>()`'s own output, which made the
+  ordinary controlled pattern a type error.
 
 ### Generalised for release
 

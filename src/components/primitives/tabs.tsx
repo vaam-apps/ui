@@ -59,11 +59,20 @@ function splitOutList(children: ReactNode): { list: ReactNode; rest: ReactNode[]
   return { list, rest };
 }
 
+/**
+ * Note the `| undefined` on the optional props below. This package
+ * compiles under `exactOptionalPropertyTypes`, where a bare `value?:
+ * string` means "you may omit this key" and NOT "you may pass
+ * `undefined`" — so the ordinary controlled pattern,
+ * `const [v, setV] = useState<string>()` followed by `value={v}`, is a
+ * type error. Found writing this component's own story, which is the
+ * first code outside the original application to use it.
+ */
 export interface ValueTabsProps {
-  value?: string;
-  defaultValue?: string;
-  onValueChange?: (value: string) => void;
-  className?: string;
+  value?: string | undefined;
+  defaultValue?: string | undefined;
+  onValueChange?: ((value: string) => void) | undefined;
+  className?: string | undefined;
   children: ReactNode;
 }
 

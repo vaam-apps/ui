@@ -1,0 +1,21 @@
+/*
+ * Storybook's own Tailwind entry point, and a live example of the setup a
+ * consumer has to replicate — see the README's Setup section.
+ *
+ * `@source` is not optional: Tailwind v4 only generates the utilities it
+ * can see used, and the class strings live in `../src`, which it does not
+ * scan by default. Omitting it renders every story unstyled with no error.
+ */
+@import "tailwindcss";
+@plugin "daisyui";
+@source "../src";
+
+/* The theme must load AFTER `@plugin "daisyui"`, so its own
+   `@plugin "daisyui/theme"` blocks register against an already-loaded
+   plugin — which puts this `@import` after a non-import rule. Tailwind's
+   `@import`/`@plugin` handling is a preprocessing step rather than spec
+   CSS, so the ordering rule below does not apply to how this file
+   actually builds. Same suppression, same reason, as the consuming
+   application's own stylesheet. */
+/* biome-ignore lint/correctness/noInvalidPositionAtImportRule: Tailwind/daisyUI directives are preprocessed, not spec CSS */
+@import "../src/styles/theme.css";

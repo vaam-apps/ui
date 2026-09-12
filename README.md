@@ -189,6 +189,47 @@ Worth knowing before you fight them:
   real amount of work to keep honest and nothing here pretends to have
   done it.
 
+## Development
+
+```sh
+pnpm install
+pnpm storybook        # the component gallery, at :6006
+pnpm test             # unit tests + the invariant guards
+pnpm typecheck
+pnpm lint             # biome, format and lint together
+pnpm build            # what npm receives: dist/ + declarations
+```
+
+**Storybook is the visual-QA surface**, and stories live beside the
+components they demonstrate. That colocation is deliberate: this package
+previously had its gallery in a consuming application, where it drifted —
+it claimed to render every export and had silently missed thirteen of
+them, including the three that turned out to be carrying live rendering
+bugs. A story in the same directory as its component at least shows up in
+the same diff.
+
+The `@storybook/addon-a11y` panel runs axe on every story. It is not
+decoration: it is what caught `--subtle-foreground` failing WCAG AA on
+every surface in the system, across 38 usages, by flagging fourteen
+calendar weekday headers at once.
+
+A few guards are worth knowing about before you trip one:
+
+- **`src/lib/theme-tokens.test.ts`** scans the components for
+  `bg-`/`text-`/`border-` tokens this stylesheet owns and fails if one is
+  not declared. Tailwind generates nothing for an unknown token and says
+  nothing about it, which has produced invisible transparent surfaces
+  here twice.
+- **`src/components/primitives/calendar.render.test.tsx`** renders the
+  calendar and asserts the classes land on the elements react-day-picker
+  actually emits. Its sibling `calendar.test.ts` only checks that the
+  `classNames` keys are real — necessary, and not sufficient: a valid key
+  carrying a class string written against a DOM shape that does not exist
+  is exactly how the selection styling silently matched nothing.
+- **`src/lib/cn.test.ts`** pins the merge behaviour, including the case
+  where `tailwind-merge` deletes a custom font size because it mistakes
+  it for a colour.
+
 ## Versioning
 
 Pre-1.0. Minor versions may contain breaking changes; pin exactly if that

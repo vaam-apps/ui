@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint and format
+        run: pnpm run lint
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Test
+        run: pnpm run test
+
+      # Builds the published artifact, which `tsc --noEmit` above does NOT
+      # exercise: declaration emit has its own failure modes (this package
+      # has already hit TS2742 on a re-exported type that could not be
+      # named through pnpm's virtual store) and they are invisible until
+      # something actually emits.
+      - name: Build the package
+        run: pnpm run build
+
+      # A published tarball that is missing files, or whose entry points
+      # point at paths that are not in it, fails only for the consumer.
+      # Packing and reading the result is the cheapest way to see it here.
+      - name: Pack and verify the tarball
+        run: |
+          pnpm pack --pack-destination /tmp
+          tar -tzf /tmp/vaam-apps-ui-*.tgz | sed 's|^package/||' | sort > /tmp/contents.txt
+          for required in dist/index.js dist/index.d.ts src/styles/theme.css README.md LICENSE; do
+            grep -qx "$required" /tmp/contents.txt \
+              || { echo "::error::$required missing from the tarball"; exit 1; }
+          done
+          grep -q '\.test\.' /tmp/contents.txt \
+            && { echo "::error::test files leaked into the tarball"; exit 1; }
+          echo "tarball contains $(wc -l < /tmp/contents.txt) files"
+
+      - name: Build Storybook
+        run: pnpm run build-storybook
