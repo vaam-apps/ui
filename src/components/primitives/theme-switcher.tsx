@@ -371,9 +371,30 @@ export function useTheme(options?: UseThemeOptions): UseThemeResult {
  *
  * It duplicates `readStoredPreference`/`resolveTheme`'s logic in plain
  * JS on purpose — it has to run before React, this package's bundle, or
- * even the document body exist, so it cannot import them. Kept in
- * lockstep with [`THEME_STORAGE_KEY`] by interpolating the constant
- * rather than repeating the literal.
+ * even the document body exist, so it cannot import them.
+ *
+ * # Why this is one literal string and not a template
+ *
+ * It used to interpolate `THEME_STORAGE_KEY`, `THEME_ATTRIBUTE` and
+ * `DARK_MEDIA_QUERY` via `JSON.stringify`, and advertised that as the
+ * thing keeping it in lockstep with the constants. CodeQL flagged all
+ * three as code construction from a non-literal value, and it is right
+ * to: this string is handed to `dangerouslySetInnerHTML` and executed,
+ * so every interpolation into it is a script-injection sink.
+ *
+ * Nothing was exploitable — all three are module constants — but the
+ * exposure is one plausible refactor away. "Let a consumer namespace the
+ * storage key" is an obvious future request, and the day someone makes
+ * `THEME_STORAGE_KEY` a parameter, this template starts writing caller
+ * input into executable code. Removing the sink is cheaper than
+ * remembering not to create it.
+ *
+ * The lockstep guarantee did not go away with the interpolation; it got
+ * stronger. `theme-switcher.init.test.ts` asserts the literal contains
+ * each constant's exact JSON form, so a renamed key fails the build
+ * rather than silently shipping a script that reads the wrong one — a
+ * test where there used to be a comment, which is this package's habit
+ * everywhere else a fact is written down twice.
  *
  * Never throws: the same private-window/blocked-storage cases
  * `readStoredPreference` guards against apply here too, and on failure it
@@ -381,13 +402,8 @@ export function useTheme(options?: UseThemeOptions): UseThemeResult {
  * `default: true` theme (`dark`) — the same fallback the rest of this
  * module uses.
  */
-export const themeInitScript = `(function(){try{var k=${JSON.stringify(
-  THEME_STORAGE_KEY,
-)};var s=window.localStorage.getItem(k);var p=s==="light"||s==="dark"?s:"system";var r=p==="system"?(window.matchMedia&&window.matchMedia(${JSON.stringify(
-  DARK_MEDIA_QUERY,
-)}).matches===false?"light":"dark"):p;document.documentElement.setAttribute(${JSON.stringify(
-  THEME_ATTRIBUTE,
-)},r);}catch(e){}})();`;
+export const themeInitScript =
+  '(function(){try{var k="vaam-ui:theme";var s=window.localStorage.getItem(k);var p=s==="light"||s==="dark"?s:"system";var r=p==="system"?(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches===false?"light":"dark"):p;document.documentElement.setAttribute("data-theme",r);}catch(e){}})();';
 
 const THEME_OPTIONS: readonly RadioGroupOption<ThemePreference>[] = [
   { value: "system", label: "System", description: "Match the OS setting" },
