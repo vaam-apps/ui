@@ -2,6 +2,42 @@
 
 ## Unreleased
 
+### Three layout bugs that needed a scrollbar to see
+
+- **A tall `Dialog` hid its own footer.** `DialogPanel` had no `max-h`
+  and no `overflow-y`, so a body taller than the viewport pushed
+  `DialogFooter` — and the only button that closes the dialog — off the
+  bottom with no scrollbar anywhere. Not below the fold: unreachable.
+
+  The obvious fix is `overflow-y-auto` on `DialogPanel`, and it strands
+  the close button: `absolute top-4 right-4` against a box that now
+  scrolls means the × scrolls away with the content. So the panel is a
+  bounded `max-h-[85vh]` shell that never scrolls itself, `children` go
+  into an inner scrollport, and the close button is that scrollport's
+  **sibling**. `DialogHeader` and `DialogFooter` are `sticky`.
+
+  **The sticky offset is `-top-6`, not `top-0`, and that was a second
+  bug found by looking at the render.** A sticky offset is measured from
+  the scrollport's *content* edge, and the scrollport is `p-6` — so
+  `top-0` pinned the header 24px below the top of the visible area,
+  leaving a band in which the scrolled body stayed visible and slid past
+  above it. Measured: scrollport top 55px, stuck header top 79px;
+  `-top-6` puts it at 55px. `DialogFooter` carries the mirror.
+
+- **`TableHeader`'s `sticky top-0` never stuck**, because nothing
+  bounded the wrapper — `sticky` needs a scrollport, and a page-level
+  scroll is not one. `Table` takes `maxHeight` now, and the two stories
+  show both sides: unbounded, the header's top goes 72 → −228 on a 300px
+  page scroll (1:1, no stickiness at all); bounded, 16 → 16.
+
+- **`Tooltip`'s bubble is still clipped by a scrolling ancestor** — that
+  needs a portal or CSS anchor positioning, and this component has
+  neither. What changed is that the label is no longer *lost*: a native
+  `title` alongside `data-tip` means a clipped bubble degrades to the
+  browser's own plain tooltip rather than to nothing. The story says so
+  in those terms, because a story that claims a fix it did not make is
+  worse than one that documents the limit.
+
 ### An accessibility gate, and what it found
 
 The a11y work in this package had been done by looking: the Storybook
