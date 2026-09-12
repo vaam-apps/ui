@@ -104,7 +104,12 @@ export const ORDER_STATUS = defineStatusSystem({
   pending: {
     family: "in-flight", silhouette: "circle", mark: "pie-1",
     hue: "neutral", filled: false, attention: "quiet",
-    label: "Pending", tooltip: "Accepted. Waiting its turn.",
+    label: "Pending", tooltip: "Accepted. Nothing has claimed it yet.",
+  },
+  charging: {
+    family: "in-flight", silhouette: "circle", mark: "pie-2",
+    hue: "progress", filled: false, attention: "quiet",
+    label: "Charging", tooltip: "The rail is taking the payment. Nothing is decided yet.",
   },
   authorising: {
     family: "in-flight", silhouette: "circle", mark: "ring",
@@ -142,47 +147,57 @@ apart.
 
 ### Choosing a hue
 
-Seven, and picking from the four obvious ones is the mistake this table
-exists to stop. `authorising` above is the case: an in-flight state whose
-next move belongs to *somebody else*.
+Eight, and picking from the four obvious ones is the mistake this table
+exists to stop. The first three rows are all "not finished", and they are
+not interchangeable.
 
 | Hue | What it tells the reader | Example state |
 | --- | --- | --- |
-| `neutral` | Still moving, and nobody needs to do anything | `pending` — accepted, waiting its turn in this system |
-| `parked` | Still moving, but someone outside this system is holding it | `authorising` — handed to the rail, waiting for the payer to approve on their handset |
+| `neutral` | Not finished, and nothing is happening to it | `pending` — accepted, nothing has claimed it |
+| `progress` | Not finished, and **this** system is working on it now | `charging` — the rail is taking the payment |
+| `parked` | Not finished, and somebody **outside** this system is holding it | `authorising` — waiting for the payer to approve on their handset |
 | `success` | Over, and it worked | `paid` |
 | `danger` | Over, and it did not work | `failed` |
 | `expired` | Over because a window closed — nobody decided anything | `lapsed` — no answer arrived in time |
 | `warning` | A recoverable condition needs a human | `stalled` — retryable in principle, but nothing is driving it |
 | `uncertain` | The outcome is unknown, and will not be learned | `unknown` — sent, and no acknowledgement ever arrived |
 
-Two pairs account for nearly every wrong pick:
+Three clusters account for nearly every wrong pick:
 
+- **`neutral` vs `progress` vs `parked`** — the three ways a record can be
+  unfinished, and they answer *who has it*: nobody (`neutral`), this
+  system (`progress`), somebody else (`parked`). All three stay `quiet`;
+  none of them needs a human. The hue is there so the row is told apart in
+  a peripheral scan down a column, not so it pulls the eye.
 - **`warning` vs `uncertain`** both read as "attention", and are not the
   same attention. `warning` means a recoverable condition needs a human —
   somebody can act, and acting will help. `uncertain` means the outcome is
   unknown — there may be nothing to do and nothing to learn. A stalled job
   is `warning`; a send whose receipt never came back is `uncertain`.
-- **`neutral` vs `expired` vs `parked`** are the three undramatic ones, and
-  they answer three different questions: nobody needs to act (`neutral`),
-  it lapsed (`expired`), someone is being waited on (`parked`).
+- **`neutral` vs `expired`** are the two undramatic ones. Both say nothing
+  is happening; only `expired` says a window closed. They are also the
+  closest pair in the system chromatically — see the ΔE note below.
 
-`parked` is the one that gets missed, because a normal in-flight state
-feels like it should be `neutral`. It should not. `neutral` is transparent
-on a transparent ground — deliberately the hue that does *not* pull the
-eye — so a payment sitting on a payer's handset stops being findable in a
-table of a thousand rows. Reaching for `uncertain` instead is worse: amber
-makes every healthy in-flight payment read as a problem. `parked` is
-violet, and quiet, and its mark is `ring`.
+`parked` is the one that gets missed, because it looks like either of its
+neighbours. It is not `progress`: nothing is being attempted, and time
+passing will not advance it — only a decision by someone you are waiting
+on. It is not `neutral` either, which is transparent on a transparent
+ground and deliberately does *not* pull the eye, so a payment sitting on a
+payer's handset stops being findable in a table of a thousand rows.
+Reaching for `uncertain` is worse still: amber makes every healthy
+in-flight payment read as a problem. `parked` is violet, and quiet, and
+its mark is `ring`.
 
-There is deliberately **no `info` hue**. Blue is selection and focus only
-(`--ring`), never a status — `theme.css` even pins daisyUI's own
-`--color-info` to the neutral grey for that reason. The state an `info`
-hue would be reached for is `parked`.
+There is deliberately **no `info` hue**, and the eighth hue is named
+`progress` for that reason. Blue is selection and focus only (`--ring`),
+never a status — `theme.css` even pins daisyUI's own `--color-info` to the
+neutral grey with a written reason, so a `StatusHue` named `info` would
+contradict its own neighbour by name. The two states an `info` hue gets
+reached for are `progress` and `parked`.
 
 ### Choosing a mark
 
-Eleven, and the names do not tell you which of the six unfinished ones you
+Eleven, and the names do not tell you which of the unfinished ones you
 want. `filled` is a separate channel: terminal marks sit on a filled
 silhouette and knock out of it, in-flight and unresolved marks are
 stroked on an empty one.
@@ -200,11 +215,62 @@ stroked on an empty one.
 | `question` | The outcome was never learned | Pair it with `uncertain`; it is not a failure |
 
 The four that overlap are `pie-*`, `ring`, `clock` and `pause` — all of
-them "not finished yet", and the difference between them is *who is
-holding it*: this system (`pie-*`), somebody else (`ring`), nobody but the
-clock (`clock`), nobody at all (`pause`). `ring` + `parked` is the
-combination a real state machine reaches for most and the one easiest to
-miss, because "submitted" sounds like progress this system is making.
+them "not finished yet", and they split on the same question the hue axis
+splits on: *who is holding it*. That is not a coincidence, and the two
+axes are meant to agree:
+
+| Who has it | Hue | Mark |
+| --- | --- | --- |
+| This system, actively | `progress` | `pie-1` / `pie-2` / `pie-3` |
+| Somebody outside it | `parked` | `ring` |
+| Nobody — only the clock | `neutral` | `clock` |
+| Nobody at all, and it is stuck | `warning` | `pause` |
+
+`ring` + `parked` is the combination a real state machine reaches for most
+and the one easiest to miss, because "submitted" sounds like progress this
+system is making.
+
+### Mapping an in-flight state
+
+Every state machine has a state that is *running and not yet resolved* —
+a payment the rail has, a job a worker claimed, a deploy underway, a
+webhook mid-delivery. It maps like this, and the two adjacent hues are
+both wrong for it:
+
+```tsx
+processing: {
+  family: "in-flight", silhouette: "circle", mark: "pie-2",
+  hue: "progress", filled: false, attention: "quiet",
+  label: "Processing", tooltip: "The rail has the charge. Nothing is decided yet.",
+},
+```
+
+- **`hue: "progress"`**, not `uncertain`. `uncertain` means the outcome
+  is unknowable — sent, and the answer never came back. A payment that is
+  merely *in flight* is entirely normal, and colouring it `uncertain`
+  gives an operator scanning for real problems a false positive on every
+  healthy row.
+- **`hue: "progress"`**, not `neutral` either. `neutral` is for a state
+  where nothing is happening and nothing is expected to — a queued item
+  nobody has claimed, a refunded order that is over. An in-flight record
+  has to stay tellable-apart from a settled one in a peripheral scan of a
+  hundred thousand rows, which is the scan this library exists for.
+- **`hue: "progress"`**, not `parked`, *while the rail is still working*.
+  The moment the next move belongs to a person — the payer approving on
+  their handset, a reviewer signing off — it becomes `parked` and its mark
+  becomes `ring`. Time advances a `progress` state; only somebody else
+  advances a `parked` one.
+- **`attention: "quiet"`.** The hue makes the row *identifiable*; the
+  attention level makes it *demand a human*. An in-flight payment demands
+  nobody. Go `loud` on a detail screen showing one record, not down a
+  column.
+- **`filled: false`, and a `pie-*` mark.** Fill answers "is it over?" on
+  its own, in grayscale and in a monochrome screenshot — the redundancy
+  that keeps hue from being load-bearing.
+
+`family: "in-flight"` is metadata, not a channel — nothing in the
+rendering reads it. It drives `isTerminalStatus`, which answers "should
+this row stop polling", and that is all it does.
 
 ### What is deliberate
 
@@ -224,10 +290,12 @@ miss, because "submitted" sounds like progress this system is making.
   never learned what happened" as whichever is more convenient.
 - **Every hue is legible in both treatments**, on all four steps of the
   surface ladder. Measured against the hex tokens in `theme.css`, not
-  assumed: quiet glyphs run 6.34:1 to 13.65:1 against the 3:1 that a
-  non-text graphic needs, and loud pills — where the 12px label takes the
-  hue itself — run 5.53:1 to 11.64:1 against 4.5:1. The worst case in the
-  system is `expired`, loud, on a hovered row.
+  assumed — the tokens are authored in hex, so a helper that expects oklch
+  parses none of them and reports success on nothing. Quiet glyphs run
+  6.34:1 to 13.65:1 against the 3:1 a non-text graphic needs, and loud
+  pills — where the 12px label takes the hue itself — run 5.53:1 to
+  11.71:1 against 4.5:1. The worst case in the system is `expired`, loud,
+  on a hovered row.
 
 ## Money
 

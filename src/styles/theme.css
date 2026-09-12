@@ -230,6 +230,41 @@
   --state-warning-fg: #fdba74;
   --state-warning-bg: rgb(251 146 60 / 0.1);
   --state-warning-border: rgb(251 146 60 / 0.28);
+
+  /* `progress` — running, outcome not yet known. Added because the hue
+     axis had no value for the one state every state machine spends most
+     of its time in: seven hues, five of which mean trouble or stasis, one
+     of which (`success`) is terminal, leaving `neutral` to cover both
+     "still moving" and "over, and there is nothing to see". The status
+     system's own §4.4 rule — two states that mean different things must
+     not look the same — is the same rule that separated `expired` and
+     `parked` from `neutral`, and "is it over?" is the axis it matters
+     most on.
+
+     Built like every tinted sibling here: a 300-level tint for the
+     foreground, its 400-level neighbour at 10%/28% for the fill and
+     border.
+
+     **This is the one token in this file that sits close to §1.3's "blue
+     is selection-only, never a status hue".** Taken deliberately, and
+     measured rather than argued: the cyan gap (Lab hue 212°, chroma 36)
+     is 71° of hue and dE2000 32.2 from the selection ring's own `#5b8def`
+     (Lab hue 283°, chroma 56), which is further apart than `warning` sits
+     from `uncertain` (29) — the separation this file already accepted as
+     sufficient. The two also never share a surface: `--ring` renders only
+     as a 2px outline offset outside a focused element, never as a glyph
+     or as text. Nearest status sibling is `neutral` at dE2000 25.3;
+     `success` is 31.0 away, which is the collision that actually matters
+     on a payments table and the reason teal-300 was rejected (16.9 from
+     `success` — near enough to be the same colour inside a 14px glyph,
+     the same failure mode `--state-warning-fg`'s own comment records).
+     Contrast on `--background` is 13.6:1, at the top of the 10.4-13.7
+     band the other foreground tokens occupy. A maintainer who reads
+     §1.3 more strictly than this should say so — the measurement is here
+     to be disagreed with, not to settle it by assertion. */
+  --state-progress-fg: #67e8f9;
+  --state-progress-bg: rgb(34 211 238 / 0.1);
+  --state-progress-border: rgb(34 211 238 / 0.28);
 }
 
 /*
@@ -306,6 +341,10 @@
   --color-state-warning-fg: var(--state-warning-fg);
   --color-state-warning-bg: var(--state-warning-bg);
   --color-state-warning-border: var(--state-warning-border);
+
+  --color-state-progress-fg: var(--state-progress-fg);
+  --color-state-progress-bg: var(--state-progress-bg);
+  --color-state-progress-border: var(--state-progress-border);
 }
 
 /*
