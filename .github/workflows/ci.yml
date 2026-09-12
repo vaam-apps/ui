@@ -4,6 +4,15 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Lets CI be re-run by hand from the Actions tab against any ref.
+  #
+  # Added after a pull request that touched this very file opened with no
+  # CI run at all — no queued run, nothing awaiting approval, the workflow
+  # still `active` — and there was no way to ask for one. Closing and
+  # reopening the PR did not fire it either. Every other check on that PR
+  # was green, which is the dangerous shape: a check list that looks
+  # passing while the gate that matters never ran.
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
