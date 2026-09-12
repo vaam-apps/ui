@@ -39,9 +39,31 @@ jobs:
       - run: pnpm run test
       - run: pnpm run build
 
-      # `prepack` rebuilds, so the tarball can never be stale.
+      # Catches a broken tarball before anything is published, which is
+      # the one failure a publish cannot take back.
+      - name: Validate the tarball
+        run: pnpm publish --dry-run --no-git-checks
+
+      # `pnpm publish`, not `npm publish`, and deliberately NO
+      # `NODE_AUTH_TOKEN`. This authenticates by npm Trusted Publishing
+      # (OIDC), which `permissions: id-token: write` above enables and
+      # pnpm performs itself. There is no npm token in this repository
+      # and there is not meant to be one.
+      #
+      # Setting NODE_AUTH_TOKEN from a secret that does not exist is
+      # actively harmful rather than merely redundant — the sibling
+      # @vymalo/vsms-node release learnt this on its own v0.2.0:
+      # `actions/setup-node`'s `registry-url` writes an `.npmrc`
+      # containing `_authToken=${NODE_AUTH_TOKEN}`, so an unset secret
+      # becomes an *empty* token rather than no token, and npm masks a
+      # bad credential as `E404 PUT https://registry.npmjs.org/...`
+      # rather than confirm to an unauthenticated caller whether a
+      # package exists. Whoever reads that log goes hunting for a missing
+      # package instead of a missing publisher.
+      #
       # Requires Trusted Publishing to be configured for @vaam-apps/ui on
-      # npmjs.com against this repository and this workflow file; without
-      # it this step fails with a masked E404.
-      - name: Publish to npm
-        run: npm publish --provenance --access public
+      # npmjs.com against this repository and this workflow filename.
+      # That is a maintainer step on npmjs.com; until it is done, this
+      # fails with exactly the masked E404 described above.
+      - name: Publish to npm (Trusted Publishing / OIDC)
+        run: pnpm publish --access public --provenance --no-git-checks
