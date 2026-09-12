@@ -27,6 +27,16 @@ export interface PaginationProps {
   /** Rendered between the counts and the buttons — a page-size select, a
    * "Newest first" note. */
   children?: ReactNode;
+  /**
+   * Overrides the landmark's accessible name.
+   *
+   * Needed whenever a screen shows more than one pager — a table with
+   * controls above and below is the usual case. Two `<nav>` landmarks
+   * with the same name is a real navigation defect, not a lint nit: a
+   * screen-reader user listing landmarks sees "Pagination, Pagination"
+   * and cannot tell which is which.
+   */
+  label?: string | undefined;
   className?: string | undefined;
 }
 
@@ -53,7 +63,14 @@ function positionLabel(position: PaginationPosition): string {
  * forces a caller to decide what the boundary is, instead of getting a
  * silently dead button by omission.
  */
-export function Pagination({ onPrevious, onNext, position, children, className }: PaginationProps) {
+export function Pagination({
+  onPrevious,
+  onNext,
+  position,
+  children,
+  label = "Pagination",
+  className,
+}: PaginationProps) {
   const atEnd =
     position.kind === "cursor"
       ? onNext === undefined
@@ -61,7 +78,7 @@ export function Pagination({ onPrevious, onNext, position, children, className }
 
   return (
     <nav
-      aria-label="Pagination"
+      aria-label={label}
       className={cn("flex items-center justify-between gap-4 text-caption", className)}
     >
       <p className="font-mono text-subtle-foreground tabular-nums">{positionLabel(position)}</p>

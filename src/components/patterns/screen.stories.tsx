@@ -25,7 +25,9 @@ export const Layout: Story = {
         description="Which provider carries which traffic, and why that one won."
       />
       <Card>
-        <CardHeader title="Catch-all" meta="priority 500 · weight 1" />
+        {/* `h2`: this card sits directly under the screen's own `h1`,
+            so the default `h3` would skip a level. */}
+        <CardHeader title="Catch-all" meta="priority 500 · weight 1" headingLevel={2} />
         <CardBody>
           <p className="text-body text-muted-foreground">Matches anything.</p>
         </CardBody>

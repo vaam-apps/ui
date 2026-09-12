@@ -35,25 +35,34 @@ export interface StatTileProps {
  */
 export function StatTile({ label, value, caption, tone, action, className }: StatTileProps) {
   return (
-    <dl
+    <div
       className={cn(
-        "flex flex-col gap-1 rounded-box border border-edge bg-base-300 p-4",
+        "relative flex flex-col rounded-box border border-edge bg-base-300 p-4",
         className,
       )}
     >
-      <div className="flex items-start justify-between gap-2">
-        <dt className="text-caption text-muted-foreground">{label}</dt>
-        {action != null && <div className="shrink-0">{action}</div>}
-      </div>
-      <dd
-        className={cn(
-          "font-mono text-metric tabular-nums",
-          tone === undefined ? "text-foreground" : HUE_CLASSES[tone].fg,
-        )}
-      >
-        {value}
-      </dd>
-      {caption != null && <dd className="text-caption text-subtle-foreground">{caption}</dd>}
-    </dl>
+      {/* Outside the `<dl>`, and absolutely positioned rather than a flex
+          sibling of the `<dt>`. A `<dl>` may contain only `<dt>`, `<dd>`
+          and `<div>`s that wrap dt/dd groups — an action button among
+          them is invalid markup, which axe reports as a serious
+          `definition-list` violation. Found by the a11y addon, after an
+          earlier version nested the action in a header row inside the
+          list. */}
+      {action != null && <div className="absolute top-4 right-4">{action}</div>}
+      <dl className="flex flex-col gap-1">
+        <dt className={cn("text-caption text-muted-foreground", action != null && "pr-20")}>
+          {label}
+        </dt>
+        <dd
+          className={cn(
+            "font-mono text-metric tabular-nums",
+            tone === undefined ? "text-foreground" : HUE_CLASSES[tone].fg,
+          )}
+        >
+          {value}
+        </dd>
+        {caption != null && <dd className="text-caption text-subtle-foreground">{caption}</dd>}
+      </dl>
+    </div>
   );
 }

@@ -66,17 +66,24 @@ export const Paging: Story = {
     const total = 137;
     return (
       <div className="flex w-[36rem] flex-col gap-4">
+        {/* Distinct labels: three `<nav>` landmarks sharing one name is
+            what a real screen with a pager above and below a table would
+            also produce, and a screen-reader user cannot tell them
+            apart. */}
         <Pagination
+          label="Results, offset paging"
           position={{ kind: "offset", offset, pageSize, total }}
           onPrevious={offset === 0 ? undefined : () => setOffset((o) => o - pageSize)}
           onNext={() => setOffset((o) => o + pageSize)}
         />
         <Pagination
+          label="Results, cursor paging"
           position={{ kind: "cursor", count: 25 }}
           onPrevious={undefined}
           onNext={() => undefined}
         />
         <Pagination
+          label="Results, empty"
           position={{ kind: "cursor", count: 0 }}
           onPrevious={undefined}
           onNext={undefined}

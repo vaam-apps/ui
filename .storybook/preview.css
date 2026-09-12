@@ -7,7 +7,9 @@
  * scan by default. Omitting it renders every story unstyled with no error.
  */
 @import "tailwindcss";
-@plugin "daisyui";
+@plugin "daisyui" {
+  themes: false;
+}
 @source "../src";
 
 /* The theme must load AFTER `@plugin "daisyui"`, so its own
@@ -19,3 +21,18 @@
    application's own stylesheet. */
 /* biome-ignore lint/correctness/noInvalidPositionAtImportRule: Tailwind/daisyUI directives are preprocessed, not spec CSS */
 @import "../src/styles/theme.css";
+
+/*
+ * Paint the theme's own page background on the preview canvas.
+ *
+ * Without this the preview `body` is transparent, Storybook's default
+ * canvas shows through, and every contrast result the a11y addon reports
+ * is measured against a background the real application never has. That
+ * is worse than no result: it produced three false failures on a loud
+ * status pill whose text composites fine over the real page, and it
+ * would equally hide a genuine one.
+ */
+body {
+  background-color: var(--color-base-100);
+  color: var(--color-base-content);
+}

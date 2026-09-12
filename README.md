@@ -27,10 +27,31 @@ Tailwind and the daisyUI plugin:
 
 ```css
 @import "tailwindcss";
-@plugin "daisyui";
+@plugin "daisyui" {
+  themes: false;
+}
 @import "@vaam-apps/ui/styles/theme.css";
 @source "../node_modules/@vaam-apps/ui/dist";
 ```
+
+**`themes: false` is load-bearing, not tidiness.** This package defines
+its theme under daisyUI's own `dark` name, and daisyUI's built-in `dark`
+emits at a higher specificity than any custom theme block can:
+
+```css
+/* daisyUI's built-in — specificity (0,3,1) */
+:is(:root:has(input.theme-controller[value=dark]:checked),[data-theme=dark]) { … }
+/* a custom theme block — specificity (0,1,0) */
+:where(:root),[data-theme=dark] { … }
+```
+
+The built-in therefore wins on every token it also defines — `base-100`,
+`base-200`, `base-300`, `base-content` — regardless of import order, so
+the page background, card surfaces and body text silently come out as
+stock daisyUI rather than this theme. Turning the built-ins off leaves
+nothing to collide with. Found by measuring a rendered page, not by
+reading: `--color-base-100` resolved to `oklch(25.33% .016 252.42)` where
+the theme declares `#0a0b0d`.
 
 **2. Keep the `@source` line.** Tailwind v4 generates only the utilities
 it can see used, and it does not look inside `node_modules` on its own.
@@ -188,6 +209,12 @@ Worth knowing before you fight them:
 - **Dark only.** There is one theme, and no toggle. A second theme is a
   real amount of work to keep honest and nothing here pretends to have
   done it.
+
+## The component gallery
+
+Every component is published as a Storybook at
+**<https://vaam-apps.github.io/ui/>**, redeployed from `main` on every
+push. The a11y panel runs axe on each story.
 
 ## Development
 

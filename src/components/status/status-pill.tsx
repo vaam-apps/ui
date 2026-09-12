@@ -71,17 +71,50 @@ export function StatusPill({
         "inline-flex items-center gap-[5px] whitespace-nowrap align-middle",
         "text-caption",
         loud && [hue.bg, hue.border, "rounded-sm border py-0.5 pr-1.5 pl-[5px] font-medium"],
-        pending && "border-dashed opacity-60",
+        // A dashed outline, and NOT dimming. `pending` used to be
+        // `opacity-60`, which took its own text to 2.71:1 against the
+        // page — below AA, and unreadable at exactly the moment a reader
+        // most wants to know what is happening. Measured before changing
+        // it: the opacity that keeps this text at AA is 0.90, by which
+        // point the dimming conveys nothing. So the state says so with a
+        // border instead, at full text contrast.
+        //
+        // A quiet pill has no border to dash, so it grows the same box a
+        // loud one has — otherwise `pending` would be invisible on the
+        // majority of pills.
+        pending && "border-dashed",
+        pending && !loud && "rounded-sm border border-edge-strong py-0.5 pr-1.5 pl-[5px]",
         interactive && "cursor-pointer",
         className,
       )}
     >
       <StateMark meta={meta} size={markSize} className={hue.fg} />
       <span className={loud ? hue.fg : "text-muted-foreground"}>{meta.label}</span>
+      {/* `muted`, not `subtle`, once the pill is loud. A loud pill paints a
+          state tint behind this text, and `--subtle-foreground` does not
+          reach 4.5:1 on a tint over anything lighter than the page
+          background — 4.36:1 over a card, 3.85:1 over a hovered row.
+          Measured, and not fixable by nudging the token: the value that
+          would clear AA on a tint is ΔE 2 from `--muted-foreground`,
+          which collapses the three-tier text ladder into two. So the
+          tier changes with the background instead. */}
       {showLiteral && literal !== undefined && (
-        <span className="font-mono text-micro text-subtle-foreground">{literal}</span>
+        <span
+          className={cn(
+            "font-mono text-micro",
+            loud ? "text-muted-foreground" : "text-subtle-foreground",
+          )}
+        >
+          {literal}
+        </span>
       )}
-      {detail != null && <span className="font-mono text-subtle-foreground">{detail}</span>}
+      {detail != null && (
+        <span
+          className={cn("font-mono", loud ? "text-muted-foreground" : "text-subtle-foreground")}
+        >
+          {detail}
+        </span>
+      )}
     </Comp>
   );
 }

@@ -26,17 +26,36 @@ export function Card({ className, ...props }: CardProps) {
 
 export interface CardHeaderProps extends Omit<HTMLAttributes<HTMLDivElement>, "title"> {
   title: ReactNode;
+  /**
+   * Heading level for `title`. Defaults to `h3`, which is right for a
+   * card inside a section that already has an `h2`.
+   *
+   * It is a prop rather than a constant because a heading level is a
+   * property of the page's outline, not of the card: a card placed
+   * directly under the screen's `h1` with `h3` skips a level, which axe
+   * reports as `heading-order` and a screen-reader user experiences as a
+   * missing section.
+   */
+  headingLevel?: 2 | 3 | 4 | 5 | 6;
   /** Optional mono metadata line beneath the title. */
   meta?: ReactNode;
   /** Right-aligned slot, e.g. a row of buttons. */
   action?: ReactNode;
 }
 
-export function CardHeader({ title, meta, action, className, ...props }: CardHeaderProps) {
+export function CardHeader({
+  title,
+  meta,
+  action,
+  headingLevel = 3,
+  className,
+  ...props
+}: CardHeaderProps) {
+  const Heading = `h${headingLevel}` as const;
   return (
     <div className={cn("flex items-start justify-between gap-4 p-4", className)} {...props}>
       <div className="min-w-0">
-        <h3 className="truncate font-medium text-foreground text-title-sm">{title}</h3>
+        <Heading className="truncate font-medium text-foreground text-title-sm">{title}</Heading>
         {meta != null && (
           <p className="mt-1 truncate font-mono text-caption text-subtle-foreground">{meta}</p>
         )}
