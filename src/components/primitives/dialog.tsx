@@ -141,7 +141,7 @@ export function DialogContent({ className, children, ...props }: ComponentPropsW
     <HeadlessDialog open={open} onClose={setOpen} className="relative z-50">
       <DialogBackdrop
         transition
-        className="fixed inset-0 bg-black/50 duration-150 ease-out data-closed:opacity-0"
+        className="fixed inset-0 bg-scrim duration-150 ease-out data-closed:opacity-0"
       />
       <div className="fixed inset-0 flex w-screen items-center justify-center p-4">
         <DialogPanel
@@ -159,12 +159,22 @@ export function DialogContent({ className, children, ...props }: ComponentPropsW
               therefore the `right-4`/`top-4` offset every dialog author
               sees) is unchanged, only its padding/margin box grows to
               absorb it. Matches `drawer.tsx`'s close button, which needs
-              the same fix for the same reason. */}
+              the same fix for the same reason.
+
+              `rounded-full`, not `rounded-sm`: icon-only controls are
+              circular in this package (see `button.tsx`'s `icon` size) —
+              a label-less control reads as "acts on the thing beside it",
+              which a circle communicates and a rounded rectangle doesn't.
+              `hover:bg-surface-3` gives the hover state something besides
+              a text-colour change to register, matching the icon-button
+              hover already used in `calendar.tsx`; focus already gets a
+              ring for free from `theme.css`'s global `:focus-visible`
+              rule, so no separate focus treatment is needed here. */}
           <button
             type="button"
             aria-label="Close"
             onClick={() => setOpen(false)}
-            className="-m-1 absolute top-4 right-4 rounded-sm p-1 text-subtle-foreground hover:text-foreground"
+            className="-m-1 absolute top-4 right-4 rounded-full p-1 text-subtle-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
           >
             <X size={16} strokeWidth={1.5} />
           </button>
@@ -202,7 +212,15 @@ export function DialogTitle({
 }: ComponentPropsWithoutRef<typeof HeadlessDialogTitle>) {
   return (
     <HeadlessDialogTitle
-      className={cn("font-medium text-foreground text-title-sm", className)}
+      // `font-display`/`tracking-normal`: `theme.css`'s own doc on
+      // `--font-display` names "card and dialog headings" outright — see
+      // `card.tsx`'s `CardHeader` comment for why the tracking reset is
+      // needed (the global `html { letter-spacing: -0.011em }` was tuned
+      // for the sans body face, not this serif).
+      className={cn(
+        "font-display font-medium text-foreground text-title-sm tracking-normal",
+        className,
+      )}
       {...props}
     />
   );

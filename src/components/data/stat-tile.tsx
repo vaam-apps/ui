@@ -11,7 +11,20 @@ export interface StatTileProps {
   value: ReactNode;
   /** One line under the value: the comparison, the window, the caveat.
    * A bare number with no denominator is the most common way a dashboard
-   * misleads, so this slot exists to make the denominator easy. */
+   * misleads, so this slot exists to make the denominator easy.
+   *
+   * Stays `font-sans`, deliberately not `font-italic`. `--font-italic`'s
+   * test (`theme.css`'s comment on the four voices, quoted in
+   * `inline-empty-state.tsx`) is "a person wrote this to explain a
+   * decision the system made". This caption fails that test: the shipped
+   * fixtures — `"98.2% of 12,710 terminal"`, `"XAF, across all
+   * providers"` — are a computed ratio and a currency unit, emitted facts
+   * of the same register as the mono value above them, not commentary
+   * standing apart from it. Compare `StateTimeline`'s `AnnotationNode`,
+   * which *is* a person qualifying one specific fact, and stays italic.
+   * If a future caption is genuinely a person's explanation, it still
+   * shouldn't flip this default — pass it through a slot that says so,
+   * rather than reopening this one. */
   caption?: ReactNode;
   /** Tints the value. Leave unset unless the number's own colour carries
    * meaning — a wall of coloured tiles makes the one that matters harder
@@ -74,7 +87,9 @@ export function StatTile({ label, value, caption, tone, action, className }: Sta
         </dd>
         {/* Two lines. Tiles sit in a grid and stretch to the tallest, so
             one long caption raises every tile in the row — the denominator
-            this slot exists for is a phrase, not a paragraph. */}
+            this slot exists for is a phrase, not a paragraph.
+            Sans, not italic — see the `caption` prop doc above for why
+            this slot fails `--font-italic`'s own test. */}
         {caption != null && (
           <dd className="line-clamp-2 text-caption text-subtle-foreground">{caption}</dd>
         )}

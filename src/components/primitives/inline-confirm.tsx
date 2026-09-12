@@ -91,7 +91,16 @@ export function InlineConfirm({
       )}
     >
       <div className="flex flex-col gap-1">
-        <h3 className="font-medium text-foreground text-title-sm">{title}</h3>
+        {/* `font-display`/`tracking-normal`: this heading is the same
+            `"font-medium text-foreground text-title-sm"` string
+            `card.tsx`'s `CardHeader` uses, and `theme.css`'s own doc on
+            `--font-display` names "card and dialog headings" outright —
+            see `CardHeader`'s comment for why the tracking reset is
+            needed (the global `html { letter-spacing: -0.011em }` was
+            tuned for the sans body face, not this serif). */}
+        <h3 className="font-display font-medium text-foreground text-title-sm tracking-normal">
+          {title}
+        </h3>
         {description != null && <p className="text-body text-muted-foreground">{description}</p>}
       </div>
 

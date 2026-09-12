@@ -134,9 +134,11 @@ const meta = {
         component:
           "Three bands, all of them plain CSS — no `useMediaQuery`, no client-only mount, " +
           "so the whole nav is in the server-rendered HTML on first paint. Below 1024px it " +
-          "fills the caller's off-canvas drawer with collapsible groups; from 1024px it is a " +
-          "64px icon rail; from 1280px a 256px sidebar with labels. Resize the preview to " +
-          "cross them.",
+          'is, by default, a floating icon rail detached from the edge (`smallScreen="floating"`); ' +
+          'the opt-in `smallScreen="off-canvas"` restores the original full-label accordion tree ' +
+          "for a caller that already owns a drawer. From 1024px it is a 64px icon rail; from " +
+          "1280px a 256px sidebar with labels — unaffected by `smallScreen` either way. Resize " +
+          "the preview to cross them.",
       },
     },
   },
@@ -189,16 +191,102 @@ export const FullSidebar: Story = {
 };
 
 /**
- * Below `lg` the nav fills whatever the caller put it in — here a 300px
- * stand-in for the off-canvas drawer — and groups become a collapsible
- * accordion, open only if it holds the current route. "Roughly 6–8
- * tappable rows on open, not 18."
+ * The opt-in legacy shape: `smallScreen="off-canvas"` restores exactly the
+ * original below-`lg` tree, unchanged, for a caller that already wraps
+ * this component in its own drawer. Below `lg` the nav fills whatever the
+ * caller put it in — here a 300px stand-in for that drawer — and groups
+ * become a collapsible accordion, open only if it holds the current
+ * route. "Roughly 6–8 tappable rows on open, not 18."
+ *
+ * This is not the default any more (`"floating"` is) — see `FloatingRail`
+ * for what a caller gets without opting into this prop.
  */
 export const OffCanvasDrawer: Story = {
   globals: { viewport: { value: "offCanvas" } },
   render: (args) => (
     <div className="flex h-[32rem] w-full max-w-[300px] overflow-hidden rounded-md border border-edge">
-      <SideNav {...args} currentPath="/composer" />
+      <SideNav {...args} smallScreen="off-canvas" currentPath="/composer" />
+    </div>
+  ),
+};
+
+/**
+ * The default below-`lg` shape: a floating icon rail, detached from the
+ * edge, layered over the page instead of hidden behind a hamburger the
+ * caller has to build. Rendered over a page-like stage — a heading, some
+ * body copy, a couple of content blocks — rather than an empty canvas,
+ * because the rail is `fixed` and the whole point is that it floats over
+ * real content instead of reserving a lane for itself.
+ *
+ * Hover (or focus) an icon for its native-`title` label — the same
+ * mechanism the `1024–1279px` icon rail relies on, and for the same
+ * reason: nothing here is a CSS tooltip, so nothing here can be clipped.
+ */
+export const FloatingRail: Story = {
+  globals: { viewport: { value: "offCanvas" } },
+  render: (args) => (
+    <div className="h-[45rem] overflow-y-auto bg-base-100 p-6">
+      <div className="flex flex-col gap-4 pl-16">
+        <div className="h-7 w-48 rounded-sm bg-surface-3" />
+        <div className="h-4 w-full max-w-xs rounded-sm bg-surface-2" />
+        <div className="h-4 w-full max-w-[200px] rounded-sm bg-surface-2" />
+        <div className="mt-4 h-40 rounded-md bg-surface-2" />
+        <div className="h-24 rounded-md bg-surface-2" />
+        <div className="h-24 rounded-md bg-surface-2" />
+        <p className="text-body text-muted-foreground">
+          The rail sits over this content — it is `fixed`, not laid out in the column above.
+        </p>
+      </div>
+      <SideNav {...args} />
+    </div>
+  ),
+};
+
+/**
+ * Enough groups that the floating rail itself outgrows `max-h-[80vh]` and
+ * has to scroll — the same overflow this component has always had to
+ * handle, one level narrower. `overflow-x-hidden` guards the same
+ * horizontal-scrollbar regression `<nav>` itself guards against, and the
+ * native `title` label keeps working the whole way down, because a
+ * browser-painted tooltip is never subject to an ancestor's `overflow`.
+ */
+export const FloatingRailOverflow: Story = {
+  globals: { viewport: { value: "offCanvas" } },
+  render: (args) => (
+    <div className="h-[45rem] overflow-y-auto bg-base-100 p-6">
+      <div className="pl-16">
+        <div className="h-7 w-48 rounded-sm bg-surface-3" />
+      </div>
+      <SideNav
+        {...args}
+        groups={[
+          ...GROUPS,
+          {
+            label: "Operations",
+            items: [
+              { label: "Jobs", href: "/jobs", icon: Route },
+              { label: "Workers", href: "/workers", icon: Plug },
+              { label: "Opt-outs", href: "/opt-outs", icon: Inbox },
+              { label: "Audit log", href: "/audit-log", icon: Book },
+            ],
+          },
+          {
+            label: "Administration",
+            items: [
+              { label: "Apps", href: "/apps", icon: Plug },
+              { label: "Users", href: "/users", icon: Send },
+              { label: "Webhooks", href: "/webhooks", icon: Route },
+            ],
+          },
+          {
+            label: "Extra",
+            items: [
+              { label: "Templates", href: "/templates", icon: Book },
+              { label: "Segments", href: "/segments", icon: Route },
+            ],
+          },
+        ]}
+      />
     </div>
   ),
 };

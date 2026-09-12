@@ -47,6 +47,13 @@ const EXEMPT: Record<string, string> = {
   REGISTERED_FONT_SIZES:
     "Not a component. Exported from `cn.ts` purely so `theme-tokens.test.ts` can check the " +
     "registered scale against the stylesheet.",
+  THEME_STORAGE_KEY:
+    "Not a component — the `localStorage` key `ThemeSwitcher` persists under, exported so a " +
+    "consumer's own settings UI can read and clear the same key. Listed here explicitly " +
+    "because the honest alternative is worse: the scan below is plain text, so merely " +
+    "*naming* a constant in a story's prose satisfies it without rendering anything. An " +
+    "exemption with a reason is a decision; a passing mention is the blind spot this file " +
+    "was written to close.",
 };
 
 function walk(dir: string): string[] {

@@ -68,7 +68,17 @@ function AnnotationNode({ text }: { text: string }) {
       <div className="flex w-4 shrink-0 justify-center">
         <Info size={14} strokeWidth={1.5} className="mt-0.5 text-muted-foreground" />
       </div>
-      <div className="min-w-0 flex-1 rounded-sm border border-edge bg-surface-2 px-3 py-2 text-caption text-muted-foreground">
+      {/* `font-italic italic`: this is the case `--font-italic` exists
+          for (see `theme.css`'s comment on the four voices) — the note
+          is a person explaining a decision the system made, set apart
+          from every emitted-fact row around it by more than just the
+          `Info` glyph. The token names the family; `italic` is what
+          actually slants it. `tracking-normal`: same correction as
+          `card.tsx`'s `CardHeader` — the global `html { letter-spacing:
+          -0.011em }` was tuned for the sans body face, and at 12px this
+          is the smallest serif slot in the system, so the sans-tuned
+          negative tracking crowds it more, not less. */}
+      <div className="min-w-0 flex-1 rounded-sm border border-edge bg-surface-2 px-3 py-2 font-italic text-caption text-muted-foreground italic tracking-normal">
         {text}
       </div>
     </li>

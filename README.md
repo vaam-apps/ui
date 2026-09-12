@@ -35,8 +35,8 @@ Tailwind and the daisyUI plugin:
 ```
 
 **`themes: false` is load-bearing, not tidiness.** This package defines
-its theme under daisyUI's own `dark` name, and daisyUI's built-in `dark`
-emits at a higher specificity than any custom theme block can:
+its themes under daisyUI's own `dark` and `light` names, and daisyUI's
+built-ins emit at a higher specificity than any custom theme block can:
 
 ```css
 /* daisyUI's built-in — specificity (0,3,1) */
@@ -59,9 +59,30 @@ Without it every component renders with no styling at all — no error, no
 warning, just a page that looks broken in a way that is miserable to
 debug. Adjust the relative path to reach your own `node_modules`.
 
-The theme registers itself under daisyUI's `dark` name and sets
-`prefersdark`, so `<html data-theme="dark">` (or no attribute at all)
-picks it up.
+Two themes register, under daisyUI's own `dark` and `light` names. `dark`
+carries `default: true` and `prefersdark`, so `<html data-theme="dark">` —
+or no attribute at all — picks it up exactly as before. Light emits only
+`[data-theme="light"]`: no `:root` rule and no `prefers-color-scheme`
+query, so a dark-only application is unaffected by its presence.
+
+One upgrade caveat: if your `<html>` already carries `data-theme="light"`
+from daisyUI boilerplate, that attribute previously matched nothing and
+now matches. Set `data-theme="dark"` explicitly if that is you.
+
+**3. Load the faces, or accept the fallback.** `theme.css` names four
+roles — `--font-display` (IBM Plex Serif), `--font-sans` (IBM Plex Sans),
+`--font-italic` (IBM Plex Serif) and `--font-mono` (JetBrains Mono) — as
+**stacks, not `@font-face` rules**. This package ships no font files and
+still does not. Load them however you already load fonts:
+
+```html
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Serif:ital,wght@0,500;0,600;1,400;1,500&family=JetBrains+Mono:wght@400;500&display=swap">
+```
+
+Skipping this is not a failure — the stacks fall back through `ui-serif` /
+`system-ui` / `ui-monospace` and every screen still works. It is a quieter
+loss than the two steps above: the display and italic roles collapse into
+the same system serif, and the four-voice distinction goes with them.
 
 ## What is in it
 
@@ -73,12 +94,13 @@ picks it up.
 `Popover` · `DropdownMenu` · `CommandMenu` · `Tooltip` · `Toast` ·
 `Table` · `Tabs` · `Pagination` · `Card` · `Badge` · `Separator` ·
 `Skeleton` / `SkeletonText` · `Spinner` · `Progress` · `SideNav` ·
-`InlineConfirm`
+`InlineConfirm` · `ThemeSwitcher` / `useTheme`
 
 ### Data display
 
 `Money` · `IdDisplay` · `PhoneDisplay` · `MaskedValue` · `CopyButton` ·
-`TimestampDisplay` · `DetailRow` / `DetailList` · `StatTile` · `Code`
+`TimestampDisplay` · `DetailRow` / `DetailList` · `StatTile` ·
+`InstrumentPanel` · `Code`
 
 ### Patterns
 
@@ -359,15 +381,28 @@ here so it is not.
 
 Worth knowing before you fight them:
 
-- **Borders, not shadows.** Cards and panels are a 1px border on a
-  surface step. Shadows are reserved for genuinely floating layers
-  (popover, dialog).
+- **Three surface registers, and borders are still the default.**
+  *Diagnostic* surfaces — tables, drawers, detail panes, the places you
+  **read** — are a 1px border on a surface step, and that is most of the
+  library. *Floating* layers (popover, dialog, drawer, toast) get a
+  shadow, because they overlap a ground they do not know. *Instrument*
+  surfaces — dashboards and metrics, the places you **scan** — get an
+  aurora: `InstrumentPanel`'s mesh ground, or `Card glow`. The third one
+  is a deliberate exception, not a loosening: a glow on every card is a
+  glow on none, and the rule still holds everywhere it was doing work.
 - **There is no success or warning *button*.** Those hues belong to
   status; a button is primary, secondary, ghost or destructive. Mixing
   them is how a status language erodes.
 - **Empty states are inline status lines, not centred placards** — see
   `InlineEmptyState`.
-- **Two of the seven status hues are quiet.** `neutral` and `success`
+- **Hue means status, with exactly one exception.** The `--aurora-*` ramp
+  — the skeleton's drift, `InstrumentPanel`'s mesh, `Card glow` — is
+  chrome: bound by `color-mix` to the system's own hues so it cannot
+  drift, and carrying no meaning at all. Nothing infers a state from it
+  and no caller can express one through it, which is the only reason a
+  coloured surface is safe in a system whose premise is that colour
+  means something.
+- **Two of the eight status hues are quiet.** `neutral` and `success`
   declare `transparent` for their own fill and border on purpose, so a
   screen where most rows succeeded is a column of glyphs and words rather
   than a wall of green boxes. A surface that needs a *box* for a quiet
@@ -385,12 +420,18 @@ Worth knowing before you fight them:
 - **Skeletons drift; they do not shimmer.** A shimmer sweeps on a fixed
   period, which reads as progress a placeholder cannot know about, and a
   column of them beats like a metronome. `Skeleton` runs a chaotic
-  gradient instead — two soft fields on coprime periods, no sweep, no
-  direction, out of phase with its neighbours — and stops entirely under
-  `prefers-reduced-motion`.
-- **Dark only.** There is one theme, and no toggle. A second theme is a
-  real amount of work to keep honest and nothing here pretends to have
-  done it.
+  gradient instead — soft aurora ribbons on coprime periods (23s and 31s),
+  no sweep, no direction, out of phase with its neighbours — and stops
+  entirely under `prefers-reduced-motion`.
+- **Two themes, and dark is still the default.** A second theme is a real
+  amount of work to keep honest, and the honest part is contrast, not
+  colour: every status foreground in the dark set is a 300-level tint
+  chosen for ~11:1 against near-black, and measured against white all
+  eight fell between 1.4:1 and 2.6:1 — every one below AA. So
+  `src/lib/contrast.test.ts` was written *first* and the light values
+  searched against it. `dark` keeps `default: true` and `prefersdark`, so
+  a consumer who sets no `data-theme` gets exactly what they got before.
+  Light is opt-in, via `data-theme="light"` or `ThemeSwitcher`.
 
 ## The component gallery
 

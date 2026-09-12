@@ -73,7 +73,24 @@ export function MaskedValue({
           onClick={() => setRevealed((previous) => !previous)}
           aria-label={revealed ? `Hide ${label}` : `Reveal ${label}`}
           aria-pressed={revealed}
-          className="shrink-0 text-subtle-foreground transition-colors hover:text-foreground"
+          // `-m-1 p-1 rounded-full`: same hit-area idiom as `copy-button.tsx`
+          // and the `dialog`/`drawer`/`toast` close buttons — negative
+          // margin cancels the padding, so this grows the clickable box to
+          // roughly 32×32px without moving the icon or shifting the
+          // `gap-1.5` row it sits in. Previously bare, a ~12px icon with no
+          // hit-area padding at all.
+          //
+          // This is the one place two `-m-1` controls sit next to each
+          // other (this button, then `CopyButton` below, both inside the
+          // same `gap-1.5` row) — worked through on paper: each pulls 4px
+          // into the 6px gap, so their invisible padding boxes overlap by
+          // 2px at the boundary, while the *visible* icon-to-icon spacing
+          // stays exactly 6px (the padding is inset from the border box by
+          // the same 4px the margin removes, so the glyph itself never
+          // moves). A worst-case pointer landing on that exact 2px sliver
+          // resolves to whichever button paints on top; not worth widening
+          // the row's gap to chase.
+          className="-m-1 shrink-0 rounded-full p-1 text-subtle-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
         >
           {revealed ? <EyeOff size={12} strokeWidth={1.5} /> : <Eye size={12} strokeWidth={1.5} />}
         </button>

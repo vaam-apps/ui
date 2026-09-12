@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { buttonVariants } from "../components/primitives/button";
 import { cn } from "./cn";
 
 describe("cn — custom theme scales", () => {
@@ -75,5 +76,44 @@ describe("cn — stock Tailwind behaviour is unchanged", () => {
 
   it("passes conditional values through clsx", () => {
     expect(cn("a", false && "b", undefined, ["c", { d: true, e: false }])).toBe("a c d");
+  });
+});
+
+describe("daisyUI button size and shape are orthogonal", () => {
+  /**
+   * Regression guard. `square`/`circle` shared a class group with
+   * `xs…xl`, so `cn()` treated them as conflicting and dropped the shape —
+   * `Button size="icon"` emitted `btn-circle btn-sm` and rendered as a
+   * plain small button, for as long as that group existed. The classes
+   * were right at the call site and deleted on the way out, which is the
+   * failure mode this whole file exists to prevent.
+   */
+  it("keeps both a shape and a size", () => {
+    expect(cn("btn-circle", "btn-sm")).toBe("btn-circle btn-sm");
+    expect(cn("btn-sm", "btn-circle")).toBe("btn-sm btn-circle");
+    expect(cn("btn-square", "btn-sm")).toBe("btn-square btn-sm");
+  });
+
+  it("still resolves two shapes, and two sizes, against each other", () => {
+    expect(cn("btn-square", "btn-circle")).toBe("btn-circle");
+    expect(cn("btn-sm", "btn-lg")).toBe("btn-lg");
+  });
+
+  /**
+   * Asserts the **radius**, not just the shape class — because asserting
+   * the class is what let a rounded square ship as a circle.
+   *
+   * `btn-circle` survived the merge and the old test was green, but the
+   * base string's `rounded-field` is an unlayered Tailwind utility and
+   * daisyUI emits `.btn-circle` a sublayer deeper, so the utility won and
+   * the element painted at 12px. A class-string assertion cannot see that
+   * and would have passed forever. This checks the class that actually
+   * decides the paint.
+   */
+  it("survives the real `buttonVariants` output, and resolves to a round radius", () => {
+    const merged = cn(buttonVariants({ variant: "ghost", size: "icon" }));
+    expect(merged).toContain("btn-circle");
+    expect(merged).toContain("rounded-full");
+    expect(merged).not.toContain("rounded-field");
   });
 });

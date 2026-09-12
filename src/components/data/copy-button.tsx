@@ -82,7 +82,30 @@ export function CopyButton({
       onClick={copy}
       aria-label={label ?? `Copy ${value}`}
       className={cn(
-        "shrink-0 text-subtle-foreground transition-opacity hover:text-foreground",
+        // `-m-1 p-1 rounded-full`: same hit-area idiom as the close
+        // buttons in `dialog.tsx`/`drawer.tsx`/`toast.tsx` — negative
+        // margin and padding are equal, so this grows the clickable box to
+        // roughly 32×32px without moving the icon or changing this
+        // element's footprint in the flex row it sits in (`IdDisplay`'s
+        // and `PhoneDisplay`'s `inline-flex items-center gap-1.5`: the
+        // added padding pushes the box outward exactly as far as the
+        // negative margin pulls it inward, so neighbouring siblings don't
+        // shift). Previously this control had no hit-area padding at all —
+        // a bare 12–16px icon, well under any reasonable tap-target
+        // minimum. `rounded-full` circular, per the icon-only-controls-
+        // are-circles convention in `button.tsx`.
+        //
+        // `transition` (not `transition-colors`): both this class string
+        // and the `revealOnGroupHover` one below animate `opacity`, and
+        // `transition-colors`/`transition-opacity` are the *same*
+        // tailwind-merge group (they both set `transition-property`), so
+        // combining them here would have let one silently clobber the
+        // other — confirmed live, not assumed: `cn("transition-colors",
+        // "transition-opacity")` resolves to just `"transition-opacity"`.
+        // The bare `transition` utility's default property list covers
+        // both `background-color`/`color` and `opacity`, and — checked the
+        // same way — doesn't collide with the `opacity-*` utilities below.
+        "-m-1 shrink-0 rounded-full p-1 text-subtle-foreground transition hover:bg-surface-3 hover:text-foreground",
         revealOnGroupHover && "opacity-0 focus-visible:opacity-100 group-hover:opacity-100",
         className,
       )}

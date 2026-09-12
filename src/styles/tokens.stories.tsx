@@ -134,6 +134,31 @@ export const Text: Story = {
           <span>cs_msg_8f21c0bd4e1a9f3c77e</span>
         </div>
       </Section>
+      {/*
+       * Four voices, one line of real copy each, so the pairing can be
+       * judged rather than taken on the doc comment's word — see
+       * `theme.css`'s own comment on `--font-display` / `--font-sans` /
+       * `--font-italic` / `--font-mono` for the roles.
+       *
+       * The italic line is the exact sentence that comment uses as the
+       * worked example: a `StateTimeline` annotation, the one case
+       * `--font-italic` exists for. `font-mono`'s line has no companion
+       * `italic` utility next to it — the token names a *family*, and
+       * mono's family does not shift for emphasis the way the serif
+       * does.
+       */}
+      <Section title="Four voices">
+        <div className="flex flex-col gap-3">
+          <p className="font-display text-title-sm tracking-normal">
+            font-display — Payout batch #4128 failed validation
+          </p>
+          <p className="text-body">font-sans — 212 of 240 messages delivered in the last hour</p>
+          <p className="font-italic text-body italic tracking-normal">
+            font-italic — sent, but no receipt ever arrived; it will not be resubmitted
+          </p>
+          <p className="font-mono text-body">font-mono — cs_msg_8f21c0bd4e1a9f3c77e</p>
+        </div>
+      </Section>
     </div>
   ),
 };
