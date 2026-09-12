@@ -106,7 +106,7 @@ const FLOW = defineStatusSystem({
     family: "in-flight",
     silhouette: "circle",
     mark: "ring",
-    hue: "neutral",
+    hue: "parked",
     filled: false,
     attention: "quiet",
     label: "Submitted",
