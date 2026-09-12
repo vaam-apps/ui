@@ -463,6 +463,10 @@ decoration: it is what caught `--subtle-foreground` failing WCAG AA on
 every surface in the system, across 38 usages, by flagging fourteen
 calendar weekday headers at once.
 
+It is no longer the only thing running axe, because a panel reports and
+a panel has to be opened. `src/lib/a11y.test.tsx` runs axe over every
+component mounted for real, on every `pnpm test`.
+
 A few guards are worth knowing about before you trip one:
 
 - **`src/lib/theme-tokens.test.ts`** scans the components for
@@ -489,6 +493,31 @@ A few guards are worth knowing about before you trip one:
   feature: Headless UI's `ListboxButton` owns `aria-describedby`, so a
   `FormField` hint cannot reach a `Select`. If an upgrade changes that,
   the test fails and says so.
+- **`src/lib/a11y.test.tsx`** mounts each component with `createRoot`
+  inside `act` and runs axe on it. It must be a *client* render: Headless
+  UI wires `aria-labelledby` in an effect, so the obvious
+  `renderToStaticMarkup` version reported violations across most of the
+  library that a browser showed were not real. Two self-check cases
+  assert axe is still live, and `color-contrast` is disabled explicitly
+  rather than silently returning nothing — jsdom has no CSS, and that
+  half is `contrast.test.ts`'s job.
+
+  What it cannot see is worth knowing before trusting it: no contrast, no
+  "is the focus ring visible", no "is this clipped by an ancestor's
+  overflow", no hit-target size. Three of the bugs found this cycle were
+  in that set. It is a floor, not a substitute for looking.
+- **`src/lib/contrast.test.ts`** parses this stylesheet and measures every
+  foreground against every surface, including translucent state fills
+  composited over the surface beneath them — the case that caught two
+  loud pills at 4.27:1 and 4.36:1 that no story renders. It asserts the
+  theme *roster* and the three text tiers by name, because an earlier
+  version stayed green with an entire theme deleted and silently skipped
+  any foreground that was not a hex literal.
+- **`src/components/primitives/side-nav.portal.test.tsx`** pins that the
+  floating rail portals to `document.body` even inside a transformed
+  ancestor, and that exactly one `nav[aria-label="Primary"]` exists in
+  the document. The a11y gate above cannot make the second check: it
+  audits the component's own host node, and the portal escapes it.
 - **`src/lib/story-coverage.test.ts`** fails when an exported component
   is mentioned by no story. Colocation makes the drift visible in a
   diff; this makes it a build failure, because "added a component,

@@ -59,7 +59,14 @@ import { cn } from "../../lib/cn";
 export interface RadioGroupOption<T extends string> {
   value: T;
   label: ReactNode;
-  /** Optional one-line explanation rendered under the label. */
+  /**
+   * Optional one-line explanation rendered under the label, e.g. "Match
+   * the OS setting." Rendered `font-italic italic` — see `FormField`'s
+   * `hint` prop doc for the line: this is a person writing a sentence,
+   * not a template filling in a value the system already has, so it
+   * fails the "could this be an emitted fact" test the same way that
+   * hint does.
+   */
   description?: ReactNode;
 }
 
@@ -127,7 +134,13 @@ export function RadioGroup<T extends string>({
               // unclamped three-line description silently pads every
               // sibling — measured at 112px against 94px for the pair in
               // this component's own story before the clamp.
-              <span className="line-clamp-2 text-caption text-subtle-foreground">
+              //
+              // `font-italic italic tracking-normal`: see the
+              // `RadioGroupOption.description` doc above. `tracking-normal`
+              // for the same reason as `StateTimeline`'s `AnnotationNode`
+              // and `FormField`'s hint — the global sans-tuned negative
+              // letter-spacing crowds a 12px serif more than a 12px sans.
+              <span className="line-clamp-2 font-italic text-caption text-subtle-foreground italic tracking-normal">
                 {option.description}
               </span>
             )}

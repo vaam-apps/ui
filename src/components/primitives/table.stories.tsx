@@ -279,16 +279,36 @@ export const Loading: Story = {
   ),
 };
 
+const STICKY_ROWS = Array.from({ length: 24 }, (_, i) => {
+  const row = FULL_ROWS[i % FULL_ROWS.length];
+  return row === undefined ? null : { ...row, key: i };
+});
+
 /**
- * The header sticks while the body scrolls, which is the whole reason a
- * dense table is readable at 200 rows. The focus ring is an `outline`
- * rather than a `box-shadow` specifically so it is not clipped here —
- * tab through the rows and watch the ring survive the sticky header's
- * stacking context.
+ * The honest default. `Table`'s own wrapper already computes
+ * `overflow-y: auto` (`overflow-x-auto` forces it — see the module doc
+ * on `Table`), so it is already the nearest scroll container `position:
+ * sticky` measures against — but left at its default `height: auto` it
+ * never overflows itself, so it never scrolls. Whatever *does* scroll
+ * here is this story's own canvas, and the header travels away with it
+ * exactly like the rest of the table would with no `sticky` at all.
+ *
+ * Measured live in Storybook (`http://localhost:6006/iframe.html?id=
+ * primitives-table--header-scrolls-away-on-a-page`) by reading
+ * `thead.getBoundingClientRect().top` before and after scrolling the
+ * page by 300px: `72` → `-228` — a 1:1 delta with the scroll, i.e. no
+ * stickiness at all. Compare with `BoundedStickyHeader`, where the same
+ * read is invariant.
+ *
+ * Scroll this story's own canvas (not a box inside it) to see it.
  */
-export const StickyHeader: Story = {
+export const HeaderScrollsAwayOnAPage: Story = {
   render: () => (
-    <div className="h-80 w-full overflow-y-auto rounded-sm border border-edge">
+    <div className="flex flex-col gap-4">
+      <p className="max-w-prose text-body text-muted-foreground">
+        No `maxHeight` here, so nothing inside this table ever scrolls on its own — scrolling the
+        page carries `TableHeader` away with everything else instead of pinning it.
+      </p>
       <Table>
         <TableHeader>
           <TableRow>
@@ -298,16 +318,16 @@ export const StickyHeader: Story = {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {Array.from({ length: 24 }, (_, i) => {
-            const row = FULL_ROWS[i % FULL_ROWS.length];
-            if (row === undefined) return null;
+          {STICKY_ROWS.map((row) => {
+            if (row === null) return null;
             return (
-              // biome-ignore lint/suspicious/noArrayIndexKey: a synthetic, fixed-length fixture
-              <TableRow key={i}>
+              <TableRow key={row.key}>
                 <TableCell>
                   <DeliveryPill state={row.state} />
                 </TableCell>
-                <TableCell mono>{`${row.id.slice(0, 14)}${String(i).padStart(2, "0")}`}</TableCell>
+                <TableCell mono>
+                  {`${row.id.slice(0, 14)}${String(row.key).padStart(2, "0")}`}
+                </TableCell>
                 <TableCell align="end">
                   <Money amount={row.cost} currency="XAF" display="none" />
                 </TableCell>
@@ -317,5 +337,56 @@ export const StickyHeader: Story = {
         </TableBody>
       </Table>
     </div>
+  ),
+};
+
+/**
+ * `maxHeight` bounds `Table`'s own wrapper, so it is both the nearest
+ * scroll container *and* the one that actually scrolls — which is what
+ * `position: sticky` needs to do anything at all. The focus ring is an
+ * `outline` rather than a `box-shadow` specifically so it is not clipped
+ * here — tab through the rows and watch the ring survive the sticky
+ * header's stacking context.
+ *
+ * `label` is supplied here (unlike every other story) because this
+ * wrapper is genuinely a scrollable region worth naming — see `Table`'s
+ * `label` prop doc for why it is otherwise left off by default.
+ *
+ * Measured live in Storybook (`http://localhost:6006/iframe.html?id=
+ * primitives-table--bounded-sticky-header`) the same way as
+ * `HeaderScrollsAwayOnAPage`, but scrolling the wrapper itself
+ * (`wrapper.scrollTop = 300`) rather than the page:
+ * `thead.getBoundingClientRect().top` read `16` before and `16` again
+ * after — invariant, which is the whole point.
+ */
+export const BoundedStickyHeader: Story = {
+  render: () => (
+    <Table maxHeight="20rem" label="Delivery attempts">
+      <TableHeader>
+        <TableRow>
+          <TableHead>Status</TableHead>
+          <TableHead>Message</TableHead>
+          <TableHead align="end">Cost</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {STICKY_ROWS.map((row) => {
+          if (row === null) return null;
+          return (
+            <TableRow key={row.key}>
+              <TableCell>
+                <DeliveryPill state={row.state} />
+              </TableCell>
+              <TableCell mono>
+                {`${row.id.slice(0, 14)}${String(row.key).padStart(2, "0")}`}
+              </TableCell>
+              <TableCell align="end">
+                <Money amount={row.cost} currency="XAF" display="none" />
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
   ),
 };

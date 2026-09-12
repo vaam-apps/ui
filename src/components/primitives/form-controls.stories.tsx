@@ -137,6 +137,17 @@ export const FieldsAndErrors: Story = {
  * `ChipSelectProps` didn't declare `aria-labelledby` until now, so this
  * exact call was a type error even though the `<fieldset>` already
  * spread the prop onto itself at runtime.
+ *
+ * This is also the `--font-italic` story: the group's hint, the
+ * "Marketing" chip's description and the radio options' descriptions are
+ * all a person's sentence explaining something the control cannot say on
+ * its own, so all three render `font-italic italic tracking-normal` —
+ * see `FormField`'s `hint` prop doc for the line being drawn. The plain
+ * count beside the chips ("2 of 4 selected") is the contrast case: it is
+ * a value the system already has, so it stays `font-sans`, the same as
+ * every chip/option label above it. Side by side, italic vs. sans should
+ * read as two different registers, not as one muted-text style with an
+ * inconsistent font.
  */
 export const SmallVocabularies: Story = {
   render: function Render() {
@@ -158,10 +169,21 @@ export const SmallVocabularies: Story = {
               { value: "otp", label: "OTP" },
               { value: "transactional", label: "Transactional" },
               { value: "notification", label: "Notification" },
-              { value: "marketing", label: "Marketing" },
+              {
+                value: "marketing",
+                label: "Marketing",
+                description: "Requires the recipient's prior consent.",
+              },
             ]}
           />
         </FormField>
+        {/* Emitted fact, not commentary — a plain count the system already
+            has, deliberately `font-sans` beside the italic hint and chip
+            description above. This is the excluded case `FormField`'s
+            `hint` doc names: nothing here is a person's sentence. */}
+        <p className="text-caption text-subtle-foreground">
+          {classes.length} of 4 message classes selected.
+        </p>
         {/* Disabled: unlike `CheckboxField`/`SwitchField`, `ChipSelect`'s
             `Label` is a *child* of the chip it toggles, not a sibling
             outside it, so it already dims correctly with no separate fix

@@ -134,3 +134,61 @@ describe("Calendar renders its selection styling onto real elements", () => {
     expect(cellFor(single, 4)).not.toContain("data-selected");
   });
 });
+
+/**
+ * `today` used to be `font-semibold text-state-uncertain-fg` — a status
+ * hue on a calendar fact. `day_button` (the element the digit actually
+ * renders in) sets its own `text-foreground`, and an inherited colour
+ * only ever applies where the element carries no explicit declaration of
+ * its own, so that hue never painted anything: measured with
+ * `getComputedStyle` in both themes, the digit was always `--foreground`.
+ * Only the (dead) class was wrong, but it is exactly the shape of bug
+ * `calendar.test.ts` cannot see — a valid key, valid CSS, styling nothing
+ * — so it gets the same rendered-markup treatment as selection.
+ *
+ * `today` is passed explicitly throughout rather than left to default to
+ * the real clock: react-day-picker accepts it as a prop precisely so a
+ * caller (here, a test) is not hostage to what day it happens to be run.
+ */
+describe("Calendar marks 'today' with shape and weight, never a status hue", () => {
+  const STATUS_HUE = /state-(neutral|progress|success|warning|danger|uncertain|expired|parked)-/;
+
+  it("gives the today cell an achromatic border and no status-hue class", () => {
+    const markup = renderToStaticMarkup(
+      <Calendar mode="single" today={new Date(2026, 8, 8)} defaultMonth={from} />,
+    );
+    const todayClass = cellClassOf(markup, 8);
+    expect(todayClass).toContain("font-semibold");
+    expect(todayClass).toContain("[&>button]:border-edge-strong");
+    expect(todayClass).not.toMatch(STATUS_HUE);
+    // A day that is not today gets none of it.
+    expect(cellClassOf(markup, 9)).not.toContain("border-edge-strong");
+  });
+
+  it("keeps the border when today is also selected", () => {
+    const markup = renderToStaticMarkup(
+      <Calendar mode="single" today={from} selected={from} defaultMonth={from} />,
+    );
+    const cellClass = cellClassOf(markup, 3);
+    expect(cellClass).toContain("[&>button]:border-edge-strong");
+    expect(cellClass).toContain("[&>button]:bg-primary");
+    expect(cellClass).toContain("[&>button]:text-primary-content");
+    expect(cellClass).not.toMatch(STATUS_HUE);
+  });
+
+  it("keeps the border when today falls inside a selected range", () => {
+    const markup = renderToStaticMarkup(
+      <Calendar
+        mode="range"
+        today={new Date(2026, 8, 8)}
+        selected={{ from, to }}
+        defaultMonth={from}
+        numberOfMonths={1}
+      />,
+    );
+    const cellClass = cellClassOf(markup, 8);
+    expect(cellClass).toContain("[&>button]:border-edge-strong");
+    expect(cellClass).toContain("bg-primary/15");
+    expect(cellClass).not.toMatch(STATUS_HUE);
+  });
+});

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { cn } from "../../lib/cn";
+import { useReducedMotion } from "../../lib/use-reduced-motion";
 import { TableRow, type TableRowProps } from "../primitives/table";
 import type { StatusHue } from "../status/status-tokens";
 
@@ -45,17 +46,46 @@ export function LiveRow({
 }: LiveRowProps) {
   const [washing, setWashing] = useState(false);
   const previousTrigger = useRef(washTrigger);
-  const reducedMotion =
-    typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // `useReducedMotion` (`src/lib/use-reduced-motion.ts`) subscribes to the
+  // media query rather than reading it once during render — the old
+  // `matchMedia(...).matches` read here was frozen at mount, so neither a
+  // live OS-level change nor Storybook's own reduced-motion toolbar
+  // emulation (which flips the query without a remount) ever reached this
+  // component.
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     if (previousTrigger.current === washTrigger) return;
     previousTrigger.current = washTrigger;
     setWashing(true);
+  }, [washTrigger]);
+
+  // Split from the trigger-detection effect above on purpose. `reducedMotion`
+  // can now change live (see `useReducedMotion`'s doc), and the two effects
+  // used to be one, keyed on `[washTrigger, reducedMotion]`: a preference
+  // flip mid-wash re-ran it, but `previousTrigger.current` already equalled
+  // `washTrigger` from the run that started the wash, so the guard above
+  // returned early — clearing the in-flight timeout (React's own effect
+  // cleanup) and never scheduling a replacement. The wash then held forever,
+  // `washing` stuck `true`, on nothing but a reduced-motion toggle during an
+  // ordinary status change.
+  //
+  // Keyed on `[washing, reducedMotion]` instead, this effect only ever
+  // fires while a wash is actually in progress, and a preference flip mid-
+  // wash restarts the hold from its own full duration under the new
+  // preference rather than getting stuck — it does not resume from wherever
+  // the previous timer was, which is an acceptable gap: an operator toggling
+  // OS-level reduced-motion in the middle of a single row's wash is not a
+  // case worth preserving exact continuity for, and restarting still keeps
+  // the one behaviour the design doc actually promises — the wash's signal
+  // survives reduced motion as a static hold, even when triggered by a
+  // preference change already in flight.
+  useEffect(() => {
+    if (!washing) return;
     const holdMs = reducedMotion ? 1200 : 400 + 240 + 600;
     const timeout = setTimeout(() => setWashing(false), holdMs);
     return () => clearTimeout(timeout);
-  }, [washTrigger, reducedMotion]);
+  }, [washing, reducedMotion]);
 
   return (
     <TableRow

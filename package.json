@@ -1,7 +1,7 @@
 {
   "name": "@vaam-apps/ui",
   "version": "0.1.1",
-  "description": "A dark-first React component library for operator consoles \u2014 daisyUI styling, Headless UI behaviour, and a parameterised status-glyph system.",
+  "description": "A dark-first React component library for operator consoles — daisyUI styling, Headless UI behaviour, and a parameterised status-glyph system.",
   "license": "MIT",
   "author": "Vaam Apps",
   "homepage": "https://github.com/vaam-apps/ui#readme",
@@ -89,7 +89,9 @@
     "@types/node": "^26",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "axe-core": "^4.13.0",
     "daisyui": "^5.7.36",
+    "jsdom": "^30.0.1",
     "react": "^19",
     "react-dom": "^19",
     "storybook": "10.6.0",

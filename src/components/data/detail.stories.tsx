@@ -45,6 +45,43 @@ export const Variants: Story = {
 };
 
 /**
+ * The failure mode the type normalisation in `detail-row.tsx`'s module
+ * doc fixes: one drawer, rows picked for their layout (`stacked` for a
+ * value too long to sit beside its label, `divided` where a list needs
+ * rules, `inline` for the rest) rather than for how their text should
+ * look. Before the normalisation this would have rendered the label
+ * bigger than the value on the `stacked` rows and a third, unstyled size
+ * on the `inline` ones. Now every label down the column is the same
+ * `text-caption text-subtle-foreground` and every value is the same
+ * `text-body text-foreground`, so the variant a row picked for its shape
+ * is invisible in its type.
+ */
+export const MixedVariantsInOneColumn: Story = {
+  render: () => (
+    <DetailList>
+      <DetailRow variant="inline" label="Id">
+        <IdDisplay value="cs_a1b2c3d4e5f6g7h8i9j0k1l2" />
+      </DetailRow>
+      <DetailRow variant="stacked" label="Provider reference">
+        a-very-long-provider-supplied-reference-that-would-rather-not-wrap
+      </DetailRow>
+      <DetailRow variant="inline" label="State">
+        <StateChip tone="success">delivered</StateChip>
+      </DetailRow>
+      <DetailRow variant="stacked" label="Notes">
+        Retried once after a 4xx from the upstream gateway, then delivered clean.
+      </DetailRow>
+      <DetailRow variant="divided" label="Cost">
+        <Money amount={1200} currency="XAF" />
+      </DetailRow>
+      <DetailRow variant="divided" label="Sender ID">
+        ACME
+      </DetailRow>
+    </DetailList>
+  ),
+};
+
+/**
  * Under 24 hours renders relative, older falls back to an absolute
  * ISO-ordered UTC form. Fixed literal timestamps here, never
  * `Date.now()`: a value computed at render time differs between the

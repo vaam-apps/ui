@@ -1,4 +1,13 @@
-import type { HTMLAttributes, TdHTMLAttributes, ThHTMLAttributes } from "react";
+"use client";
+
+import {
+  type HTMLAttributes,
+  type TdHTMLAttributes,
+  type ThHTMLAttributes,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { cn } from "../../lib/cn";
 
 // Table conventions per design doc §6.4: sticky header on surface-1, 1px
@@ -31,17 +40,169 @@ import { cn } from "../../lib/cn";
 //    `px-3`/`py-2`/`h-8` utilities unchanged, at equal selector
 //    specificity to daisyUI's rule — confirmed live that the existing
 //    cell padding and type scale still win, not daisyUI's defaults.
-export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>) {
+export interface TableProps extends HTMLAttributes<HTMLTableElement> {
+  /**
+   * Bounds the scroll wrapper and turns it into a real vertical
+   * scrollport (`max-height` + `overflow-y: auto`), e.g. `"24rem"`.
+   *
+   * `TableHeader`'s `sticky top-0` **requires this**. Per CSS Overflow,
+   * setting `overflow-x: auto` on the wrapper below forces its computed
+   * `overflow-y` from `visible` to `auto` — so that wrapper, not whatever
+   * scrolls the page, is already the nearest scroll container `position:
+   * sticky` measures against. Left at its default `height: auto`, it
+   * never itself overflows vertically (it just grows to fit the table),
+   * so there is nothing for the header to stick *to*: the whole wrapper,
+   * header included, scrolls away with the page. `maxHeight` gives that
+   * same box an actual bound, so it — rather than the page — is what
+   * scrolls, and the sticky header has a scrollport to stay pinned
+   * against. Omit it and the header **will** scroll away; that is a
+   * documented, honest trade-off, not a bug (see `TableHeader`'s doc and
+   * the two stories in `table.stories.tsx`).
+   */
+  maxHeight?: string | undefined;
+  /**
+   * Accessible name for the scroll wrapper, used only while the wrapper
+   * is actually scrollable (see `Table`'s own doc for how that's
+   * detected) — it needs a name at exactly the moment it becomes a
+   * keyboard-focusable landmark, and not before.
+   *
+   * Left undefined in every existing story and in the `Table` used by
+   * `a11y.test.tsx`'s fixture, both of which fit without overflowing: an
+   * unlabelled `role="region"` is *worse* than no region at all (a
+   * landmark with no name is exactly what `axe`'s `region`/`landmark-*`
+   * guidance warns against — a screen-reader user gets an extra stop on
+   * their landmarks list that tells them nothing). So `role="region"`
+   * and `aria-label` only ever appear together, and only once the
+   * wrapper is confirmed scrollable; a scrollable-but-unlabelled wrapper
+   * is still made keyboard-focusable (`tabIndex={0}`) but stays a
+   * roleless `<div>` rather than a landmark nobody can identify, and a
+   * wrapper that isn't scrollable gets neither.
+   */
+  label?: string | undefined;
+}
+
+/**
+ * Whether `tabIndex`/`role="region"` apply at all is **measured, not
+ * guessed from props**. The wrapper below is unconditionally
+ * `overflow-x-auto`, so it *can* be horizontally scrollable purely from
+ * table content being wider than its container — nothing about `Table`'s
+ * own props determines that, since it depends on the caller's columns
+ * and data. `maxHeight` doesn't determine vertical scrolling either, only
+ * bounds it: a `maxHeight` shorter than the actual row count overflows,
+ * a generous one doesn't. Gating on "was `maxHeight` passed" would
+ * therefore both miss the horizontal case entirely (the one the
+ * `scrollable-region-focusable` bug report was actually about) and
+ * mislabel a bounded-but-short table as scrollable when it isn't. So this
+ * measures the real thing — `scrollWidth`/`scrollHeight` against
+ * `clientWidth`/`clientHeight`, on mount and on every resize — and only
+ * a wrapper that is *actually* overflowing right now becomes a focusable
+ * region. An unconditional `tabIndex={0}` on every `Table` in the app,
+ * including every one that already fits, would add a tab stop nobody
+ * needs to the common case to fix the uncommon one.
+ *
+ * `ResizeObserver` is unavailable in the `jsdom` environment
+ * `a11y.test.tsx` mounts components in — guarded rather than polyfilled,
+ * since jsdom's own layout is always zero anyway (`scrollWidth ===
+ * clientWidth === 0`), so "not scrollable" is the correct answer there
+ * regardless.
+ */
+function useScrollable(): [React.RefObject<HTMLDivElement | null>, boolean] {
+  const ref = useRef<HTMLDivElement>(null);
+  const [scrollable, setScrollable] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (el === null || typeof ResizeObserver === "undefined") return;
+    const measure = () => {
+      setScrollable(el.scrollWidth > el.clientWidth || el.scrollHeight > el.clientHeight);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return [ref, scrollable];
+}
+
+export function Table({ className, maxHeight, label, ...props }: TableProps) {
+  const [ref, scrollable] = useScrollable();
+  const style = maxHeight ? { maxHeight, overflowY: "auto" as const } : undefined;
+  const table = (
+    <table
+      className={cn("table table-pin-rows w-full border-collapse! text-body", className)}
+      {...props}
+    />
+  );
+
+  // `focus-visible:ring-1 focus-visible:ring-ring`: the same idiom
+  // `calendar.tsx`'s `day_button` uses for a focusable non-form element —
+  // a `tabIndex` with no visible focus state would trade one barrier
+  // (unreachable by keyboard) for another (reachable, but invisible).
+  const focusRing = "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+
+  // Two literal JSX branches, not one element with `role={... ? "region"
+  // : undefined}`: `aria-label` is only a valid attribute on an element
+  // whose *role* supports naming, and a conditional `role` expression
+  // isn't something the static, role-aware linter
+  // (`lint/a11y/useAriaPropsSupportedByRole`) can resolve — it flagged
+  // the div as if `role` were always absent. Each branch below is
+  // internally consistent (one has both `role="region"` and
+  // `aria-label`, literally; the other has neither), which is what the
+  // rule can actually verify, and is also the correct semantics — see
+  // the `label` prop doc above for why an unnamed region is deliberately
+  // left roleless rather than given `role="region"` with no name.
+  if (scrollable && label) {
+    return (
+      // biome-ignore lint/a11y/useSemanticElements: this has to be the `overflow-x-auto` box itself — swapping it for a bare `<section>` would rename the element the rule is complaining about, not change what it's reachable through.
+      <div
+        ref={ref}
+        className={cn("w-full overflow-x-auto", focusRing)}
+        style={style}
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: axe's own `scrollable-region-focusable` rule (and WCAG 2.1.1) requires this — a scrolling container a keyboard user can't reach into is a real barrier, not a false positive here. Applied only once `scrollable` measures true (see `useScrollable`'s doc above), so a table that fits gets no extra tab stop.
+        tabIndex={0}
+        role="region"
+        aria-label={label}
+      >
+        {table}
+      </div>
+    );
+  }
   return (
-    <div className="w-full overflow-x-auto">
-      <table
-        className={cn("table table-pin-rows w-full border-collapse! text-body", className)}
-        {...props}
-      />
+    // Unlike the branch above, `tabIndex` here is a conditional
+    // expression (`scrollable ? 0 : undefined`) rather than a literal
+    // `0`, which is why `lint/a11y/noNoninteractiveTabindex` — suppressed
+    // by name in the branch above, for the identical reason — doesn't
+    // fire on this one at all: verified empirically, not assumed, since
+    // a stale suppression here that no longer matches anything is a
+    // biome error in its own right (`suppressions/unused`).
+    <div
+      ref={ref}
+      className={cn("w-full overflow-x-auto", scrollable && focusRing)}
+      style={style}
+      tabIndex={scrollable ? 0 : undefined}
+    >
+      {table}
     </div>
   );
 }
 
+/**
+ * `sticky top-0` **requires `Table`'s `maxHeight` prop.** Without it, the
+ * wrapper `Table` renders (`overflow-x-auto`, computed `overflow-y: auto`
+ * per CSS Overflow) is already the nearest scroll container — sticky
+ * positioning always measures against *some* ancestor, and this one wins
+ * by proximity — but at its default `height: auto` it never actually
+ * overflows vertically, so it never scrolls. Whatever real scrolling
+ * happens (the page, or an app-level container) happens on an ancestor
+ * *further out*, and this header just travels along with the rest of the
+ * wrapper as that outer thing scrolls — indistinguishable from `sticky`
+ * never having been applied at all. `maxHeight` bounds the wrapper itself
+ * so it is both the nearest scroll container *and* the one that actually
+ * scrolls, which is what `position: sticky` needs to do anything. See
+ * `table.stories.tsx`'s two sticky-header stories for both cases measured
+ * live.
+ */
 export function TableHeader({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) {
   return (
     <thead

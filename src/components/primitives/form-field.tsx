@@ -53,7 +53,27 @@ export interface FormFieldProps {
   htmlFor: string;
   /** Validation message. `undefined` renders no error element at all. */
   error?: string | undefined;
-  /** Help text rendered between the label and the control. */
+  /**
+   * Help text rendered between the label and the control, e.g. "Three to
+   * eleven characters." — `font-italic italic` (see the rendering below),
+   * because it is `--font-italic`'s test case, not an exception to it:
+   * `theme.css`'s comment on the four voices now reads italic as *a
+   * person writing to the operator*, not only commentary on a decision
+   * the system already made, and a hint is exactly that — someone
+   * explaining a constraint the control itself cannot say out loud.
+   *
+   * **The line, for the next slot that looks like a candidate:** could
+   * this string be a template that only fills in a value the system
+   * already has — a count, a ratio, a unit, an id, a label? Then it is
+   * an emitted fact, not commentary, and it stays `font-sans` no matter
+   * how small or muted it is (`StatTile`'s caption, `InlineEmptyState`'s
+   * message). A hint, a `RadioGroupOption.description`, a
+   * `ChipOption.description` all fail that test — there is no value
+   * behind "Three to eleven characters." or "Needs a reason." for a
+   * template to have filled in; a person decided the constraint and
+   * wrote the sentence. That is the distinction this component is
+   * drawing, not "every 12px muted string."
+   */
   hint?: ReactNode;
   /**
    * `"field"` (default) labels a single form control by `htmlFor`.
@@ -183,7 +203,18 @@ export function FormField({
         <Label htmlFor={htmlFor}>{label}</Label>
       )}
       {hasHint && (
-        <p id={hintId(htmlFor)} className="text-caption text-muted-foreground">
+        // `font-italic italic tracking-normal`: see the `hint` prop doc
+        // above for why this is `--font-italic`'s test case rather than
+        // an exception. `tracking-normal` for the same reason
+        // `card.tsx`'s `CardHeader` and `StateTimeline`'s
+        // `AnnotationNode` carry it — the global `html { letter-spacing:
+        // -0.011em }` is tuned for the sans body face, and at 12px this
+        // is the smallest serif slot in the system, where that
+        // sans-tuned negative tracking crowds the letterforms most.
+        <p
+          id={hintId(htmlFor)}
+          className="font-italic text-caption text-muted-foreground italic tracking-normal"
+        >
           {hint}
         </p>
       )}

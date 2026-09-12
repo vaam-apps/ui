@@ -16,10 +16,14 @@ const meta = {
           "through `content: attr(...)`, so the label must be a **plain string** — there is " +
           "no rich or interactive tooltip anywhere in this system. " +
           "\n\n" +
-          "The other limitation is not in the API and is worth knowing before reaching for " +
-          "this: the bubble is an absolutely positioned pseudo-element, so **any ancestor " +
-          "that scrolls will clip it**. `SideNav`'s icon rail is exactly that case, and its " +
-          "labels are native `title` attributes for exactly that reason.",
+          "The other limitation is not fully in the API's control: the `.tooltip` bubble is " +
+          "an absolutely positioned pseudo-element, so any ancestor that scrolls clips it " +
+          "away. `SideNav`'s icon rail hits exactly that case. This component's answer is " +
+          "the same one `SideNav` reached for — a native `title` — but applied as a " +
+          "**fallback rather than a replacement**: `Tooltip` sets `title={label}` on the " +
+          "same element as `data-tip`, so a clipped bubble still leaves the label reachable " +
+          "through the browser's own tooltip, just without the styling. See " +
+          "`ClippedByAScrollingAncestor` below for exactly what that looks like.",
       },
     },
   },
@@ -81,31 +85,41 @@ export const OnAnIconButton: Story = {
 };
 
 /**
- * The failure mode, shown rather than described. Both triggers are
- * identical; the left one sits inside a scrolling box, and its bubble is
- * clipped to nothing. Hover both.
+ * The failure mode, shown rather than described — and what actually
+ * survives it. Both triggers are identical; the left one sits inside a
+ * scrolling box. Hover both.
  *
- * There is no CSS-only fix — escaping a scroll container needs a portal
- * or CSS anchor positioning — so the rule is simply: do not put a
- * `Tooltip` inside something that scrolls. Use a native `title` there,
- * which the browser paints outside the page entirely.
+ * The styled `.tooltip` bubble is clipped to nothing on the left, exactly
+ * as it always was — there is no CSS-only fix for that half, since
+ * escaping a scroll container needs a portal or CSS anchor positioning.
+ * What is no longer true is that the label itself disappears: `Tooltip`
+ * now also sets a native `title`, which the browser paints outside the
+ * page entirely, so hovering the left trigger long enough still surfaces
+ * "You will still see this — just later, and plain" as the browser's own
+ * tooltip, after its own hover delay and with none of the intended
+ * styling. That is a real degradation from the right-hand trigger, not a
+ * fix to reach for on purpose — prefer a `title` prop or a plain
+ * `title="…"` attribute directly on the trigger when a scroller is
+ * unavoidable, so the fallback is the *only* thing that renders instead
+ * of a bubble nobody sees plus a late plain one.
  */
 export const ClippedByAScrollingAncestor: Story = {
   render: () => (
     <div className="flex flex-wrap items-start gap-8 py-16">
       <div className="h-24 w-40 overflow-y-auto rounded-sm border border-edge bg-surface-2 p-3">
-        <Tooltip label="You will not see this." position="right">
+        <Tooltip label="You will still see this — just later, and plain." position="right">
           <Button size="sm" variant="secondary">
             In a scroller
           </Button>
         </Tooltip>
         <p className="mt-2 text-caption text-subtle-foreground">
-          Scrolls, so the bubble is clipped away and the leftover width shows up as a stray
-          horizontal scrollbar.
+          The styled bubble is clipped away and the leftover width shows up as a stray horizontal
+          scrollbar — but the label is not lost. `Tooltip`'s native `title` fallback still surfaces
+          it as the browser's own plain tooltip.
         </p>
       </div>
       <div className="h-24 w-40 rounded-sm border border-edge bg-surface-2 p-3">
-        <Tooltip label="This one works." position="right">
+        <Tooltip label="This one works, styled bubble and all." position="right">
           <Button size="sm" variant="secondary">
             Not a scroller
           </Button>

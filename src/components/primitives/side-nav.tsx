@@ -3,6 +3,8 @@
 import { Disclosure, DisclosureButton, DisclosurePanel } from "@headlessui/react";
 import { ChevronDown } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "../../lib/cn";
 
 /**
@@ -43,30 +45,49 @@ export interface SideNavProps {
    * always hidden it. */
   accountSlot?: ReactNode;
   /**
-   * How the nav behaves below `lg`. Defaults to `"off-canvas"`.
+   * How the nav behaves below `lg`. Defaults to `"floating"`.
    *
-   * `"floating"` is opt-in, and the default did **not** change, because
-   * flipping it would have been a silent break with no compile error:
+   * `"floating"` used to be opt-in, for exactly one reason: it renders a
+   * `fixed` pill, and a `fixed` element's containing block is the
+   * nearest ancestor with a `transform`, `filter`, `backdrop-filter`,
+   * `contain` **or `will-change: transform`**. This package's own
+   * `Drawer` is exactly that ancestor — `vaul` stamps
+   * `[data-vaul-drawer]{will-change:transform}` unconditionally, with no
+   * state gate (still true; read it in `vaul/dist/index.mjs`) — so the
+   * rail used to re-anchor to the drawer instead of the viewport for the
+   * one consumer documented to nest this component inside one.
    *
-   * - The two shapes are mutually exclusive at *mount*, not by CSS. A
-   *   consumer who wraps this in their own drawer — the documented
-   *   pattern — would have got an empty drawer, because the accordion
-   *   tree simply would not be rendered.
-   * - Worse, `"floating"` positions a `fixed` pill, and a `fixed`
-   *   element's containing block is the nearest ancestor with a
-   *   `transform`, `filter`, `backdrop-filter`, `contain` **or
-   *   `will-change: transform`**. This package's own `Drawer` is exactly
-   *   that ancestor: `vaul` stamps `[data-vaul-drawer]{will-change:transform}`
-   *   unconditionally, with no state gate (read it in
-   *   `vaul/dist/index.mjs`). So the rail would re-anchor to the drawer
-   *   instead of the viewport — and while that drawer is closed its
-   *   content is not in the DOM at all, leaving no navigation below `lg`
-   *   whatsoever.
+   * That hazard is why `FloatingRail` is now rendered through
+   * `createPortal` to `document.body` (see `FloatingRailPortal`'s own
+   * doc for the SSR cost that came with it): a portaled node's containing
+   * block is resolved against the document root, not against whatever
+   * ancestor happens to sit above wherever `SideNav` was mounted, so no
+   * ancestor of the caller's — transformed, `will-change`d or otherwise —
+   * can capture it any more. Verified directly, not assumed: see this
+   * file's stories, `FloatingRail`'s render inside a
+   * `transform: translateZ(0)` wrapper still resolves against the
+   * viewport.
    *
-   * That is not something the library can make robust from the inside; a
-   * `fixed` child would need a portal to `document.body`, which this does
-   * not use. So `"floating"` is for a caller who owns their own shell and
-   * knows no transformed ancestor sits above it.
+   * Removing that hazard is what makes `"floating"` safe to default, but
+   * it does not make the default free:
+   *
+   * - It is a real behaviour change on upgrade. Every existing consumer
+   *   who never passed this prop gets a new, permanent, floating icon
+   *   rail below `lg` on the next install — where before there was
+   *   nothing until they opened a hamburger they had built themselves.
+   * - The documented drawer consumer is the sharpest case: they already
+   *   render their own trigger that opens a `Drawer` containing this
+   *   component. Passing nothing now gets them **both** — their drawer
+   *   (still openable, though `"floating"` mode never mounts an
+   *   off-canvas tree, so it opens with nothing in it, exactly as
+   *   before) *and* a floating rail permanently on screen underneath it.
+   *   That consumer must pass `smallScreen="off-canvas"` explicitly to
+   *   get back the single below-`lg` experience they had.
+   *
+   * `"off-canvas"` remains exactly what it always was: the full-label
+   * accordion tree, mounted only for a caller who opts in, for a
+   * consumer who already owns a drawer and wants this component to fill
+   * it rather than float over it.
    */
   smallScreen?: "floating" | "off-canvas" | undefined;
   className?: string;
@@ -392,6 +413,19 @@ function GroupSection({
  * paints it outside the page entirely, immune to any ancestor's
  * `overflow`. That is the whole reason this rail is still usable once it
  * starts scrolling.
+ *
+ * # Why this component is never mounted directly
+ *
+ * This function renders the pill itself — the classes above are exactly
+ * what ends up in the DOM — but `SideNav` never mounts it in place. It
+ * always goes through `FloatingRailPortal`, which moves this markup to
+ * `document.body` via `createPortal` so the `fixed` positioning above
+ * resolves against the viewport regardless of what the caller wrapped
+ * `SideNav` in (`SideNavProps.smallScreen`'s doc has the full reasoning).
+ * Splitting the two apart — one function that knows how to draw the
+ * rail, one that knows where to put it — keeps this function testable
+ * and readable as plain JSX with no portal or lifecycle concerns mixed
+ * into it.
  */
 function FloatingRail({
   topItem,
@@ -411,6 +445,14 @@ function FloatingRail({
 
   return (
     <div
+      // A stable hook, not a test-only wart. This subtree is portalled to
+      // `document.body`, so it is the one part of `SideNav` a caller
+      // cannot reach through the element they rendered — `side-nav.portal.test.tsx`
+      // needs it to assert the portal target, and a consumer needs it to
+      // reach past a portal for the same reason (an e2e selector, or a
+      // `body > [data-floating-rail]` override). Selecting on the layout
+      // classes instead would make a styling change silently break both.
+      data-floating-rail=""
       className={cn(
         "fixed top-1/2 left-3 z-40 flex w-[52px] -translate-y-1/2 flex-col items-stretch gap-1",
         "max-h-[80vh] overflow-y-auto overflow-x-hidden",
@@ -449,6 +491,70 @@ function FloatingRail({
 }
 
 /**
+ * `FloatingRail`, portaled to `document.body` — and the one place in this
+ * file where "everything is in the server-rendered HTML on first paint"
+ * (the module doc's headline claim, see `SideNav` below) is not true.
+ *
+ * # Why a portal needs a mount gate, and what that costs
+ *
+ * `createPortal` needs a real DOM node to portal into, and `document`
+ * does not exist while this component renders on the server. There is no
+ * way to hand `createPortal` a body element that has not been created
+ * yet — so, unlike every other band in this file, `FloatingRail` cannot
+ * be part of the server-rendered markup at all when `smallScreen` is
+ * `"floating"`. This function is the containment for that: it renders
+ * `null` until an effect confirms a client has mounted it, then portals.
+ * `useState` + `useEffect` rather than some cleverer check, because the
+ * question is not "what breakpoint are we at" (still answered by CSS
+ * everywhere else in this file) but "does `document.body` exist yet" —
+ * true on the server and during the first client render (so server and
+ * client markup match, no hydration warning), false only after that
+ * first commit, which is exactly when the effect flips it.
+ *
+ * The cost is real and worth stating plainly rather than glossing over:
+ * for a `curl` of the page, or for a client whose JS fails to load or
+ * has not finished hydrating yet, `smallScreen="floating"` mode has *no
+ * small-screen navigation at all* for that window — the same gap this
+ * file was rewritten to eliminate when it dropped
+ * `next/dynamic({ ssr: false })`. It is a narrower version of that same
+ * gap, not the same size: scoped to one band (the floating rail, not the
+ * whole sidebar) and to one mode (`"floating"`, not every render), and
+ * bounded by hydration rather than a lazy chunk's network round trip.
+ * But it is not zero, and a caller who cannot accept any gap at all below
+ * `lg` — a bot that only ever sees first-paint HTML, or a strict
+ * no-JS requirement — should reach for `smallScreen="off-canvas"`, which
+ * has none: it renders with the rest of the tree, no portal, no gate.
+ *
+ * # Why the `<nav>` count stays exactly one despite the portal
+ *
+ * The portal moves DOM out of `SideNav`'s own subtree — in the live DOM
+ * tree, this rail ends up a descendant of `document.body`, a sibling of
+ * `SideNav`'s ancestors, not a descendant of the `<nav>` element `SideNav`
+ * renders. That sounds like it could produce a second landmark, so it was
+ * checked rather than assumed: `FloatingRail` itself renders a `<div>`,
+ * never a `<nav>` — there is exactly one `<nav>` element anywhere in this
+ * file, in `SideNav` itself — so moving this subtree elsewhere in the DOM
+ * cannot add a second "Primary" landmark. Verified directly: render
+ * `SideNav` with `smallScreen="floating"` in jsdom and query the whole
+ * document (not just the component's own return value) for
+ * `nav[aria-label="Primary"]` — one match, at every width, portal
+ * included.
+ */
+function FloatingRailPortal(props: {
+  topItem: NavItem;
+  groups: NavGroup[];
+  footerItems: NavItem[];
+  currentPath: string;
+}) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  if (!mounted) return null;
+  return createPortal(<FloatingRail {...props} />, document.body);
+}
+
+/**
  * The console's side navigation (console-redesign.md §4, §6.2). A pure
  * structural/layout component — routing, session data, and the drawer's
  * own off-canvas/persistent CSS split all live at the call site
@@ -476,19 +582,37 @@ function FloatingRail({
  *
  * Exactly one `<nav aria-label="Primary">` exists at any width, in either
  * mode: there is only ever one `<nav>` element in this file, full stop —
- * every band is a subtree of it, shown or hidden by CSS (`display: none`
- * removes a subtree from the accessibility tree, so a hidden band is
- * genuinely absent, not merely invisible). `smallScreen` only decides,
- * per render, which below-`lg` subtree exists at all — the off-canvas
- * tree is never mounted in `"floating"` mode, and `FloatingRail` is never
- * mounted in `"off-canvas"` mode — so there is never a moment with two
- * competing below-`lg` trees, mounted or hidden.
+ * every band except `FloatingRail` is a subtree of it, shown or hidden by
+ * CSS (`display: none` removes a subtree from the accessibility tree, so
+ * a hidden band is genuinely absent, not merely invisible). `smallScreen`
+ * only decides, per render, which below-`lg` subtree exists at all — the
+ * off-canvas tree is never mounted in `"floating"` mode, and
+ * `FloatingRail` is never mounted in `"off-canvas"` mode — so there is
+ * never a moment with two competing below-`lg` trees, mounted or hidden.
+ * `FloatingRail` itself is the one exception to "subtree of the `<nav>`":
+ * `FloatingRailPortal` moves it to `document.body`, so in the live DOM it
+ * ends up a sibling of this component's own ancestors, not a descendant
+ * of the `<nav>` element below. That does not create a second landmark —
+ * `FloatingRail` renders a `<div>`, never a `<nav>` — but it was checked,
+ * not assumed (see `FloatingRailPortal`'s doc for how).
  *
- * This means the whole nav — every row, every group, every breakpoint's
- * shape — is present in the server-rendered HTML on first paint. No
- * `next/dynamic({ ssr: false })`, no client-only mount flash. Verify that
- * claim directly, not by trusting this comment: `curl` a page and grep the
- * raw HTML for a nav item's label.
+ * This means every breakpoint's shape *except one* is present in the
+ * server-rendered HTML on first paint: the `1024–1279px` icon rail, the
+ * `≥1280px` full sidebar, and — for a caller who opts into
+ * `smallScreen="off-canvas"` — the off-canvas accordion tree below `lg`,
+ * all render with no JS at all. No `next/dynamic({ ssr: false })`, no
+ * client-only mount flash, for any of those. Verify that directly, not by
+ * trusting this comment: `curl` a page rendered with `smallScreen`
+ * omitted or set to `"off-canvas"`, and grep the raw HTML for a nav
+ * item's label.
+ *
+ * The one exception is `FloatingRail` in the default `"floating"` mode.
+ * It is portaled to `document.body`, and `document` does not exist on the
+ * server, so it cannot be part of that same server-rendered HTML — it is
+ * mount-gated instead and appears only after the client hydrates.
+ * `FloatingRailPortal`'s doc has the full reasoning and, plainly, the
+ * cost: this is a real, narrow regression of the property above, not a
+ * quiet one.
  */
 export function SideNav({
   topItem,
@@ -496,7 +620,7 @@ export function SideNav({
   footerItems,
   currentPath,
   accountSlot,
-  smallScreen = "off-canvas",
+  smallScreen = "floating",
   className,
 }: SideNavProps) {
   return (
@@ -509,15 +633,16 @@ export function SideNav({
             // real box of its own — full width and height, its own
             // background, scrollable.
             "flex h-full w-full shrink-0 flex-col gap-4 overflow-y-auto overflow-x-hidden bg-base-200 py-4"
-          : // Floating: below `lg` the only visible thing is the `fixed`
-            // `FloatingRail` rendered inside this element — which paints
-            // its own pill and escapes this element's box entirely (fixed
-            // positioning is sized independently of its parent). So
-            // *this* element must not draw a box of its own down here —
-            // no background, no padding, no forced height — or it becomes
-            // a full-width, empty, coloured strip sitting uselessly
-            // behind content the rail already floats over. It becomes the
-            // real rail/sidebar box starting at `lg`, identically to the
+          : // Floating: below `lg` this element renders no visible band of
+            // its own at all — `FloatingRailPortal` moves the pill's
+            // markup to `document.body`, so nothing below `lg` is even a
+            // descendant of this `<nav>` any more. So *this* element must
+            // not draw a box of its own down here — no background, no
+            // padding, no forced height — or it becomes a full-width,
+            // empty, coloured strip sitting uselessly wherever `SideNav`
+            // was mounted, doing nothing (the rail floats independently,
+            // wherever `document.body` puts it). It becomes the real
+            // rail/sidebar box starting at `lg`, identically to the
             // off-canvas branch.
             "lg:flex lg:h-full lg:shrink-0 lg:flex-col lg:gap-4 lg:overflow-y-auto lg:overflow-x-hidden lg:bg-base-200 lg:py-4",
         // The `1024–1279px`/`≥1280px` widths as real widths, so the rail
@@ -540,7 +665,7 @@ export function SideNav({
       )}
     >
       {smallScreen === "floating" && (
-        <FloatingRail
+        <FloatingRailPortal
           topItem={topItem}
           groups={groups}
           footerItems={footerItems}

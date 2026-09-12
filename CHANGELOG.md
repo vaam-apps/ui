@@ -2,6 +2,182 @@
 
 ## Unreleased
 
+### An accessibility gate, and what it found
+
+The a11y work in this package had been done by looking: the Storybook
+addon runs axe, and it is genuinely how several real bugs were found.
+But it runs in a browser a person has to open, on a story someone has to
+write, and it **reports** rather than fails. `src/lib/a11y.test.tsx`
+makes it a build failure — axe over every component mounted for real,
+on every `pnpm test`.
+
+- **The gate is a client render, and the obvious version of it was
+  wrong.** The first cut used `renderToStaticMarkup`, matching
+  `form-field.render.test.tsx`'s precedent, and reported violations
+  across most of the library. They were false. Headless UI wires a
+  control's `aria-labelledby` in an *effect*, so server markup shows a
+  `<label for="…">` pointing at a `<span role="checkbox">` — and `for`
+  only associates with labelable elements, so the name really is absent
+  in that snapshot, for a state no user ever sees. Checked in a browser
+  before believing either side: the hydrated control carries
+  `aria-labelledby="headlessui-label-_r_8_"`. The harness was lying, not
+  the components. It is `createRoot` inside `act` now.
+
+  Two self-check cases assert axe is live — an invalid role, an
+  unlabelled button — because a gate that silently stops checking is
+  worse than no gate. `contrast.test.ts` had exactly that failure
+  earlier in this cycle and it is what those cases exist to prevent.
+
+- **`StatusPill`'s accessible name never included `detail`.** The
+  non-interactive pill rendered `role="img"` with a synthetic
+  `aria-label` built from `literal` + `meta.label`. `img` flattens its
+  subtree: the label string is the whole name and nothing inside is
+  announced. So `detail` — the `4xx`, the provider code, the reason
+  anyone is looking at a failed pill — was rendered, visible, and read
+  to nobody. The `interactive` pill was worse in the same way, where
+  `aria-label` overrides content naming outright.
+
+  It is content-named now: the glyph is `aria-hidden`, the text is just
+  text, and `literal` rides in an `sr-only` span on the one path where
+  it is meaningful but not visible. Folding `detail` into a larger
+  `aria-label` was the alternative and could not work — `detail` is a
+  `ReactNode`, and there is no honest way to serialise arbitrary
+  children into an attribute.
+
+  **axe reports zero violations on both the broken and the fixed
+  version**, which is the point worth recording: every rule it has is
+  satisfied either way. So this one is pinned by asserting the mechanism
+  — no flattening role, no synthetic label, both strings reachable as
+  content — and the assertion was mutation-checked: putting `role="img"`
+  back fails exactly those cases and nothing else in the suite.
+
+- **A `LiveRow` wash could hang forever.** Not found by the gate but by
+  rewriting the component onto the new `useReducedMotion` hook. The
+  single effect was keyed on `[washTrigger, reducedMotion]`, so flipping
+  the OS reduced-motion setting *mid-wash* re-ran it, the guard returned
+  early because the trigger had not changed, React's cleanup cleared the
+  in-flight timeout, and no replacement was ever scheduled: `washing`
+  stuck `true` for the life of the row. Split into two effects, one
+  owning detection and one owning the timer.
+
+- **`useReducedMotion` is exported.** Every animated surface here gated
+  on a bare `matchMedia(...).matches` read during render — frozen at
+  mount, so neither a live OS change nor Storybook's own reduced-motion
+  toolbar ever reached the component. It is a `useSyncExternalStore`
+  subscription now, SSR-safe, and exported for the same reason `useTheme`
+  is: a consumer building its own animated surface has the identical
+  need.
+
+- **A blanket `prefers-reduced-motion` rule**, at `0.01ms` rather than
+  `0` — deliberately. A zero-duration transition never fires
+  `transitionend`, and `vaul` closes its drawer on one; a drawer that
+  can be opened but not closed is a worse outcome than a 0.01ms
+  animation.
+
+### The floating rail is the default, and it escapes its wrapper
+
+`smallScreen="floating"` was shipped opt-in last cycle with a warning in
+its prop doc, because a `fixed` element's containing block is the
+viewport **only** while no ancestor establishes one — and `transform`,
+`filter`, `backdrop-filter`, `contain` and `will-change: transform` all
+do. That is not hypothetical: `vaul` stamps
+`[data-vaul-drawer]{will-change:transform}` unconditionally, so every
+consumer wrapping `SideNav` in a drawer would have re-anchored the rail
+to the drawer's box.
+
+The rail is `createPortal`ed to `document.body` now, which puts it
+outside any wrapper by construction, and `"floating"` is the default.
+
+- **This changes rendering for existing callers.** A consumer on the old
+  default gets the floating rail below `lg` instead of the off-canvas
+  tree. Pass `smallScreen="off-canvas"` to keep the previous behaviour.
+- **One property is genuinely narrower:** the portalled rail cannot be
+  server-rendered, so it is invisible until hydration — only the rail,
+  only in `"floating"` mode. The `lg` icon rail, the `xl` sidebar and
+  the whole off-canvas tree are still in first-paint HTML. A consumer
+  with a hard no-JS requirement should pass `smallScreen="off-canvas"`.
+- `side-nav.portal.test.tsx` pins both halves — portal target is
+  `document.body` even under a transformed ancestor, and there is still
+  exactly **one** `nav[aria-label="Primary"]` in the whole document, a
+  duplicate-landmark check the component-scoped a11y gate cannot make
+  because the portal escapes its host node. Mutation-checked in both
+  directions: removing the portal and un-flipping the default each fail
+  exactly one case.
+- The rail carries `data-floating-rail` — a real hook, not a test wart.
+  It is the one part of `SideNav` a caller cannot reach through the
+  element they rendered.
+
+### Two things that were the wrong kind of right
+
+- **`Calendar`'s "today" was dead CSS.** The class read
+  `font-semibold text-state-uncertain-fg` — amber, from the *status*
+  vocabulary, for a fact that is not a status. It also never painted:
+  `day_button` declares its own `text-foreground`, and inherited colour
+  only applies to an element with no explicit declaration of its own, so
+  the digit was always `--foreground`. Measured with `getComputedStyle`
+  before changing anything, because "this class does nothing" is the
+  kind of claim worth checking rather than asserting. Today is marked by
+  shape and weight now — a `border-edge-strong` hairline, the same
+  achromatic token every other present-but-unselected control state
+  uses.
+
+- **`DetailRow`'s three variants disagreed about which text is the
+  label.** `divided` paired a small quiet label with a body-size value.
+  `stacked` had it inverted — the label rendering *larger* than the
+  value it labelled. `inline` set neither size nor colour, so a label
+  was indistinguishable from its own value. All three render inside one
+  `<dl>`, so a drawer mixing variants showed values at two sizes side by
+  side. All three now use `divided`'s pairing. **This changes the
+  rendered type size and colour of every existing `stacked` and
+  `inline` call site** — it is not a tidy-up, it is the file picking one
+  hierarchy instead of three.
+
+### The aurora, pushed further
+
+The ramp was a narrow arc: `--aurora-3` sat on `--ring`, between the
+cyan and the violet it was meant to separate, so the mesh read as one
+hue with a gradient rather than several. It is a `color-mix` toward
+`--state-danger-fg` now — a real magenta between `parked` and `danger` —
+and the alphas are up (dark 30/26/22/14, light 20/17/15/10, from
+22/18/16/10 and 14/12/11/7). Still bound to the system's own hues, so it
+cannot drift away from the palette, and still chrome: no status is
+inferable from it and no caller can tint it.
+
+**The light-theme glow was not multicoloured, and the obvious fix made it
+worse.** `Card glow` paints four offset shadows in four hues. In dark
+they read as four; in light they collapsed into one grey-lilac smudge.
+The cause is that light's `--state-*-fg` values are dark and desaturated
+*because they are text colours* — chosen to clear 4.5:1 on a near-white
+page — and a glow carries no text, so the ramp had imported a constraint
+that does not apply to it.
+
+The principled-looking fix is to mix each stop toward white, freeing it
+from the type constraint. Rendered, that is strictly worse: a tint mixed
+toward white sits *closer* to a white ground, so every stop lost the
+contrast that made it visible and the mesh went from green-and-lilac to
+flat grey. On a light ground, saturation against the ground is the entire
+budget. Reverted, with the finding written into `theme.css` so the next
+person does not re-derive it.
+
+What actually works is alpha: a `[data-theme="light"]` override takes the
+four stops to 78/72/66/58%. Note the reduced-motion rule had to be
+qualified for both themes at the same time — the light override is
+`[data-theme="light"] .aurora-glow` at specificity (0,2,0), and a bare
+`.aurora-glow` under `prefers-reduced-motion` (0,1,0) would have silently
+lost to it, leaving reduced-motion readers in light with the full bloom
+and nothing anywhere reporting it.
+
+**Italic widened.** `--font-italic` marked one thing — a person
+commenting on a decision the system made — which turned out to be too
+narrow for the hints and option descriptions a person also writes. It
+now marks human prose written to the operator, with a test that keeps it
+from swallowing everything: *could this string be a template that only
+fills in a value the system already has — a count, a ratio, a unit, an
+id, a label? Then it is an emitted fact and stays `font-sans`.*
+`InlineEmptyState`'s message and `StatTile`'s caption both still decline
+under the wider rule, and both say why in their own docs — the role
+means something only because things like those are excluded.
+
 ### A light theme, an aurora, and four type voices
 
 Five asks, and the one that looked like a switch was a week. The other

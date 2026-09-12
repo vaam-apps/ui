@@ -17,15 +17,21 @@ export interface InlineEmptyStateProps {
  * the panel where the missing list would be.
  *
  * `message` deliberately stays `font-sans` (the inherited default), not
- * `font-italic`. `--font-italic`'s test is "a person wrote this to
- * explain a decision the system made" — a `StateTimeline` annotation
- * exists because a human is qualifying one specific fact among facts.
- * "No messages match these filters" has no decision behind it and no
- * particular record to comment on: it is the component reporting its own
- * state ("here is nothing"), the same register as a table's own empty
- * cell or a loading skeleton, not commentary standing apart from
- * emitted facts. Marking it italic would dilute the one signal the role
- * carries elsewhere in this system rather than extend it correctly.
+ * `font-italic`, and it still declines under the **wider** reading of
+ * that role — italic now marks any human prose written to the operator,
+ * including `FormField` hints and option descriptions, not only
+ * commentary on a decision.
+ *
+ * It declines because of the line `theme.css` draws: could this string be
+ * a template that only fills in a value the system already has? "No
+ * messages match these filters" is the component reporting its own state
+ * — the same register as an empty table cell or a skeleton — rather than
+ * a sentence a person wrote for a reader. No one is addressing anybody
+ * here; the component is describing itself.
+ *
+ * Marking it italic would dilute the one signal the role carries
+ * elsewhere rather than extend it correctly. The role means something
+ * only because things like this are excluded.
  */
 export function InlineEmptyState({
   message,

@@ -37,6 +37,46 @@ export interface StatusPillProps {
  * implementation serves every state machine in an application.
  * [`createStatusPill`] is the ergonomic wrapper; reach for this directly
  * only when the meta comes from somewhere other than a fixed table.
+ *
+ * # Accessible name: content, not `role="img"` + `aria-label`
+ *
+ * This used to render the non-interactive case as `role="img"` with a
+ * synthetic `aria-label` built from `literal` + `meta.label` alone. Per
+ * the `img` role's own semantics, that makes the whole subtree a single
+ * opaque node — so once `detail` (e.g. `failed · 4xx`) and `showLiteral`'s
+ * mono text were added, both rendered visually and were announced to
+ * **nobody**: the `aria-label` never grew to include them. The `button`
+ * case had the same bug in a sharper form — `aria-label` on a focusable
+ * element also overrides its content-derived name outright, so an
+ * `interactive` pill's `detail` was unreachable even though nothing there
+ * claimed a subtree-flattening role at all.
+ *
+ * The fix drops `role="img"` and the synthetic `aria-label` entirely and
+ * lets the pill's accessible name fall out of its actual content, the way
+ * a plain `<span>`/`<button>` with visible text normally works:
+ * `StateMark`'s glyph is already `aria-hidden` (see that component), the
+ * visible label/`literal`/`detail` spans are read in the order they're
+ * rendered, and — because `literal` is documented as always part of the
+ * accessible name, not just of the visible text when `showLiteral` is
+ * set — an `sr-only` span carries it on the rendered-but-not-visible path
+ * below so a screen-reader user still gets it even when a sighted one
+ * doesn't see it.
+ *
+ * This was chosen over the alternative of keeping `role="img"` and
+ * folding `detail`/`literal` into a bigger `aria-label` string, because
+ * `detail` is a `ReactNode` — arbitrary markup, not always a plain string
+ * — and there is no reliable way to serialise arbitrary children into an
+ * `aria-label` attribute. Content-based naming has no such limit: whatever
+ * `detail` actually renders is simply read as text, exactly like any other
+ * inline content on the page. The `role="img"` comment this replaced gave
+ * a real reason for the original choice (a bare `aria-label` on a
+ * non-interactive `<span>` was, at the time, ignored by some screen
+ * readers) — but nothing here still depends on that: every piece of
+ * meaning is now visible text content instead of an attribute some AT
+ * might skip.
+ *
+ * `meta.tooltip` is a separate, deliberately-unresolved gap — see the
+ * comment on the rendered `title` below.
  */
 export function StatusPill({
   meta,
@@ -61,12 +101,23 @@ export function StatusPill({
     <Comp
       type={interactive ? "button" : undefined}
       onClick={interactive ? onClick : undefined}
+      // `meta.tooltip` — a full sentence of what the state means — is
+      // carried *only* by this native `title`, which is mouse-hover-only
+      // and reaches neither keyboard nor touch users. Left as a
+      // decorative, hover-only enhancement rather than surfaced through
+      // `aria-describedby`, deliberately, not by omission: this is the
+      // most-rendered component in an operator console, and
+      // `aria-describedby` content is announced automatically alongside
+      // the name, not on request — wiring the full sentence in would make
+      // every screen-reader pass over a table read a paragraph per row.
+      // The state itself is never solely carried by the tooltip (glyph +
+      // hue + label + `detail` already say what happened, redundantly,
+      // through independent channels), so nothing load-bearing depends on
+      // hover. A real fix — an on-demand disclosure a keyboard/touch user
+      // can actually reach, e.g. this package's own `Popover` opened on
+      // focus rather than only on hover — is follow-up work, not
+      // something to bolt onto every row silently.
       title={meta.tooltip}
-      // A non-interactive pill is an image of a state, not a label for
-      // one; without `role="img"` the `aria-label` on a `<span>` is
-      // ignored by several screen readers.
-      role={interactive ? undefined : "img"}
-      aria-label={literal === undefined ? meta.label : `${literal} — ${meta.label}`}
       className={cn(
         "inline-flex items-center gap-[5px] whitespace-nowrap align-middle",
         "text-caption",
@@ -90,6 +141,12 @@ export function StatusPill({
     >
       <StateMark meta={meta} size={markSize} className={hue.fg} />
       <span className={loud ? hue.fg : "text-muted-foreground"}>{meta.label}</span>
+      {/* The raw enum literal is part of the accessible name whether or
+          not it is *visible* — `showLiteral` controls presentation, not
+          whether a screen-reader user learns it. When it's already
+          rendered below (`showLiteral`) this would double-announce it, so
+          it only exists for the complementary case. */}
+      {literal !== undefined && !showLiteral && <span className="sr-only">{literal}</span>}
       {/* `muted`, not `subtle`, once the pill is loud. A loud pill paints a
           state tint behind this text, and `--subtle-foreground` does not
           reach 4.5:1 on a tint over anything lighter than the page

@@ -3,3 +3,11 @@ dist/
 storybook-static/
 *.tgz
 .DS_Store
+
+# Agent-local scratch: `.claude/launch.json` is written by the Storybook
+# preview tooling per machine, and in the main checkout this directory is
+# also where git worktrees live. Nothing here is shared. Ignoring it also
+# takes it out of `biome check .` — biome reads this file
+# (`vcs.useIgnoreFile`), so an untracked local config was failing the
+# repo's own lint gate for reasons no commit could explain.
+.claude/

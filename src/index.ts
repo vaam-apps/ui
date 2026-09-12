@@ -96,3 +96,9 @@ export * from "./components/status/status-tokens";
 export { cn } from "./lib/cn";
 export * from "./lib/money";
 export { omitUndefined } from "./lib/omit-undefined";
+/** The hook every animated component in this package gates on, exported
+ * for the same reason `useTheme` is: a consumer building its own
+ * animated surface in an operator console has the identical need, and
+ * the alternative is each app re-deriving a `matchMedia` subscription
+ * that is subtly wrong about live preference changes. */
+export { useReducedMotion } from "./lib/use-reduced-motion";

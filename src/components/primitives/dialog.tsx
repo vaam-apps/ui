@@ -135,6 +135,56 @@ export function DialogClose<T extends ElementType = "button">({
 // Radius bumps to --radius-md here on purpose (design doc §3.5, unchanged by
 // D8's radius-scale rewrite — see theme.css): a floating layer reads as
 // detached from the grid beneath it.
+/**
+ * `DialogPanel` is a bounded `flex flex-col`, not a plain padded box.
+ *
+ * The panel sits in `fixed inset-0 flex items-center justify-center`, so a
+ * body taller than the viewport used to overflow **both** ends at once:
+ * `DialogFooter`'s buttons went off the bottom, and the close button (an
+ * `absolute top-4 right-4` child of the panel) went off the top along with
+ * it. Escape and backdrop-click still worked, so nothing trapped the user,
+ * but every footer action was unreachable.
+ *
+ * The obvious fix — `overflow-y-auto` on `DialogPanel` itself — creates a
+ * second bug instead of fixing the first: the close button is an
+ * `absolute` child of that same element, and an absolutely positioned
+ * descendant of a scrolling box scrolls *with* the box (its containing
+ * block is the padding edge of the scrollport, which travels with the
+ * content). The button would still be reachable, but it would travel up
+ * out of view as soon as the body scrolled down — reachable at the top of
+ * the scroll and gone everywhere else.
+ *
+ * So the scrolling element and the close button's containing block are
+ * two different boxes:
+ *
+ * - `DialogPanel` itself never scrolls. It is `flex flex-col`,
+ *   `overflow-hidden` (so the rounded corners still clip), and bounded by
+ *   `max-h-[85vh]` — a cap, not a fixed height, so a short dialog sizes to
+ *   its content exactly as before and never shows a scrollbar.
+ * - `children` (`DialogHeader`, the caller's own content, `DialogFooter`,
+ *   all flat siblings — this component has no way to tell them apart)
+ *   render inside one `flex-1 min-h-0 overflow-y-auto` wrapper. `min-h-0`
+ *   is required: a flex item's default `min-height: auto` refuses to
+ *   shrink below its content's height, which would silently defeat the
+ *   `overflow-y-auto` above it.
+ * - The close button is a **sibling** of that wrapper, still a direct
+ *   `absolute` child of `DialogPanel`. Its containing block never
+ *   scrolls, so `top-4 right-4` stays pinned regardless of how far the
+ *   body has scrolled.
+ * - `DialogHeader`/`DialogFooter` stay visually pinned to the top/bottom
+ *   of the *visible* panel — not just present somewhere in the scroll —
+ *   via `sticky top-0`/`sticky bottom-0` declared on those two components
+ *   themselves (below), each with an opaque `bg-surface-2` so scrolled
+ *   content doesn't show through underneath them. Because they are
+ *   ordinary flow children of the scrolling wrapper (first and last,
+ *   respectively, in every real usage), sticky positioning holds them at
+ *   the wrapper's own top/bottom edge without this component needing to
+ *   single them out from `children`.
+ *
+ * Net effect: short dialogs are pixel-identical to before (auto height,
+ * no scrollbar); a body taller than `85vh` scrolls internally, with the
+ * header and footer — and the close button — always in reach.
+ */
 export function DialogContent({ className, children, ...props }: ComponentPropsWithoutRef<"div">) {
   const { open, setOpen } = useDialogContext("DialogContent");
   return (
@@ -147,13 +197,13 @@ export function DialogContent({ className, children, ...props }: ComponentPropsW
         <DialogPanel
           transition
           className={cn(
-            "relative w-full max-w-[480px] rounded-md border border-edge bg-surface-2 p-6 shadow-[var(--shadow-dialog)]",
+            "relative flex max-h-[85vh] w-full max-w-[480px] flex-col overflow-hidden rounded-md border border-edge bg-surface-2 shadow-[var(--shadow-dialog)]",
             "duration-150 ease-out data-closed:scale-95 data-closed:opacity-0",
             className,
           )}
           {...props}
         >
-          {children}
+          <div className="min-h-0 flex-1 overflow-y-auto p-6">{children}</div>
           {/* `-m-1 p-1`: grows the hit target to roughly 32×32px without
               moving the icon itself — the button's visual position (and
               therefore the `right-4`/`top-4` offset every dialog author
@@ -169,12 +219,19 @@ export function DialogContent({ className, children, ...props }: ComponentPropsW
               a text-colour change to register, matching the icon-button
               hover already used in `calendar.tsx`; focus already gets a
               ring for free from `theme.css`'s global `:focus-visible`
-              rule, so no separate focus treatment is needed here. */}
+              rule, so no separate focus treatment is needed here.
+
+              `z-20`: a sibling of the scrolling wrapper above, not a
+              descendant of it (see the module doc) — painted after it in
+              DOM order, which already puts it on top, but the explicit
+              `z-20` keeps that true even if `DialogHeader`'s own `z-10`
+              (needed so its sticky background occludes scrolled content)
+              ever changes. */}
           <button
             type="button"
             aria-label="Close"
             onClick={() => setOpen(false)}
-            className="-m-1 absolute top-4 right-4 rounded-full p-1 text-subtle-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
+            className="-m-1 absolute top-4 right-4 z-20 rounded-full p-1 text-subtle-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
           >
             <X size={16} strokeWidth={1.5} />
           </button>
@@ -186,24 +243,61 @@ export function DialogContent({ className, children, ...props }: ComponentPropsW
 
 /**
  * `pr-8` reserves a gutter for the close button rendered by `DialogContent`
- * (`absolute top-4 right-4` around a 16px icon). `DialogPanel` is `p-6`
- * (24px), so the content column already ends 24px from the panel's right
- * edge, but the button's own box runs from 16px to 32px inset — 8px
- * *inside* that column with no gutter here. Every existing story uses a
- * short title, so the overlap has never rendered; `ConfirmDialog`'s
- * `max-w-sm` panel makes it more likely once a title is long enough to
- * wrap. `pr-8` (32px) puts the header's own right edge safely past the
- * button's 32px-inset extent, with room to spare.
+ * (`absolute top-4 right-4` around a 16px icon, positioned against
+ * `DialogPanel`'s own padding edge). The scrolling wrapper `DialogContent`
+ * renders `children` into is `p-6` (24px), so the content column already
+ * ends 24px from the panel's edge, but the button's own box runs from
+ * 16px to 32px inset — 8px *inside* that column with no gutter here.
+ * Every existing story uses a short title, so the overlap has never
+ * rendered; `ConfirmDialog`'s `max-w-sm` panel makes it more likely once a
+ * title is long enough to wrap. `pr-8` (32px) puts the header's own right
+ * edge safely past the button's 32px-inset extent, with room to spare.
+ *
+ * `sticky top-0`: see `DialogContent`'s module doc for the full mechanism
+ * — this, not `DialogContent`, is what keeps the header at the top of the
+ * *visible* panel while a tall body scrolls underneath it, since
+ * `DialogContent` has no way to single header/body/footer out of its flat
+ * `children`. `-mx-6 -mt-6 px-6 pt-6` extends the sticky box out to the
+ * scrolling wrapper's own edges (undoing that wrapper's `p-6` on this
+ * element's three outer sides, then reapplying it as this element's own
+ * padding) so `bg-surface-2` actually reaches the wrapper's left/right
+ * edges and top — without that, the header would still stick, but a
+ * 24px-wide sliver of scrolled content would remain visible around it,
+ * peeking out from the padding `DialogContent`'s wrapper never removes on
+ * a `position: sticky` element (padding is not part of what `sticky`
+ * anchors to the scrollport edge).
  */
 export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("mb-4 flex flex-col gap-1 pr-8", className)} {...props} />;
+  return (
+    <div
+      className={cn(
+        "-mx-6 -mt-6 sticky top-0 z-10 mb-4 flex flex-col gap-1 bg-surface-2 px-6 pt-6 pr-8",
+        className,
+      )}
+      {...props}
+    />
+  );
 }
 
 /** #56: the confirm/requeue dialog's own action row. Mirrors `DialogHeader`'s
  * shape (a thin, class-composing div, not a Headless-UI-wrapped primitive —
- * a footer has no accessibility semantics either library needs to own). */
+ * a footer has no accessibility semantics either library needs to own).
+ *
+ * `sticky bottom-0` + the `-mx-6 -mb-6 px-6 pb-6` edge-extension: the same
+ * mechanism as `DialogHeader`'s `sticky top-0`, mirrored to the bottom of
+ * the scrolling wrapper `DialogContent` renders `children` into — see
+ * that header's own comment and `DialogContent`'s module doc for why this
+ * lives here rather than in `DialogContent` itself. */
 export function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("mt-6 flex items-center justify-end gap-2", className)} {...props} />;
+  return (
+    <div
+      className={cn(
+        "-mx-6 -mb-6 sticky bottom-0 z-10 mt-6 flex items-center justify-end gap-2 bg-surface-2 px-6 pt-2 pb-6",
+        className,
+      )}
+      {...props}
+    />
+  );
 }
 
 export function DialogTitle({

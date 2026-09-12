@@ -176,6 +176,29 @@ export const PendingAndInteractive: Story = {
   ),
 };
 
+/**
+ * `detail`, `showLiteral` and `pending` all at once — the combination that
+ * used to be silently unreachable to a screen reader. Non-interactive
+ * pills previously rendered as `role="img"` with a synthetic `aria-label`
+ * built only from `literal` + the label, which makes the whole subtree a
+ * single opaque node: `detail` (the failure class here) and the mono
+ * `literal` text both painted on screen and were announced to nobody.
+ * `StatusPill`'s own doc comment ("Accessible name: content, not
+ * `role="img"` + `aria-label`") covers the fix; this story is the fixture
+ * that would have caught the original bug, had it existed at the time —
+ * inspect it with a screen reader or Storybook's accessibility addon and
+ * every piece of visible text here should be announced, not just the
+ * label.
+ */
+export const DetailLiteralAndPending: Story = {
+  render: () => (
+    <div className="flex flex-wrap items-center gap-4">
+      <DemoStatusPill state="failed" showLiteral pending detail="4xx" />
+      <DemoStatusPill state="stalled" showLiteral pending detail="no worker claimed it" />
+    </div>
+  ),
+};
+
 /** The raw geometry every pill renders through: silhouette × interior mark
  * × filled-or-stroked, at 16px. */
 export const Glyphs: Story = {
