@@ -63,6 +63,7 @@ type ExtraClassGroupId =
   | "daisy-btn-variant"
   | "daisy-btn-style"
   | "daisy-btn-size"
+  | "daisy-btn-shape"
   | "daisy-badge-variant"
   | "daisy-badge-style"
   | "daisy-badge-size"
@@ -128,7 +129,30 @@ const twMerge = extendTailwindMerge<ExtraClassGroupId>({
     classGroups: {
       "daisy-btn-variant": [{ btn: [...DAISY_COLOURS, "ghost", "link"] }],
       "daisy-btn-style": [{ btn: ["outline", "soft", "dash"] }],
-      "daisy-btn-size": [{ btn: [...DAISY_SIZES, "wide", "block", "square", "circle"] }],
+      // **Size and shape are two groups, not one — and this was a live bug.**
+      //
+      // `square`/`circle`/`wide`/`block` used to sit in the same group as
+      // `xs…xl`, which made them mutually exclusive with a size. They are
+      // not: daisyUI's `.btn-circle` sets `width`/`height` from `--size`
+      // and overrides `border-radius`, while `.btn-sm` sets `--size`
+      // itself, so the two compose and every real call site pairs them.
+      //
+      // Collapsed into one group, `cn()` deleted the shape:
+      //
+      //   buttonVariants({ size: "icon" })  // "… btn-circle btn-sm"
+      //   cn(that)                          // "… btn-sm"      <- gone
+      //
+      // So `Button size="icon"` never rendered as a square for as long as
+      // that group has existed, and nothing said a word — which is the
+      // exact failure shape this file's own header describes, committed
+      // by the file itself. Found by checking the merge output rather
+      // than reading the group list.
+      //
+      // It is the same split already made above for `btn` colour versus
+      // style, for the same reason: two orthogonal axes that happen to
+      // share a prefix are two groups.
+      "daisy-btn-size": [{ btn: [...DAISY_SIZES] }],
+      "daisy-btn-shape": [{ btn: ["wide", "block", "square", "circle"] }],
       "daisy-badge-variant": [{ badge: [...DAISY_COLOURS, "ghost"] }],
       "daisy-badge-style": [{ badge: ["outline", "soft", "dash"] }],
       "daisy-badge-size": [{ badge: [...DAISY_SIZES] }],

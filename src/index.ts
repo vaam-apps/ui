@@ -27,6 +27,7 @@ export * from "./components/data/code";
 export * from "./components/data/copy-button";
 export * from "./components/data/detail-row";
 export * from "./components/data/id-display";
+export * from "./components/data/instrument-panel";
 export * from "./components/data/masked-value";
 export * from "./components/data/money";
 export * from "./components/data/phone-display";
@@ -76,6 +77,7 @@ export * from "./components/primitives/switch";
 export * from "./components/primitives/table";
 export * from "./components/primitives/tabs";
 export * from "./components/primitives/textarea";
+export * from "./components/primitives/theme-switcher";
 export * from "./components/primitives/toast";
 export * from "./components/primitives/tooltip";
 // ---------------------------------------------------------------------------

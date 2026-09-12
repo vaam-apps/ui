@@ -27,7 +27,7 @@ export const DrawerOverlay = forwardRef<
 >(({ className, ...props }, ref) => (
   <DrawerPrimitive.Overlay
     ref={ref}
-    className={cn("fixed inset-0 z-50 bg-black/50", className)}
+    className={cn("fixed inset-0 z-50 bg-scrim", className)}
     {...props}
   />
 ));
@@ -67,7 +67,16 @@ export const DrawerTitle = forwardRef<
 >(({ className, ...props }, ref) => (
   <DrawerPrimitive.Title
     ref={ref}
-    className={cn("font-medium text-foreground text-title-sm", className)}
+    // `font-display`/`tracking-normal`: `theme.css`'s own doc on
+    // `--font-display` names "card and dialog headings" outright, and a
+    // drawer title is the same role — see `card.tsx`'s `CardHeader`
+    // comment for why the tracking reset is needed (the global
+    // `html { letter-spacing: -0.011em }` was tuned for the sans body
+    // face, not this serif).
+    className={cn(
+      "font-display font-medium text-foreground text-title-sm tracking-normal",
+      className,
+    )}
     {...props}
   />
 ));
@@ -221,7 +230,7 @@ function DetailDrawerContent({
       autoFocus
     >
       <DrawerPrimitive.Portal>
-        {dimmed && <DrawerPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />}
+        {dimmed && <DrawerPrimitive.Overlay className="fixed inset-0 z-50 bg-scrim" />}
         <DrawerPrimitive.Content
           className={cn(
             "fixed z-50 flex flex-col bg-surface-2 shadow-[var(--shadow-dialog)] outline-none",
@@ -265,10 +274,13 @@ function DetailDrawerContent({
             {/* `-m-1 p-1`: same hit-area fix as `dialog.tsx`'s close button
                 (§ that file's own `DialogContent` comment) — grows the
                 clickable box to roughly 32×32px without moving the 16px
-                icon itself, so the two close buttons agree. */}
+                icon itself, so the two close buttons agree. `rounded-full`
+                and the `hover:bg-surface-3` affordance agree with it too —
+                see that comment for why (icon-only controls are circular;
+                focus already gets a ring for free from `theme.css`). */}
             <DrawerPrimitive.Close
               aria-label="Close"
-              className="-m-1 shrink-0 rounded-sm p-1 text-subtle-foreground hover:text-foreground"
+              className="-m-1 shrink-0 rounded-full p-1 text-subtle-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
             >
               <X size={16} strokeWidth={1.5} />
             </DrawerPrimitive.Close>

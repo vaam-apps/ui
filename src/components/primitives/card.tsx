@@ -1,7 +1,22 @@
 import type { HTMLAttributes, ReactNode } from "react";
 import { cn } from "../../lib/cn";
 
-export type CardProps = HTMLAttributes<HTMLDivElement>;
+export interface CardProps extends HTMLAttributes<HTMLDivElement> {
+  /**
+   * Wraps the card in a multi-hue aurora glow.
+   *
+   * For the **instrument register** only — dashboard and metric surfaces,
+   * where the job is to make one number findable. Not for a card in a
+   * list, a drawer, or anywhere a reader is working through rows: a glow
+   * on every card is a glow on none, and this library's default is a
+   * hairline for exactly that reason (see "Borders, not shadows").
+   *
+   * Carries no meaning. A glow is not a status, cannot be tinted per
+   * state, and nothing should be inferred from its presence — the hue
+   * vocabulary stays entirely with `StatusHue`.
+   */
+  glow?: boolean | undefined;
+}
 
 // Borders, not shadows (design doc §3.6): every card is `--shadow-none` +
 // a 1px border. daisyUI's own `card` class would add `shadow-xl` under
@@ -37,10 +52,18 @@ export type CardProps = HTMLAttributes<HTMLDivElement>;
  * to. This is the class of bug where a `truncate` that looks correct
  * silently does nothing.
  */
-export function Card({ className, ...props }: CardProps) {
+export function Card({ className, glow = false, ...props }: CardProps) {
   return (
     <div
-      className={cn("card min-w-0 border border-edge bg-base-300 shadow-none", className)}
+      className={cn(
+        "card min-w-0 border border-edge bg-base-300",
+        // `shadow-none` is a Tailwind utility and lands unlayered, so it
+        // would outrank `.aurora-glow`'s `@layer components` rule and the
+        // glow would silently not paint. It is emitted only when there is
+        // no glow to suppress.
+        glow ? "aurora-glow" : "shadow-none",
+        className,
+      )}
       {...props}
     />
   );
@@ -77,7 +100,14 @@ export function CardHeader({
   return (
     <div className={cn("flex items-start justify-between gap-4 p-4", className)} {...props}>
       <div className="min-w-0">
-        <Heading className="truncate font-medium text-foreground text-title-sm">{title}</Heading>
+        {/* `font-display`/`tracking-normal`: same pairing and the same
+            reason as `ScreenHeader`'s `<h1>` — see that component's doc
+            comment. `text-title-sm` (16px) is closer to body size than
+            the screen title is, which makes the sans-tuned global
+            tracking's crowding *more* visible here, not less. */}
+        <Heading className="truncate font-display font-medium text-foreground text-title-sm tracking-normal">
+          {title}
+        </Heading>
         {meta != null && (
           <p className="mt-1 truncate font-mono text-caption text-subtle-foreground">{meta}</p>
         )}

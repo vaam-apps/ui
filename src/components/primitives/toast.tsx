@@ -175,12 +175,15 @@ export function Toaster() {
                 `×` glyph this replaced rendered a different weight and a
                 roughly 8×18px box. `-m-1 p-1`: the same hit-area idiom
                 used there, growing the click target without moving the
-                icon. */}
+                icon. `rounded-full` and `hover:bg-surface-3` match those
+                two as well — icon-only controls are circular in this
+                package (`button.tsx`'s `icon` size), and a background
+                shift gives hover a signal beyond text colour alone. */}
             <button
               type="button"
               onClick={() => dismissToast(item.id)}
               aria-label="Dismiss"
-              className="-m-1 shrink-0 rounded-sm p-1 text-subtle-foreground hover:text-foreground"
+              className="-m-1 shrink-0 rounded-full p-1 text-subtle-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
             >
               <X size={16} strokeWidth={1.5} />
             </button>

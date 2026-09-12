@@ -6,6 +6,28 @@
  * can see used, and the class strings live in `../src`, which it does not
  * scan by default. Omitting it renders every story unstyled with no error.
  */
+
+/*
+ * The four faces `theme.css`'s `--font-*` stacks name, loaded from Google
+ * Fonts. **This is Storybook acting as a consumer, not the package
+ * shipping fonts** — `theme.css`'s own comment on the four voices is
+ * explicit that this library ships stacks, not `@font-face` rules, and
+ * that a consumer loads the faces or falls back through `ui-serif` /
+ * `system-ui` / `ui-monospace`. Storybook is exactly that consumer: skip
+ * this import and every story still builds, lints and passes, and every
+ * story silently renders in the fallback face, which makes this whole
+ * axis invisible to whoever opens Storybook to judge it. A future reader
+ * of this file should not conclude from its presence that the package
+ * itself bundles fonts — it does not, and still ships none.
+ *
+ * Weights: 400/500/600 + 400 italic for Sans (body copy never goes
+ * bolder than 600 or italic beyond hint text elsewhere in this system);
+ * 500/600 + 400/500 italic for Serif (`font-display` headings sit at
+ * medium/semibold, `font-italic` annotations at regular or medium); 400/500
+ * for Mono (data and its rare medium-weight emphasis).
+ */
+@import "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Serif:ital,wght@0,500;0,600;1,400;1,500&family=JetBrains+Mono:wght@400;500&display=swap";
+
 @import "tailwindcss";
 @plugin "daisyui" {
   themes: false;

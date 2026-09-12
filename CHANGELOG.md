@@ -2,6 +2,140 @@
 
 ## Unreleased
 
+### A light theme, an aurora, and four type voices
+
+Five asks, and the one that looked like a switch was a week. The other
+four are contained. Nothing here removes an export or narrows a
+signature — every break below is in **defaults and pixels**.
+
+- **There is a light theme.** The README said "dark only … a second theme
+  is a real amount of work to keep honest and nothing here pretends to
+  have done it". The work is done rather than the constraint dropped.
+  Every status foreground in the dark set is a 300-level tint chosen for
+  ~11:1 against near-black; measured against white, all eight landed
+  between **1.4:1 and 2.6:1** — every one below AA. A palette picked by
+  eye ships a status vocabulary nobody can read, and
+  `theme-tokens.test.ts` could not have caught it: it asserts a token is
+  *declared*, never that it is *legible*.
+
+  So `src/lib/contrast.test.ts` was written **first**, and the light
+  values searched against it — maximum pairwise ΔE among candidates that
+  already cleared the bar. Minimum separation 19.3, against the dark
+  set's own 9.6 between `neutral` and `expired`.
+
+  It then caught two more, which is the point of a gate: `danger` and
+  `expired` cleared the bar on a *bare* surface and failed it once their
+  own fill was composited under the label — the **loud** pill case, at
+  4.36:1 and 4.27:1 on the row-hover fill. Both invisible to axe, because
+  no story renders a loud pill on a hovered row. The test now composites,
+  and those two hues are darker.
+
+  `dark` keeps `default: true` and `prefersdark`. Light emits only
+  `[data-theme="light"]` — no `:root` rule, no media query — so a
+  dark-only consumer is bit-identical to before. **One upgrade path is
+  not:** an app carrying a stray `<html data-theme="light">` from daisyUI
+  boilerplate was matching no rule at all and falling through to the dark
+  values; that attribute now matches.
+
+- **`ThemeSwitcher`, and the headless `useTheme` behind it.** Three
+  states — system / light / dark — not a toggle, because `dark` carries
+  `prefersdark` and a two-state control cannot express "follow my OS" at
+  all: it has to start somewhere, and wherever it starts is a decision
+  the operator never made.
+
+  **`themeInitScript` is not optional if you use it.** React cannot run
+  before the browser's first paint, so without a synchronous `<head>`
+  script every visitor who chose the non-default theme sees a flash of
+  the other one on every full page load. Inline it before any stylesheet,
+  and put `suppressHydrationWarning` on `<html>` — the script mutates
+  that exact element pre-hydration.
+
+- **Four type voices, one superfamily.** `--font-display` (IBM Plex
+  Serif) for screen and card and dialog titles; `--font-sans` (IBM Plex
+  Sans, replacing Inter) for everything else; `--font-italic` for **human
+  commentary** — a `StateTimeline` annotation is a person explaining a
+  decision, not the system reporting one; `--font-mono` unchanged.
+
+  Mono stays JetBrains Mono rather than becoming Plex Mono: this system
+  leans on its slashed zero, and coherence on paper is worth less than
+  telling `0` from `O` in a `cs_cuid()` at 12px.
+
+  The italic rule is applied narrowly and on purpose. `InlineEmptyState`
+  was tested against it and declined — "No messages match these filters"
+  is the component reporting its own state, not commentary. `StatTile`'s
+  caption was italicised and then reverted for the same reason: its
+  shipped fixtures are `"98.2% of 12,710 terminal"` and `"XAF, across all
+  providers"`, which are emitted facts.
+
+  **This package still ships no font files** and the stacks fall back
+  through `ui-serif` / `system-ui` / `ui-monospace`. A consumer who loads
+  nothing gets a working page with two voices instead of four — see the
+  README's new third setup step.
+
+- **The skeleton drifts in colour.** Ribbons rather than blobs (radial
+  stops 58%×120%, plus a shear in the keyframes), on longer coprime
+  periods — 23s and 31s, so the pair returns to its starting arrangement
+  every 713s rather than every 247s. Still transform-only, still no
+  `filter: blur()`, still dead under `prefers-reduced-motion`.
+
+- **A third surface register.** `InstrumentPanel` is an aurora mesh
+  ground for data you *scan* rather than read, and `Card glow` is the
+  same register at card scale. This is a deliberate exception to
+  "borders, not shadows", not a loosening of it: the rule still governs
+  every diagnostic surface, which is most of the library.
+
+  The panel **steps its own caption tier from `subtle` to `muted`**,
+  because a gradient ground breaks the one-surface-one-ratio assumption
+  every other check rests on: at the 14% cap, `--subtle-foreground`
+  measures 4.41:1 in dark and 4.45:1 in light, below AA, while `muted`
+  holds above 5.29:1. Enforced in the component rather than documented as
+  a rule, the same move `StatusPill` already makes for a loud tint.
+
+  `filter: blur()` is used for the glow, and is still banned on the
+  skeleton — ruinous at two hundred table cells, free on six cards. Same
+  analysis, opposite answer.
+
+- **`--aurora-*` is one ramp, bound to the system's own hues.** The first
+  version declared it "named rather than borrowed"; all four values were
+  in fact the status palette copy-pasted as literals, with nothing
+  binding them and the two themes borrowing inconsistently. They are
+  `color-mix`-derived now and the comment says what is true. They carry
+  no meaning: nothing infers a state from a glow.
+
+- **`SideNav` gains `smallScreen`, defaulting to `"off-canvas"`** — the
+  existing behaviour, unchanged. `"floating"` renders a `fixed` icon rail
+  below `lg` instead of the drawer-hosted accordion, and is opt-in for a
+  reason: a `fixed` element's containing block is the nearest ancestor
+  with a `transform`, `filter`, `contain` **or `will-change: transform`**,
+  and this package's own `Drawer` is exactly that ancestor — `vaul`
+  stamps `[data-vaul-drawer]{will-change:transform}` unconditionally. For
+  the documented consumer who wraps `SideNav` in a drawer, defaulting to
+  floating would have meant an empty drawer, a rail anchored to the wrong
+  element, and no navigation at all below `lg` while that drawer is
+  closed.
+
+- **`Button size="icon"` is circular — for the first time.** Two bugs,
+  stacked. `square`/`circle` shared a `tailwind-merge` group with
+  `xs…xl`, so `cn()` deleted the shape class outright and what shipped
+  was a `btn-sm` rounded rectangle. Fixing that revealed the second:
+  `rounded-field` in the base string is an unlayered Tailwind utility,
+  and daisyUI emits `.btn-circle` one sublayer deeper, so the utility
+  outranked it — 12px on a 32×32 box, a rounded square reported as a
+  circle. Both fixed; the test now asserts the radius rather than the
+  class string, which is what let the second one hide behind a green run.
+
+  The bare `<button>` icon controls follow: `Dialog`, `Drawer` and
+  `Toast`'s closes, `CopyButton`, `MaskedValue`'s reveal toggle and
+  `Calendar`'s month nav are all `rounded-full` with a real hover
+  affordance, and the two that had no hit-area padding gained the
+  `-m-1 p-1` idiom the others already had.
+
+- **The overlay scrim is a token.** `bg-black/50` was hardcoded in three
+  places — free over near-black, and over a near-white page it crushed
+  the surround to a dead mid-grey with nothing able to say otherwise.
+  `--scrim` is per-theme now (`rgb(20 23 28 / 0.32)` in light) and
+  exposed as `bg-scrim`.
+
 ### `StatusHue` gains `progress` (minor, additive)
 
 **The hue axis had no value for "running, outcome not yet known"** — the
@@ -192,9 +326,9 @@ build or a screen, so they come first.**
 
 ### Skeletons drift instead of standing still
 
-`Skeleton` plays a **chaotic gradient**: two oversized, very
+`Skeleton` plays a **chaotic gradient**: two oversized,
 low-contrast gradient fields translating and scaling past each other on
-coprime periods (13s and 19s), with per-position phase offsets so a
+coprime periods (23s and 31s), with per-position phase offsets so a
 stack of them never brightens in unison.
 
 This does not reverse the "no skeleton shimmer" rule. A shimmer is a

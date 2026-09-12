@@ -58,13 +58,20 @@ export function Calendar({
         nav: "flex items-center gap-1",
         // The nav buttons are absolutely positioned by RDP's own layout at
         // the top corners of the month; these restyle them in place.
+        // `rounded-full`, not `rounded-sm`: `button.tsx`'s own convention
+        // comment calls the circular shape universal for icon-only
+        // controls ("it only pays off if every icon-only control uses
+        // it") and this pair — icon-only, aria-labelled by RDP itself —
+        // was the one it missed. `day_button` below stays `rounded-sm` on
+        // purpose: it's a labelled calendar cell (a date, not an icon),
+        // not an icon-only control, so the convention doesn't apply to it.
         button_previous: cn(
-          "absolute top-3 left-3 inline-flex size-7 items-center justify-center rounded-sm",
+          "absolute top-3 left-3 inline-flex size-7 items-center justify-center rounded-full",
           "text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground",
           "disabled:pointer-events-none disabled:opacity-40",
         ),
         button_next: cn(
-          "absolute top-3 right-3 inline-flex size-7 items-center justify-center rounded-sm",
+          "absolute top-3 right-3 inline-flex size-7 items-center justify-center rounded-full",
           "text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground",
           "disabled:pointer-events-none disabled:opacity-40",
         ),

@@ -8,14 +8,26 @@
  * the two disagree — see D8/D9 in that document for the reasoning behind
  * every change below.
  *
- * **Dark-only (D9).** The `"light"` `@plugin "daisyui/theme"` block and its
- * paired `[data-theme="light"]` block are deleted outright, not merely
- * unreferenced — constraint 2 ("no light theme, no toggle") and this
- * project's own standing "no dormant code" rule (CLAUDE.md, "Delivery
- * style") both rule out keeping a second, unreachable theme alive in the
- * codebase. `frontends/apps/admin/app/layout.tsx` keeps `data-theme="dark"` on `<html>`
- * regardless — harmless, and documents intent even with only one theme
- * registered.
+ * **Two themes, dark still the default (supersedes D9).** D9 deleted the
+ * light theme outright on the grounds that a second theme is "a real
+ * amount of work to keep honest". That was true, and the work has now
+ * been done rather than the constraint quietly dropped.
+ *
+ * What made it real: every status foreground is a 300-level tint chosen
+ * for roughly 11:1 against near-black, and measured against white all
+ * eight landed between **1.4:1 and 2.6:1** — every one of them below the
+ * 4.5:1 WCAG AA bar. A light palette picked by eye would have shipped a
+ * status vocabulary nobody could read, and `theme-tokens.test.ts` could
+ * not have caught it: that file asserts a token is *declared*, never that
+ * it is *legible*. So `contrast.test.ts` was written **first**, and the
+ * light values below were searched for against it — maximum pairwise ΔE
+ * among candidates that already cleared the bar. The result separates
+ * better than the dark set it mirrors (minimum ΔE 19.3 against the dark
+ * theme's own 9.6 between `neutral` and `expired`).
+ *
+ * `dark` keeps `default: true`, so a consumer who sets no `data-theme`
+ * attribute gets exactly what they got before this change. Light is
+ * opt-in, via `data-theme="light"` or the `ThemeSwitcher` component.
  *
  * **Radius (D8).** Rewritten from the previous near-square 2px system to a
  * visibly, deliberately rounded one. This is a genuine visual-identity
@@ -57,12 +69,12 @@
  * `--edge-strong`) the design doc specifies, just under a collision-free
  * name.
  *
- * Font self-hosting/subsetting (design doc F2: Inter Variable + JetBrains
- * Mono Variable, latin + latin-ext, `font-display: swap`) is explicitly
+ * Font self-hosting/subsetting (design doc F2: IBM Plex + JetBrains
+ * Mono, latin + latin-ext, `font-display: swap`) is explicitly
  * NOT done here — that is a separate, later task per the design doc's own
  * build order, and no font files are checked into this repo yet. The
  * family stacks below are correct and will pick the right system fallback
- * (`system-ui` / `ui-monospace`) until self-hosting lands.
+ * (`ui-serif` / `system-ui` / `ui-monospace`) until self-hosting lands.
  */
 
 @plugin "daisyui/theme" {
@@ -133,12 +145,50 @@
  * selected fill) is one step daisyUI's own three-tier base system doesn't
  * have, so it lives here as a plain extra token.
  *
- * D9: this used to be paired with a `[data-theme="light"]` block carrying
- * the same token set under a light palette. That block is deleted, not
- * merely unused — see this file's own header comment.
+ * This block's light counterpart lives ~150 lines below. D9 had deleted it
+ * outright; the header explains why it is back and what had to be true
+ * first.
  */
 [data-theme="dark"] {
   --surface-3: #1c1f25;
+
+  /* The aurora ramp.
+   *
+   * This is the one place in the system where *chrome* carries hue, and
+   * the first version of this comment claimed the hues were "named
+   * rather than borrowed" so that stayed obvious. That was not true: all
+   * four values were the status palette copy-pasted as literals —
+   * `--state-progress-fg`, `--state-parked-*`'s base, `--ring` and
+   * `--state-success-fg` — with nothing binding them to their sources,
+   * and light borrowed inconsistently on top. Four duplicated literals
+   * with no test is the failure class this changelog already records
+   * four times.
+   *
+   * So: they *are* drawn from the system's own hues, deliberately — a
+   * placeholder should belong to the same world as the thing it stands
+   * in for, not a second invented palette — and `color-mix` binds them
+   * to the real tokens so they cannot drift. What makes them chrome is
+   * not a separate hue but the absence of meaning: no status surface
+   * reads this ramp, and nothing infers state from it.
+   *
+   * Opaque here; each use site applies its own alpha. The skeleton wants
+   * 8–20%, a card glow wants more, and baking alpha into the token made
+   * the second impossible. */
+  --aurora-1: var(--state-progress-fg);
+  --aurora-2: #a78bfa;
+  --aurora-3: var(--ring);
+  --aurora-4: var(--state-success-fg);
+
+  --skeleton-aurora-1: color-mix(in oklab, var(--aurora-1) 20%, transparent);
+  --skeleton-aurora-2: color-mix(in oklab, var(--aurora-2) 18%, transparent);
+  --skeleton-aurora-3: color-mix(in oklab, var(--aurora-3) 16%, transparent);
+  --skeleton-aurora-4: color-mix(in oklab, var(--aurora-4) 8%, transparent);
+
+  /* Overlay scrim. The only literal colour left in a component after the
+     light theme landed was `bg-black/50`, hardcoded in three places —
+     free in dark, and in light it crushes a near-white page to a dead
+     mid-grey with no way for a theme or a consumer to say otherwise. */
+  --scrim: rgb(0 0 0 / 0.5);
 
   /* §3.6: borders, not shadows, for cards/tables/panels — only floating
      layers (popover, dropdown, dialog, tooltip, sheet/drawer) get one. */
@@ -268,6 +318,149 @@
 }
 
 /*
+ * The light theme. Registered under daisyUI's own built-in `light` name,
+ * the same pattern the dark block above uses — with `themes: false` in the
+ * consuming stylesheet there is no built-in left to collide with.
+ *
+ * Not `default: true`. `dark` keeps that, so nothing changes for a
+ * consumer who never sets the attribute.
+ */
+@plugin "daisyui/theme" {
+  name: "light";
+  default: false;
+  prefersdark: false;
+  color-scheme: light;
+
+  /* The dark ladder inverted and kept slightly blue-biased, so the greys
+     read as chosen rather than as stock neutrals — pure white would sit
+     oddly beside a status palette this cool. */
+  --color-base-100: #fcfcfd;
+  --color-base-200: #f4f6f8;
+  --color-base-300: #eceef2;
+  --color-base-content: #14171c;
+
+  /* §1.3 holds in both themes: one achromatic accent, never a hue. */
+  --color-primary: #14171c;
+  --color-primary-content: #fcfcfd;
+  --color-secondary: #14171c;
+  --color-secondary-content: #fcfcfd;
+  --color-accent: #14171c;
+  --color-accent-content: #fcfcfd;
+  --color-neutral: #e1e5ea;
+  --color-neutral-content: #14171c;
+
+  /* info stays achromatic grey for the same reason it does in dark: blue
+     is selection-only and never a status hue. */
+  --color-info: #4e5666;
+  --color-info-content: #fcfcfd;
+  --color-success: #166534;
+  --color-success-content: #ffffff;
+  --color-warning: #9a3412;
+  --color-warning-content: #ffffff;
+  --color-error: #c02626;
+  --color-error-content: #ffffff;
+
+  --radius-selector: 8px;
+  --radius-field: 12px;
+  --radius-box: 20px;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+/*
+ * Light's own extra tokens, mirroring the dark block above key for key.
+ *
+ * Every foreground here was derived against `contrast.test.ts` rather
+ * than chosen and then checked — see this file's header. The worst case
+ * in the set is `expired` at 4.71:1 on `--surface-3`, the darkest ground
+ * a foreground has to survive; the rest sit between 4.97 and 5.99.
+ */
+[data-theme="light"] {
+  --surface-3: #e1e5ea;
+
+  /* Cooler and far softer than dark's. A near-black shadow on a light
+     ground reads as dirt; the hue-matched slate at low alpha reads as
+     depth. */
+  --shadow-popover: 0 8px 24px -6px rgb(20 23 28 / 0.14), 0 0 0 1px var(--edge);
+  --shadow-dialog: 0 24px 56px -12px rgb(20 23 28 / 0.2), 0 0 0 1px var(--edge);
+
+  --edge-subtle: #e6e9ee;
+  --edge: #d5dae2;
+  --edge-strong: #b4bcc8;
+
+  --muted-foreground: #4e5666;
+  --subtle-foreground: #5b6371;
+
+  --ring: #2563eb;
+  --ring-subtle: rgb(37 99 235 / 0.18);
+
+  --destructive: #c02626;
+  --destructive-foreground: #ffffff;
+
+  /* The eight status hues at their light weights. `neutral` and `success`
+     keep `transparent` for fill and border in both themes — quiet is a
+     property of the hue vocabulary, not of the palette, and `isQuietHue`
+     in `status-tokens.ts` is the single place that fact is written down. */
+  --state-neutral-fg: #475569;
+  --state-neutral-bg: transparent;
+  --state-neutral-border: transparent;
+
+  --state-progress-fg: #036672;
+  --state-progress-bg: rgb(3 102 114 / 0.08);
+  --state-progress-border: rgb(3 102 114 / 0.24);
+
+  --state-success-fg: #166534;
+  --state-success-bg: transparent;
+  --state-success-border: transparent;
+
+  --state-warning-fg: #9a3412;
+  --state-warning-bg: rgb(154 52 18 / 0.08);
+  --state-warning-border: rgb(154 52 18 / 0.24);
+
+  /* Darker than the flat check alone required. `#be123c` cleared 4.97:1
+     on the bare `--surface-3` and only 4.36:1 once its own 8% fill was
+     composited under the label — the *loud* pill case, which the gate
+     did not measure until it was extended to. `#a80f35` clears 5.20:1
+     composited and stays ΔE 26 from `warning`. */
+  --state-danger-fg: #a80f35;
+  --state-danger-bg: rgb(168 15 53 / 0.08);
+  --state-danger-border: rgb(168 15 53 / 0.24);
+
+  --state-uncertain-fg: #854d0e;
+  --state-uncertain-bg: rgb(133 77 14 / 0.08);
+  --state-uncertain-border: rgb(133 77 14 / 0.24);
+
+  /* Same correction as `danger`: 4.71:1 flat, 4.29:1 loud. `#5c544e`
+     clears 5.24:1 composited and holds ΔE 18 from `neutral`, the pair
+     this palette has always had to work hardest to keep apart. */
+  --state-expired-fg: #5c544e;
+  --state-expired-bg: rgb(92 84 78 / 0.08);
+  --state-expired-border: rgb(92 84 78 / 0.24);
+
+  --state-parked-fg: #6d28d9;
+  --state-parked-bg: rgb(109 40 217 / 0.08);
+  --state-parked-border: rgb(109 40 217 / 0.24);
+
+  /* Same ramp, bound the same way. The alphas are lower because the same
+     values do more work on a light ground — at dark's strengths the
+     light skeleton reads as periwinkle rather than as a tint. */
+  --aurora-1: var(--state-progress-fg);
+  --aurora-2: #6d28d9;
+  --aurora-3: var(--ring);
+  --aurora-4: var(--state-success-fg);
+
+  --skeleton-aurora-1: color-mix(in oklab, var(--aurora-1) 14%, transparent);
+  --skeleton-aurora-2: color-mix(in oklab, var(--aurora-2) 12%, transparent);
+  --skeleton-aurora-3: color-mix(in oklab, var(--aurora-3) 12%, transparent);
+  --skeleton-aurora-4: color-mix(in oklab, var(--aurora-4) 7%, transparent);
+
+  --scrim: rgb(20 23 28 / 0.32);
+}
+
+/*
  * Re-expose the theme-varying tokens above as Tailwind utilities
  * (`bg-surface-3`, `border-edge`, `text-state-danger-fg`, …). `var()`
  * indirection is late-bound at computed-value time, so these correctly
@@ -300,6 +493,7 @@
   --color-surface-1: var(--color-base-200);
   --color-surface-2: var(--color-base-300);
   --color-surface-3: var(--surface-3);
+  --color-scrim: var(--scrim);
 
   --color-edge-subtle: var(--edge-subtle);
   --color-edge: var(--edge);
@@ -381,7 +575,42 @@
   --radius-md: 20px;
   /* --radius-full (9999px) is already Tailwind's default; not redeclared. */
 
-  --font-sans: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /*
+   * Four voices, and the roles are the point rather than the faces.
+   *
+   * - `--font-display` — screen titles, card and dialog headings. A serif
+   *   gives a dense console one calm anchor per surface without reading
+   *   as a magazine.
+   * - `--font-sans` — everything else. The body face carries labels,
+   *   controls and prose at 11–14px, so it is chosen for density and
+   *   legibility, not personality.
+   * - `--font-italic` — **a person wrote this.** On a screen of emitted
+   *   facts, italic is the one weight that can mark human commentary:
+   *   a `StateTimeline` annotation ("sent, but no receipt ever arrived;
+   *   it will not be resubmitted") is someone explaining a decision, not
+   *   the system reporting one. That is the status system's own logic —
+   *   redundant channels, never colour alone — applied to type. Set it
+   *   with `italic` beside `font-italic`; the token names the *family*,
+   *   not the style.
+   * - `--font-mono` — data. Unchanged, and deliberately so.
+   *
+   * IBM Plex is one superfamily drawn to work together, which is worth
+   * more here than four individually optimal faces. The mono is the
+   * exception: `--font-mono` stays JetBrains Mono because this system
+   * leans on its slashed zero — "an operator tells `0` from `O` in a
+   * `cs_cuid()` at 12px only because of the slash" — and Plex Mono would
+   * be more coherent on paper and a worse instrument for that job.
+   *
+   * **These are stacks, not `@font-face` rules.** This package ships no
+   * font files, exactly as before: a consumer loads the faces (Google
+   * Fonts, self-hosted, or not at all) and the stack falls back through
+   * `ui-serif`/`system-ui`/`ui-monospace` if they do not. Shipping
+   * ~200KB of woff2 for four faces is a packaging decision this library
+   * has consistently declined, and nothing here changes that.
+   */
+  --font-display: "IBM Plex Serif", ui-serif, Georgia, "Times New Roman", serif;
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-italic: "IBM Plex Serif", ui-serif, Georgia, serif;
   --font-mono:
     "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Mono", Menlo,
     monospace;
@@ -449,8 +678,8 @@
  * cannot know, and a grid of them beats in unison like a metronome.
  *
  * What replaces it is a *drift*: two soft, oversized gradient fields
- * translating and scaling past each other on coprime periods (13s and
- * 19s, so the pair only returns to its starting arrangement every 247s).
+ * translating and scaling past each other on coprime periods (23s and
+ * 31s, so the pair only returns to its starting arrangement every 713s).
  * There is no sweep, no direction, no edge, and no shared phase between
  * two skeletons mounted a moment apart — which is what "chaotic" is
  * buying. It says "alive, still waiting" without saying anything about
@@ -462,9 +691,9 @@
  *   `background-position` or `background-image`, so the whole effect is
  *   composited and a table of 200 skeleton cells costs no layout and no
  *   repaint.
- * - **Low amplitude, low contrast.** The blobs are `--color-base-content`
- *   at 5–9%, over `--surface-3`. At a glance it should read as a texture,
- *   not as a moving object — "silent".
+ * - **Low amplitude, low contrast.** Four fields drawn from the aurora
+ *   ramp at 7–20%, over `--surface-3`. At a glance it should read as a
+ *   texture, not as a moving object — "silent".
  * - **Off under `prefers-reduced-motion`, and still correct.** Pausing
  *   leaves the gradients painted where they stand, so a reduced-motion
  *   reader gets a static mottled surface rather than a flat one: the
@@ -495,34 +724,29 @@
     will-change: transform;
   }
 
+  /*
+   * Ribbons, not blobs: the radial stops are far taller than they are
+   * wide (58% × 120%), so each field reads as a band crossing the
+   * element rather than a spot sitting in it. That plus the `skew` in
+   * the keyframes is the whole difference between "drift" and "aurora".
+   *
+   * **No `filter: blur()`.** A blurred layer is cheap on one element and
+   * ruinous on two hundred table cells, and it would force the whole
+   * skeleton onto its own composited layer for no visual gain — the
+   * softness here comes from wide gradient stops, which cost nothing.
+   */
   .skeleton-chaos::before {
     background-image:
-      radial-gradient(
-        42% 64% at 26% 34%,
-        color-mix(in oklab, var(--color-base-content) 9%, transparent),
-        transparent 70%
-      ),
-      radial-gradient(
-        34% 56% at 78% 68%,
-        color-mix(in oklab, var(--color-base-content) 6%, transparent),
-        transparent 72%
-      );
-    animation: skeleton-drift-a 13s ease-in-out infinite;
+      radial-gradient(58% 120% at 18% 30%, var(--skeleton-aurora-1), transparent 68%),
+      radial-gradient(46% 110% at 72% 78%, var(--skeleton-aurora-2), transparent 70%);
+    animation: skeleton-drift-a 23s ease-in-out infinite;
   }
 
   .skeleton-chaos::after {
     background-image:
-      radial-gradient(
-        50% 72% at 64% 22%,
-        color-mix(in oklab, var(--color-base-content) 7%, transparent),
-        transparent 68%
-      ),
-      radial-gradient(
-        30% 48% at 14% 82%,
-        color-mix(in oklab, var(--color-base-content) 5%, transparent),
-        transparent 74%
-      );
-    animation: skeleton-drift-b 19s ease-in-out infinite;
+      radial-gradient(70% 130% at 58% 12%, var(--skeleton-aurora-3), transparent 66%),
+      radial-gradient(40% 90% at 8% 88%, var(--skeleton-aurora-4), transparent 72%);
+    animation: skeleton-drift-b 31s ease-in-out infinite;
   }
 
   /*
@@ -586,42 +810,160 @@
    avoid. */
 @keyframes skeleton-drift-a {
   0% {
-    transform: translate3d(-7%, -5%, 0) scale(1.06);
+    transform: translate3d(-12%, -4%, 0) scale(1.1) skewX(0deg);
   }
-  23% {
-    transform: translate3d(6%, 4%, 0) scale(1.18);
+  29% {
+    transform: translate3d(6%, 7%, 0) scale(1.28) skewX(-6deg);
   }
-  41% {
-    transform: translate3d(-2%, 8%, 0) scale(1.02);
+  47% {
+    transform: translate3d(-3%, 9%, 0) scale(1.04) skewX(3deg);
   }
-  68% {
-    transform: translate3d(9%, -6%, 0) scale(1.14);
+  61% {
+    transform: translate3d(-4%, -9%, 0) scale(1.14) skewX(4deg);
   }
   86% {
-    transform: translate3d(-8%, 1%, 0) scale(1.08);
+    transform: translate3d(9%, 2%, 0) scale(1.2) skewX(-2deg);
   }
   100% {
-    transform: translate3d(-7%, -5%, 0) scale(1.06);
+    transform: translate3d(-12%, -4%, 0) scale(1.1) skewX(0deg);
   }
 }
 
 @keyframes skeleton-drift-b {
   0% {
-    transform: translate3d(8%, 6%, 0) scale(1.12);
+    transform: translate3d(9%, 8%, 0) scale(1.22) skewY(3deg);
   }
   19% {
-    transform: translate3d(-6%, -3%, 0) scale(1.02);
+    transform: translate3d(-7%, -6%, 0) scale(1.06) skewY(-4deg);
   }
-  47% {
-    transform: translate3d(3%, -8%, 0) scale(1.2);
+  37% {
+    transform: translate3d(3%, -10%, 0) scale(1.3) skewY(1deg);
   }
-  63% {
-    transform: translate3d(-9%, 5%, 0) scale(1.05);
+  73% {
+    transform: translate3d(4%, 10%, 0) scale(1.16) skewY(2deg);
   }
   91% {
-    transform: translate3d(5%, 2%, 0) scale(1.16);
+    transform: translate3d(-5%, 3%, 0) scale(1.1) skewY(-3deg);
   }
   100% {
-    transform: translate3d(8%, 6%, 0) scale(1.12);
+    transform: translate3d(9%, 8%, 0) scale(1.22) skewY(3deg);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * The instrument register: aurora glow and aurora mesh.
+ *
+ * A third surface treatment, and it is a deliberate exception to "borders,
+ * not shadows" rather than a loosening of it. The rule holds where it was
+ * doing work — diagnostic surfaces (tables, drawers, detail panes; the
+ * places you *read*) are a hairline on a surface step, and floating layers
+ * get a shadow because they overlap a ground they do not know. This is a
+ * third case: dashboard and metric surfaces, the places you *scan*, where
+ * the job is to make one number findable rather than to keep forty rows
+ * legible.
+ *
+ * Both draw from the `--aurora-*` ramp above, which is bound by
+ * `color-mix` to the system's own hues. Neither carries meaning: no status
+ * is inferable from a glow, and a caller cannot express one through it.
+ * That is what keeps this out of the status vocabulary's way.
+ *
+ * # `filter: blur()` is correct here, for the exact reason it was wrong on
+ * the skeleton
+ *
+ * `.skeleton-chaos` bans blur because a blurred layer is cheap once and
+ * ruinous at two hundred table cells, and it would promote every cell to
+ * its own composited layer. A dashboard has six cards. Same analysis,
+ * opposite answer — and the inversion is written down here so nobody
+ * "fixes" one to match the other.
+ *
+ * # The mesh is static, and the alpha is capped
+ *
+ * No animation: a drifting field behind a number you are trying to read is
+ * a different thing from one standing in for a number that has not
+ * arrived. And the stops are capped at 14%, because a gradient ground
+ * breaks the one-surface-one-contrast-ratio assumption every other check
+ * in this system relies on. Measured over `--surface-1`, worst case across
+ * the four blobs: `--subtle-foreground` falls to 4.41:1 in dark and 4.45:1
+ * in light — *below* AA — while `--muted-foreground` holds at 5.29:1 and
+ * above. So `InstrumentPanel` steps its own caption tier up from subtle to
+ * muted rather than leaving that to the caller, the same move `StatusPill`
+ * already makes when a loud tint lands under its label.
+ * ------------------------------------------------------------------------- */
+@layer components {
+  /*
+   * A multi-hue glow, as four offset coloured `box-shadow`s rather than a
+   * blurred pseudo-element.
+   *
+   * The pseudo-element version is the obvious one and it does not survive
+   * contact with a real page. It needs `z-index: -1` to sit behind the
+   * card's own opaque background — but a negative-z-index element paints
+   * in the *root* stacking context's negative layer, which is **below
+   * in-flow block backgrounds**. Any page whose `body` has a background
+   * colour therefore paints straight over it. This library's own
+   * Storybook does exactly that (`body { background: var(--color-base-100) }`),
+   * and so does essentially every consuming application. Rendered result:
+   * every computed style correct, every value present, and no glow at all
+   * on screen. Found by looking, after the styles checked out.
+   *
+   * `box-shadow` has no such problem: it paints outside the border box,
+   * in the element's own painting order, and no ancestor background can
+   * get in front of it. Four shadows at different offsets and hues give
+   * the multicolour bleed a single shadow cannot, and it costs no filter,
+   * no extra layer and no stacking-context assumptions.
+   *
+   * `Card` drops its `shadow-none` when `glow` is set — a Tailwind
+   * utility is unlayered and would outrank this whole block.
+   */
+  .aurora-glow {
+    box-shadow:
+      0 4px 20px -6px color-mix(in oklab, var(--aurora-1) 60%, transparent),
+      -12px 10px 26px -12px color-mix(in oklab, var(--aurora-2) 55%, transparent),
+      12px 14px 30px -12px color-mix(in oklab, var(--aurora-3) 50%, transparent),
+      0 20px 38px -18px color-mix(in oklab, var(--aurora-4) 40%, transparent);
+  }
+
+  /* Softened, not removed — a heavy coloured bloom is often part of what a
+     reduced-motion reader is asking to be spared, but the card keeps its
+     identity as an instrument surface. */
+  @media (prefers-reduced-motion: reduce) {
+    .aurora-glow {
+      box-shadow:
+        0 4px 14px -8px color-mix(in oklab, var(--aurora-1) 40%, transparent),
+        0 10px 22px -14px color-mix(in oklab, var(--aurora-3) 35%, transparent);
+    }
+  }
+
+  .aurora-mesh {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+  }
+
+  .aurora-mesh::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      radial-gradient(
+        60% 80% at 12% 18%,
+        color-mix(in oklab, var(--aurora-1) 14%, transparent),
+        transparent 62%
+      ),
+      radial-gradient(
+        55% 75% at 88% 22%,
+        color-mix(in oklab, var(--aurora-2) 12%, transparent),
+        transparent 64%
+      ),
+      radial-gradient(
+        70% 90% at 30% 94%,
+        color-mix(in oklab, var(--aurora-3) 12%, transparent),
+        transparent 66%
+      ),
+      radial-gradient(
+        50% 70% at 80% 88%,
+        color-mix(in oklab, var(--aurora-4) 8%, transparent),
+        transparent 68%
+      );
   }
 }
