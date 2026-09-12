@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+**Releasing as a minor, not a patch.** 0.1.2 shipped behaviour changes
+under a patch number with a paragraph apologising for it. Doing that
+twice knowingly is worse than doing it once by accident, and this
+release changes what renders for an existing caller in six ways with no
+API change at all:
+
+- `SideNav` stops taking width below `xl` — a 16px strip at 375 and 900,
+  40px at 1262, gone. Anything that compensated for it now has 16px too
+  much padding.
+- `RadioGroup` option names lose their descriptions, which is the fix,
+  but it changes what a screen reader says and what a `getByRole` query
+  with an exact name matches.
+- `DropdownMenuCheckboxItem`'s checked state moves out of `aria-checked`
+  and into the accessible name, for the same reason and with the same
+  consequence for name-based queries.
+- `Tooltip`'s `position` starts actually positioning. Bubbles that
+  silently rendered above their trigger now appear where the prop asked.
+- `DialogTrigger` / `DialogClose` stop submitting an enclosing `<form>`.
+  Anything that relied on that submit — accidentally — loses it.
+- The dark theme applies with **no** `data-theme` attribute, so a page
+  that set none goes from half-themed to themed.
+
+README's own versioning note is the rule being followed here: pre-1.0,
+minor versions are where breaking changes go.
+
 ### A skill, for integrating this package somewhere else
 
 ```sh
