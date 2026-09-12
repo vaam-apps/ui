@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.0
+
 **Releasing as a minor, not a patch.** 0.1.2 shipped behaviour changes
 under a patch number with a paragraph apologising for it. Doing that
 twice knowingly is worse than doing it once by accident, and this
