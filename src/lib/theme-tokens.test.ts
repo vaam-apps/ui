@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { HUE_CLASSES, isQuietHue, type StatusHue } from "../components/status/status-tokens";
 import { REGISTERED_FONT_SIZES } from "./cn";
 
 /**
@@ -98,5 +99,39 @@ describe("theme.css declares every token the components reference", () => {
 describe("cn()'s registered font-size scale matches theme.css", () => {
   it("registers every declared --text-* step", () => {
     expect([...REGISTERED_FONT_SIZES].sort()).toEqual([...declaredFontSizes].sort());
+  });
+});
+
+/**
+ * `isQuietHue` is a hand-written list of two hue names, and the fact it
+ * encodes lives in `theme.css` as four `transparent` declarations. That
+ * is exactly the shape of drift this file already guards for the
+ * font-size scale: a second copy of a stylesheet fact, with nothing
+ * holding the two together.
+ *
+ * It is worth guarding because the same fact has now been got wrong four
+ * times — `RadioGroup` and `ChipSelect` styled a selected state with the
+ * quiet tokens and rendered no box at all, then `InlineBanner` and
+ * `StateChip` did the same for a variant. Writing it down once was the
+ * fix; this is what stops the fifth copy drifting from the stylesheet.
+ */
+describe("isQuietHue matches the hues theme.css actually declares transparent", () => {
+  const hues = Object.keys(HUE_CLASSES) as StatusHue[];
+
+  /** Hues whose *both* `-bg` and `-border` are declared `transparent`. */
+  const transparentInCss = new Set(
+    hues.filter((hue) =>
+      ["bg", "border"].every((slot) =>
+        new RegExp(`--state-${hue}-${slot}\\s*:\\s*transparent\\s*;`).test(THEME_CSS),
+      ),
+    ),
+  );
+
+  it("finds transparent hues to check at all", () => {
+    expect(transparentInCss.size).toBeGreaterThan(0);
+  });
+
+  it.each(hues)("%s", (hue) => {
+    expect(isQuietHue(hue)).toBe(transparentInCss.has(hue));
   });
 });

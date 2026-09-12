@@ -29,7 +29,19 @@ export interface InlineBannerProps {
    * the variant they needed did not exist, and the agents doing the
    * factorization were deliberately barred from editing this package. Two
    * of them flagged the gap rather than inventing a competing component,
-   * which is the behaviour the constraint was for. */
+   * which is the behaviour the constraint was for.
+   *
+   * `success` is quiet chrome wearing a loud variant's clothes: rendered
+   * on a real page, `EveryVariant` showed five bordered boxes and a bare
+   * line of green text, because `--state-success-bg`/`-border` are
+   * `transparent` in `theme.css` on purpose (`success` is one of the two
+   * quiet status hues — see `isQuietHue` in `../status/status-tokens`, the
+   * same fact `StateChip` had to account for, and the same shape of bug
+   * `RadioGroup`/`ChipSelect` had on the selection side, fixed in
+   * `be63a70`). `success` now renders through the same achromatic
+   * `border-edge`/`bg-surface-2` chrome as `neutral`, keeping only its
+   * own `text-state-success-fg`, so it reads as a member of the same
+   * family instead of a rendering bug. */
   variant?: "neutral" | "danger" | "warning" | "success" | "uncertain" | "plain";
   children: ReactNode;
   className?: string;
@@ -46,8 +58,19 @@ export function InlineBanner({ variant = "neutral", children, className }: Inlin
           "rounded-sm border border-state-danger-border bg-state-danger-bg px-3 py-2 text-state-danger-fg",
         variant === "warning" &&
           "rounded-sm border border-state-warning-border bg-state-warning-bg px-3 py-2 text-state-warning-fg",
+        // `success` draws the achromatic quiet-hue box, not its own.
+        // `--state-success-bg`/`-border` are declared `transparent` on
+        // purpose (see `isQuietHue` in `../status/status-tokens`), so
+        // painting them here rendered a bare line of green text between
+        // five bordered siblings. The classes are literal rather than a
+        // call to `isQuietHue("success")`: a predicate applied to a
+        // literal is a constant with an unreachable branch, and it cannot
+        // deliver the "stays correct if the quiet set changes" benefit it
+        // looks like it delivers, because `isQuietHue` is itself a hand-
+        // written list rather than something derived from `theme.css`.
+        // `StateChip` calls it on a runtime value, where it is a real check.
         variant === "success" &&
-          "rounded-sm border border-state-success-border bg-state-success-bg px-3 py-2 text-state-success-fg",
+          "rounded-sm border border-edge bg-surface-2 px-3 py-2 text-state-success-fg",
         variant === "uncertain" &&
           "rounded-sm border border-state-uncertain-border bg-state-uncertain-bg px-3 py-2 text-state-uncertain-fg",
         variant === "plain" && "text-subtle-foreground",

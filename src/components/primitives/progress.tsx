@@ -6,7 +6,8 @@ export interface ProgressProps {
   /** Completed units. Clamped into `[0, max]`. */
   value: number;
   max?: number;
-  /** `undefined` renders an indeterminate bar. */
+  /** Tints the fill. Default `"neutral"`. Leave unset unless the number's
+   * colour carries meaning — the same rule `StatTile`'s `tone` documents. */
   tone?: StatusHue;
   /** Accessible name, e.g. `"Retry budget used"`. */
   label: string;

@@ -63,6 +63,16 @@ export interface ChipSelectProps<T extends string> {
   options: readonly ChipOption<T>[];
   disabled?: boolean | undefined;
   "aria-label"?: string | undefined;
+  /**
+   * Pairs with `FormField`'s own doc, which tells callers that
+   * `control="group"` is for `RadioGroup`/`ChipSelect` and that "the
+   * caller wires the group with `aria-labelledby={groupLabelId(htmlFor)}`"
+   * — a call this type did not accept until now, even though the
+   * `<fieldset>` below already spreads `...aria` onto itself and would
+   * have honoured it at runtime. `RadioGroupProps` already declares both;
+   * this was the type missing, not the wiring.
+   */
+  "aria-labelledby"?: string | undefined;
   className?: string | undefined;
 }
 
@@ -79,7 +89,7 @@ export function ChipSelect<T extends string>({
       {options.map((option) => {
         const checked = value.includes(option.value);
         return (
-          <Field key={option.value}>
+          <Field key={option.value} disabled={disabled ?? false}>
             <Checkbox
               checked={checked}
               disabled={disabled ?? false}
@@ -114,7 +124,14 @@ export function ChipSelect<T extends string>({
                 )}
               </span>
               <span className="flex min-w-0 flex-col gap-0.5">
-                <Label className="cursor-pointer truncate font-mono font-medium">
+                {/* `data-disabled:` works here because the `Field` above is
+                    given `disabled` too. Headless UI's `Label` reads that
+                    state from `Field`'s context and from nowhere else, so
+                    without it this class was dead and a disabled chip kept
+                    a `cursor-pointer` on its label — the same defect fixed
+                    in `CheckboxField`/`SwitchField`, and now fixed the
+                    same way rather than with a third mechanism. */}
+                <Label className="cursor-pointer truncate font-mono font-medium data-disabled:cursor-not-allowed">
                   {option.label}
                 </Label>
                 {option.description !== undefined && (

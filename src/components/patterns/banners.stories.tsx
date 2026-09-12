@@ -20,6 +20,15 @@ type Story = StoryObj<typeof meta>;
  * declared for most of this package's life, so it rendered as plain grey
  * text — invisible precisely because nothing ever showed the variants
  * side by side, where one missing fill is obvious.
+ *
+ * `success` had the same kind of problem for the same reason: it painted
+ * `border-state-success-border`/`bg-state-success-bg` unconditionally,
+ * and both are declared `transparent` in `theme.css` on purpose — `success`
+ * is one of the two quiet status hues. Rendered here, that meant five
+ * bordered boxes and a bare line of green text floating between them,
+ * reading as a rendering bug rather than a design choice. `success` now
+ * routes through the same neutral chrome as `neutral` (see `isQuietHue`
+ * in `../status/status-tokens`), and all six read as one family again.
  */
 export const EveryVariant: Story = {
   render: () => (

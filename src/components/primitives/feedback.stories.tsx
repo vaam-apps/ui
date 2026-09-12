@@ -133,3 +133,32 @@ export const Confirming: Story = {
     );
   },
 };
+
+/**
+ * `busy` and a failed-attempt `children` block, both pinned open rather
+ * than reached through the 1200ms `setTimeout` in `Confirming` above —
+ * that timeout makes the in-flight state real but impossible to inspect
+ * statically or catch in an axe scan (it is gone again before either can
+ * look). This story renders it as a fixed state instead: both buttons
+ * disabled, the confirm button's spinner showing, and the error message
+ * `children` is documented for (`ConfirmDialogProps.children`: "the place
+ * for a failed attempt's message") actually in view.
+ */
+export const ConfirmingBusyWithError: Story = {
+  render: () => (
+    <ConfirmDialog
+      open
+      onOpenChange={() => undefined}
+      tone="destructive"
+      title="Delete this endpoint?"
+      description="Queued attempts for it are abandoned. This cannot be undone."
+      confirmLabel="Delete endpoint"
+      busy
+      onConfirm={() => undefined}
+    >
+      <p className="text-body text-state-danger-fg">
+        The last attempt failed: 3 attempts still queued against this endpoint.
+      </p>
+    </ConfirmDialog>
+  ),
+};

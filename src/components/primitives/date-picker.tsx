@@ -54,6 +54,9 @@ interface TriggerProps {
   disabled: boolean | undefined;
   onClear: (() => void) | undefined;
   className: string | undefined;
+  /** See `DatePickerProps["aria-describedby"]`. */
+  describedBy: string | undefined;
+  invalid: boolean | undefined;
 }
 
 /**
@@ -72,20 +75,32 @@ function PickerTrigger({
   disabled,
   onClear,
   className,
+  describedBy,
+  invalid,
 }: TriggerProps) {
   return (
     <div className={cn("relative inline-flex w-full items-center", className)}>
       <PopoverButton
+        {...omitUndefined({ "aria-describedby": describedBy, "aria-invalid": invalid })}
         {...omitUndefined({ disabled })}
         className={cn(
-          "input input-bordered flex w-full items-center gap-2 text-left font-sans text-prose",
+          "input flex w-full items-center gap-2 text-left font-sans text-prose",
+          "aria-invalid:border-state-danger-border aria-invalid:text-state-danger-fg",
           !hasValue && "text-subtle-foreground",
           "disabled:cursor-not-allowed disabled:opacity-50",
           hasValue && onClear !== undefined && "pr-9",
         )}
       >
         <CalendarDays size={14} strokeWidth={1.5} className="shrink-0 text-subtle-foreground" />
-        <span className="truncate font-mono tabular-nums">{label}</span>
+        {/* `min-w-0 flex-1`, not a bare `truncate`. The parent is a
+          `.input` flex row, so this span is a flex item with the default
+          `min-width: auto` and `white-space: nowrap` from `truncate` —
+          its min-content width is the whole string, it refuses to shrink,
+          and `.input` sets no `overflow`, so a long label spilled outside
+          the control's border instead of ellipsizing. Same three-class
+          idiom `SelectTrigger` uses; this was the last place in the tree
+          still missing it. */}
+        <span className="min-w-0 flex-1 truncate font-mono tabular-nums">{label}</span>
         <span className="sr-only">{placeholder}</span>
       </PopoverButton>
       {hasValue && onClear !== undefined && (
@@ -123,6 +138,15 @@ export interface DatePickerProps {
   disabled?: boolean | undefined;
   /** Show an inline clear affordance once a date is picked. */
   clearable?: boolean;
+  /** Forwarded to the trigger button.
+   *
+   * `FormField` associates a control with its hint and error by cloning
+   * its direct child with these attributes; that child is this component,
+   * and the element that must carry them is the trigger inside it. Without
+   * them declared here they were silently dropped — the hint rendered with
+   * an id that nothing referenced. */
+  "aria-describedby"?: string | undefined;
+  "aria-invalid"?: boolean | undefined;
   className?: string | undefined;
 }
 
@@ -136,6 +160,8 @@ export function DatePicker({
   disabled,
   clearable = true,
   className,
+  "aria-describedby": describedBy,
+  "aria-invalid": invalid,
 }: DatePickerProps) {
   const selected = value === undefined ? undefined : fromIsoDate(value);
 
@@ -150,6 +176,8 @@ export function DatePicker({
             disabled={disabled}
             onClear={clearable ? () => onValueChange(undefined) : undefined}
             className={undefined}
+            describedBy={describedBy}
+            invalid={invalid}
           />
           <PopoverPanel anchor="bottom start" transition className={PANEL_CLASS}>
             <Calendar
@@ -191,6 +219,15 @@ export interface DateRangePickerProps {
   /** Months shown side by side. Two makes a cross-month range selectable
    * without navigating, which is the common case for "last 30 days". */
   numberOfMonths?: number;
+  /** Forwarded to the trigger button.
+   *
+   * `FormField` associates a control with its hint and error by cloning
+   * its direct child with these attributes; that child is this component,
+   * and the element that must carry them is the trigger inside it. Without
+   * them declared here they were silently dropped — the hint rendered with
+   * an id that nothing referenced. */
+  "aria-describedby"?: string | undefined;
+  "aria-invalid"?: boolean | undefined;
   className?: string | undefined;
 }
 
@@ -223,6 +260,8 @@ export function DateRangePicker({
   clearable = true,
   numberOfMonths = 2,
   className,
+  "aria-describedby": describedBy,
+  "aria-invalid": invalid,
 }: DateRangePickerProps) {
   const selected: DateRange | undefined =
     value === undefined
@@ -243,6 +282,8 @@ export function DateRangePicker({
         disabled={disabled}
         onClear={clearable ? () => onValueChange(undefined) : undefined}
         className={undefined}
+        describedBy={describedBy}
+        invalid={invalid}
       />
       <PopoverPanel anchor="bottom start" transition className={PANEL_CLASS}>
         <Calendar

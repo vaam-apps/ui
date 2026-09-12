@@ -59,12 +59,36 @@ export function LiveRow({
   return (
     <TableRow
       className={cn(
-        washing && [
-          WASH_BG_CLASS[washHue],
-          reducedMotion
-            ? "transition-none"
-            : "transition-colors duration-[var(--dur-state)] ease-out",
-        ],
+        // The transition classes are unconditional — present whether or
+        // not `washing` is currently true — and only the tint itself is
+        // gated. Gating both together on `washing` made the *decay* edge
+        // (the timeout below flipping `washing` back to `false`) land on
+        // a post-change style with no `transition-colors` in it at all,
+        // so nothing interpolated: the tint simply vanished on the next
+        // paint instead of fading out over `--dur-state` as documented
+        // above. With the transition always present, both the wash-in and
+        // the wash-out animate.
+        //
+        // `TableRow` already carries its own `transition-colors
+        // duration-[var(--dur-instant)]` (see `table.tsx`) for its hover
+        // state. `cn()` (`src/lib/cn.ts`) resolves same-group utility
+        // conflicts in *call order*, and `TableRow` merges its own base
+        // classes ahead of the `className` it receives — this string —
+        // so `duration-[var(--dur-state)]` below is applied after, and
+        // wins over, `duration-[var(--dur-instant)]`.
+        reducedMotion ? "transition-none" : "transition-colors ease-out",
+        // Only the *duration* is gated, not the transition itself.
+        //
+        // Gating the whole `transition-colors` was the original bug (the
+        // decay edge landed on a style with no transition, so the tint
+        // blinked off). But making `duration-[var(--dur-state)]`
+        // unconditional overshot: `TableRow` carries
+        // `duration-[var(--dur-instant)]` for its *hover*, `cn()` resolves
+        // same-group utilities last-wins, and every `LiveRow` therefore
+        // hovered at 240ms while a plain `TableRow` beside it hovered at
+        // 90ms — visibly inconsistent in a table holding both.
+        washing && "duration-[var(--dur-state)]",
+        washing && WASH_BG_CLASS[washHue],
         className,
       )}
       {...props}

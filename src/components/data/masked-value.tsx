@@ -3,6 +3,7 @@
 import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { cn } from "../../lib/cn";
+import { maskSecret } from "../../lib/mask-secret";
 import { CopyButton } from "./copy-button";
 
 export interface MaskedValueProps {
@@ -26,19 +27,6 @@ export interface MaskedValueProps {
    * e.g. `"signing secret"`. */
   label?: string;
   className?: string | undefined;
-}
-
-const DOT = "•";
-
-function mask(value: string, prefix: number, reveal: number): string {
-  const head = value.slice(0, prefix);
-  const tail = reveal > 0 ? value.slice(-reveal) : "";
-  const hiddenCount = Math.max(value.length - head.length - tail.length, 0);
-  // A fixed run of dots, not one per character: the exact length of a
-  // secret is information, and padding it out to the real length leaks it
-  // to anyone looking over a shoulder.
-  const dots = DOT.repeat(hiddenCount === 0 ? 0 : Math.min(Math.max(hiddenCount, 6), 12));
-  return `${head}${dots}${tail}`;
 }
 
 /**
@@ -74,7 +62,7 @@ export function MaskedValue({
   className,
 }: MaskedValueProps) {
   const [revealed, setRevealed] = useState(false);
-  const shown = revealed ? value : mask(value, prefix, reveal);
+  const shown = revealed ? value : maskSecret(value, prefix, reveal);
 
   return (
     <span className={cn("group inline-flex items-center gap-1.5", className)}>

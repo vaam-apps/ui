@@ -89,7 +89,7 @@ picks it up.
 ### Status
 
 `StatusPill` · `createStatusPill` · `StateMark` · `StateChip` ·
-`defineStatusSystem` · `HUE_CLASSES`
+`defineStatusSystem` · `HUE_CLASSES` · `isQuietHue`
 
 ## The status system
 
@@ -160,8 +160,15 @@ Amounts go in as an **integer count of minor units** — `number`,
 trip. The decimal exponent comes from `Intl`, which knows every ISO 4217
 currency including the three-decimal ones (`KWD`, `BHD`, `TND`) that
 hand-written tables invariably forget. Scaling is string surgery, never
-division, so an amount past `Number.MAX_SAFE_INTEGER` formats exactly.
-A non-integer throws rather than being silently rounded.
+division, so a `bigint` or a digit string formats exactly at any size.
+
+A `number` cannot make that promise past `Number.MAX_SAFE_INTEGER`, and
+`formatMoney` throws rather than pretending otherwise. Not because every
+such value has lost precision — `1e16` is exact — but because a `number`
+no longer carries enough information to tell an exact value from one the
+caller's arithmetic already rounded, and printing a figure that *looks*
+exact is the one thing a money formatter must never do. A non-integer
+throws too, rather than being silently rounded.
 
 ## Dates
 
@@ -207,6 +214,14 @@ Worth knowing before you fight them:
   them is how a status language erodes.
 - **Empty states are inline status lines, not centred placards** — see
   `InlineEmptyState`.
+- **Two of the seven status hues are quiet.** `neutral` and `success`
+  declare `transparent` for their own fill and border on purpose, so a
+  screen where most rows succeeded is a column of glyphs and words rather
+  than a wall of green boxes. A surface that needs a *box* for a quiet
+  hue draws ordinary `border-edge`/`bg-surface-2` chrome and keeps only
+  the hue's foreground — `isQuietHue` is the predicate, and painting the
+  quiet tokens as unconditional chrome has now produced an invisible box
+  four separate times.
 - **A slot with a line budget clips; it never grows.** Nav labels, card
   titles, select values, tile captions, option descriptions and toast
   bodies all end in an ellipsis rather than wrapping, because a row of
@@ -270,6 +285,16 @@ A few guards are worth knowing about before you trip one:
 - **`src/lib/cn.test.ts`** pins the merge behaviour, including the case
   where `tailwind-merge` deletes a custom font size because it mistakes
   it for a colour.
+- **`src/components/primitives/form-field.render.test.tsx`** pins what
+  each control *actually* emits when `FormField` wires it to its hint and
+  error. `tsc` cannot check it (`cloneElement` on an `isValidElement<P>`
+  cast type-checks whatever you claim) and axe cannot see it (an
+  unassociated `<p>` is valid HTML), so the first version of that feature
+  shipped with a doc comment asserting it worked for controls where it
+  did not. One row of that test pins a *limitation* rather than a
+  feature: Headless UI's `ListboxButton` owns `aria-describedby`, so a
+  `FormField` hint cannot reach a `Select`. If an upgrade changes that,
+  the test fails and says so.
 - **`src/lib/story-coverage.test.ts`** fails when an exported component
   is mentioned by no story. Colocation makes the drift visible in a
   diff; this makes it a build failure, because "added a component,

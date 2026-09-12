@@ -1,6 +1,7 @@
 "use client";
 
 import { cva } from "class-variance-authority";
+import { X } from "lucide-react";
 import { useSyncExternalStore } from "react";
 import { cn } from "../../lib/cn";
 
@@ -14,6 +15,20 @@ import { cn } from "../../lib/cn";
  * design doc §5.1: anything an operator must act on is inline, never a
  * toast, because a toast that expires while they're reading a payload is a
  * lost message.
+ *
+ * No enter/exit transition (deliberately, for now): a toast currently
+ * appears and vanishes in one frame, and a survivor jumps upward when a
+ * card above it expires. `toast()`/`dismissToast()` mutate `toasts`
+ * synchronously and `Toaster` renders straight off that array, so an exit
+ * animation needs a card to stay mounted, in a "leaving" state, for the
+ * duration of its own transition *after* `dismissToast` has already run —
+ * a second piece of state this module does not have today, layered on a
+ * component with no way to visually check it here (this environment has
+ * no browser). Doing that without seeing it animate risks exactly the
+ * kind of half-done, silently-wrong motion the brief warns about, so it's
+ * left undone rather than guessed at. Whoever adds it should gate it on
+ * `motion-reduce:transition-none` per the same reduced-motion rule the
+ * rest of the library follows.
  */
 
 export type ToastVariant = "default" | "success" | "danger";
@@ -45,14 +60,35 @@ function getSnapshot(): ToastItem[] {
 }
 
 export function dismissToast(id: string) {
-  toasts = toasts.filter((t) => t.id !== id);
+  const next = toasts.filter((t) => t.id !== id);
+  // A toast evicted by the cap keeps its own `setTimeout`, which fires up
+  // to `durationMs` later for an id that is already gone. Without this
+  // guard that allocated a fresh array with identical contents and
+  // `emit()`ed it, re-rendering every subscriber for nothing.
+  if (next.length === toasts.length) return;
+  toasts = next;
   emit();
 }
 
+// Deliberately unbounded growth was the previous behaviour: nothing capped
+// the stack, so ten rapid `toast()` calls produced ten stacked cards —
+// 600px of viewport with no ceiling.
+const MAX_TOASTS = 4;
+
+/**
+ * Enqueues a toast and schedules its own expiry.
+ *
+ * **Caps the stack at four, dropping the oldest.** This is a deliberate
+ * behaviour change, not a pre-existing limit: past four, a toast is no
+ * longer something a reader can plausibly read and act on before the next
+ * one lands — see the module doc's own "anything an operator must act on
+ * is inline, never a toast" rule. A fifth concurrent `toast()` call now
+ * silently retires the oldest card instead of growing the stack forever.
+ */
 export function toast(item: Omit<ToastItem, "id">): string {
   const id = crypto.randomUUID();
   const durationMs = item.durationMs ?? 4000;
-  toasts = [...toasts, { ...item, id }];
+  toasts = [...toasts, { ...item, id }].slice(-MAX_TOASTS);
   emit();
   if (durationMs > 0) {
     setTimeout(() => dismissToast(id), durationMs);
@@ -84,14 +120,43 @@ const toastVariants = cva(
   },
 );
 
-/** Mount once, near the app root. Renders the live toast stack. */
+/**
+ * Mount once, near the app root. Renders the live toast stack.
+ *
+ * # The live region is the container, and only the container
+ *
+ * `role="status"` used to sit here *alongside* `aria-live="polite"`, and
+ * that role carries an **implicit `aria-atomic="true"`** — so every
+ * insertion or expiry re-read every toast on screen. Three rapid
+ * "Copied" toasts announced as "Copied. Copied. Copied. / Copied.
+ * Copied. / Copied." The fix is the explicit `aria-atomic="false"`
+ * below; an explicit value always beats a role's implicit default.
+ *
+ * An earlier attempt also moved `role="status"` onto each card, on the
+ * theory that a freshly-inserted node with its own role announces
+ * itself. **That is backwards, and it made the bug worse rather than
+ * better.** A live region has to be present in the accessibility tree
+ * *before* its contents change for the change to be announced — a region
+ * inserted already populated is the canonical non-announcement case, and
+ * it is why every toast implementation mounts an empty region at the
+ * root and injects into it. Worse, for a mutation inside nested live
+ * regions the *nearest* region owns the announcement, so a card that is
+ * its own region shadows the container that actually can announce. Range
+ * of outcomes across assistive tech: "no change" to "the toast is never
+ * announced at all".
+ *
+ * `aria-relevant` was dropped for a smaller reason: its default is
+ * `"additions text"`, so removals were never announced and the attribute
+ * was fixing nothing — while narrowing it to `"additions"` would have
+ * *lost* the announcement if a toast's text ever mutated in place.
+ */
 export function Toaster() {
   const items = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
   return (
     <div
-      role="status"
       aria-live="polite"
+      aria-atomic="false"
       className="pointer-events-none fixed right-4 bottom-4 z-50 flex w-80 flex-col gap-2"
     >
       {items.map((item) => (
@@ -105,13 +170,19 @@ export function Toaster() {
                 more room than this is not a toast — see the module doc:
                 anything an operator must act on belongs inline. */}
             <p className="line-clamp-2 min-w-0 font-medium">{item.title}</p>
+            {/* Lucide `X` at the same 16px/1.5 stroke every other close in
+                the library uses (`dialog.tsx`, `drawer.tsx`) — the literal
+                `×` glyph this replaced rendered a different weight and a
+                roughly 8×18px box. `-m-1 p-1`: the same hit-area idiom
+                used there, growing the click target without moving the
+                icon. */}
             <button
               type="button"
               onClick={() => dismissToast(item.id)}
               aria-label="Dismiss"
-              className="shrink-0 text-subtle-foreground hover:text-foreground"
+              className="-m-1 shrink-0 rounded-sm p-1 text-subtle-foreground hover:text-foreground"
             >
-              ×
+              <X size={16} strokeWidth={1.5} />
             </button>
           </div>
           {item.description != null && (

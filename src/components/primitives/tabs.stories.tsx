@@ -122,3 +122,55 @@ export const WithCounts: Story = {
     </ValueTabs>
   ),
 };
+
+/**
+ * Eight multi-word labels in a ~380px container — narrower than the
+ * combined natural width of the triggers. Before `shrink-0
+ * whitespace-nowrap` (trigger) and `overflow-x-auto` (list), each trigger
+ * shrank to its longest word, multi-word labels wrapped to two lines, and
+ * the active tab's `-mb-px border-b-2` ended up a line below the list's
+ * own `border-b` — the underline and the rule beneath it visibly
+ * separated. Now the row stays one line tall, the 2px underline sits
+ * flush against the 1px rule, and the list scrolls horizontally in its
+ * own box — the page itself never gains a scrollbar.
+ */
+export const ManyTabsScrolling: Story = {
+  render: () => (
+    <ValueTabs defaultValue="all" className="w-[380px]">
+      <ValueTabsList>
+        <ValueTabsTrigger value="all">All requests</ValueTabsTrigger>
+        <ValueTabsTrigger value="pending">Pending review</ValueTabsTrigger>
+        <ValueTabsTrigger value="failed">Failed attempts</ValueTabsTrigger>
+        <ValueTabsTrigger value="unresolved">Unresolved receipts</ValueTabsTrigger>
+        <ValueTabsTrigger value="archived">Archived cases</ValueTabsTrigger>
+        <ValueTabsTrigger value="flagged">Flagged for review</ValueTabsTrigger>
+        <ValueTabsTrigger value="drafts">Draft submissions</ValueTabsTrigger>
+        <ValueTabsTrigger value="closed">Closed and settled</ValueTabsTrigger>
+      </ValueTabsList>
+      <ValueTabsContent value="all">
+        <p className="text-body text-muted-foreground">Every request, scrolled into view.</p>
+      </ValueTabsContent>
+      <ValueTabsContent value="pending">
+        <p className="text-body text-muted-foreground">Waiting on a reviewer.</p>
+      </ValueTabsContent>
+      <ValueTabsContent value="failed">
+        <p className="text-body text-muted-foreground">Rejected by the provider.</p>
+      </ValueTabsContent>
+      <ValueTabsContent value="unresolved">
+        <p className="text-body text-muted-foreground">No outcome ever learned.</p>
+      </ValueTabsContent>
+      <ValueTabsContent value="archived">
+        <p className="text-body text-muted-foreground">Kept for the record, not for action.</p>
+      </ValueTabsContent>
+      <ValueTabsContent value="flagged">
+        <p className="text-body text-muted-foreground">Marked for a second look.</p>
+      </ValueTabsContent>
+      <ValueTabsContent value="drafts">
+        <p className="text-body text-muted-foreground">Not sent yet.</p>
+      </ValueTabsContent>
+      <ValueTabsContent value="closed">
+        <p className="text-body text-muted-foreground">Done, one way or the other.</p>
+      </ValueTabsContent>
+    </ValueTabs>
+  ),
+};

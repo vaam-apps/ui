@@ -97,6 +97,23 @@ describe("formatMoney", () => {
     expect(() => formatMoney("", "USD", L)).toThrow(/integer count of minor units/);
   });
 
+  /**
+   * `Number.isInteger(1e21)` is `true`, so it passes the integer guard
+   * above, but `(1e21).toFixed(0)` is `"1e+21"` — per spec, `toFixed`
+   * falls back to `ToString` once `|x| >= 1e21` — and that string does not
+   * survive `shiftDecimal`. Rather than let a value quietly stop
+   * round-tripping, `formatMoney` rejects any `number` past
+   * `Number.MAX_SAFE_INTEGER` outright.
+   */
+  it("throws on a number at or past 1e21 rather than mangling it", () => {
+    expect(() => formatMoney(1e21, "USD", L)).toThrow(TypeError);
+    expect(() => formatMoney(1e21, "USD", L)).toThrow(/safe integer/);
+  });
+
+  it("still accepts the largest safe integer as a number", () => {
+    expect(plain(formatMoney(Number.MAX_SAFE_INTEGER, "USD", L))).toBe("USD 90,071,992,547,409.91");
+  });
+
   it("honours the display mode", () => {
     expect(plain(formatMoney(1250, "USD", { ...L, display: "code" }))).toBe("USD 12.50");
     expect(formatMoney(1250, "USD", { ...L, display: "symbol" })).toBe("$12.50");

@@ -39,6 +39,37 @@ import { omitUndefined } from "../../lib/omit-undefined";
 interface SelectContextValue {
   value: string | undefined;
   itemLabel: (value: string) => ReactNode | undefined;
+  /**
+   * Validity wiring handed down from `Select` to `SelectTrigger`.
+   *
+   * `FormField` associates a control with its own hint and error by
+   * cloning its **direct child** with `aria-describedby`/`aria-invalid`.
+   * For a `Select` that child is `Select` itself, and the element that
+   * has to carry it is `SelectTrigger`'s button — a grandchild. `Select`
+   * used to destructure a closed prop list, so the cloned attribute was
+   * dropped with no type error and no runtime warning.
+   *
+   * # `aria-describedby` cannot be threaded the same way
+   *
+   * Headless UI's `ListboxButton` sets `"aria-describedby"` in its *own*
+   * props, from an internal `Description` context that is `undefined`
+   * when no `<Description>` is present — and its render helper lets its
+   * own props win over the caller's. So a value passed down here is
+   * overwritten with `undefined` before it reaches the DOM. Confirmed by
+   * reading `@headlessui/react/dist/components/listbox/listbox.js` (the
+   * button builds `aria-describedby: useDescribedBy()` into `ourProps`)
+   * and pinned by `form-field.render.test.tsx`, which asserts what each
+   * control actually emits.
+   *
+   * `aria-invalid` is not in that set, which is why it threads fine.
+   *
+   * Wiring a `Select`'s description properly means adopting Headless
+   * UI's own `Field`/`Description` pair in `FormField` — a real
+   * architectural change, not a patch, and a maintainer's call. Until
+   * then this component does not accept an `aria-describedby` it cannot
+   * honour.
+   */
+  invalid: boolean | undefined;
 }
 const SelectContext = createContext<SelectContextValue | null>(null);
 
@@ -80,10 +111,25 @@ export interface SelectProps {
   defaultValue?: string | undefined;
   onValueChange?: ((value: string) => void) | undefined;
   disabled?: boolean | undefined;
+  /**
+   * Forwarded to `SelectTrigger`'s button.
+   *
+   * There is deliberately **no `aria-describedby` here**, and the reason
+   * is a hard constraint rather than an oversight — see
+   * `SelectContextValue.invalid`.
+   */
+  "aria-invalid"?: boolean | undefined;
   children: ReactNode;
 }
 
-export function Select({ value, defaultValue, onValueChange, disabled, children }: SelectProps) {
+export function Select({
+  value,
+  defaultValue,
+  onValueChange,
+  disabled,
+  "aria-invalid": invalid,
+  children,
+}: SelectProps) {
   const [internalValue, setInternalValue] = useState(defaultValue);
   const isControlled = value !== undefined;
   const currentValue = isControlled ? value : internalValue;
@@ -109,7 +155,7 @@ export function Select({ value, defaultValue, onValueChange, disabled, children 
       onChange={handleChange}
       {...omitUndefined({ disabled })}
     >
-      <SelectContext.Provider value={{ value: currentValue, itemLabel }}>
+      <SelectContext.Provider value={{ value: currentValue, itemLabel, invalid }}>
         {children}
       </SelectContext.Provider>
     </Listbox>
@@ -150,22 +196,43 @@ export function SelectGroup({ children }: { children: ReactNode }) {
  * the arrow it is no longer drawing; left alone, the chevron would float
  * 28px off the right edge while the leading edge sits at 12px, which
  * looks like a mistake even to someone who cannot say why.
+ *
+ * No `select-bordered` here (or `input-bordered` on `DatePicker`'s
+ * trigger, styled the same way). It was daisyUI v4; in v5 `.select`/
+ * `.input` draw their own border via `--input-color` with nothing left
+ * for a `-bordered` modifier to add. Confirmed against the installed
+ * package, not assumed: `grep -rho '\b[a-z]*-bordered\b' node_modules/daisyui/`
+ * returns zero matches anywhere in the compiled CSS, so the class matched
+ * no selector and removing it changes nothing rendered.
  */
 export function SelectTrigger({
   id,
   className,
   children,
+  "aria-label": ariaLabel,
+  "aria-labelledby": ariaLabelledBy,
 }: {
   id?: string;
   className?: string;
   children: ReactNode;
+  /** Accessible name for a `Select` rendered outside a `FormField` — which
+   * otherwise has no way to be named, since this trigger only ever renders
+   * its selected value, never a label. Purely additive; a `FormField`-
+   * wrapped `Select` keeps working unchanged without either prop. */
+  "aria-label"?: string | undefined;
+  /** Same, pointing at an existing label element instead of inlining the
+   * text. */
+  "aria-labelledby"?: string | undefined;
 }) {
-  useSelectContext("SelectTrigger");
+  const { invalid } = useSelectContext("SelectTrigger");
   return (
     <ListboxButton
       id={id}
+      {...omitUndefined({ "aria-invalid": invalid })}
+      aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy}
       className={cn(
-        "select select-bordered flex w-full items-center justify-between gap-2 bg-none pe-3 font-sans text-prose",
+        "select flex w-full items-center justify-between gap-2 bg-none pe-3 font-sans text-prose",
         className,
       )}
     >

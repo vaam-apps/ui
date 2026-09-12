@@ -1,6 +1,6 @@
 import type { HTMLAttributes } from "react";
 import { cn } from "../../lib/cn";
-import { HUE_CLASSES, type StatusHue } from "./status-tokens";
+import { HUE_CLASSES, isQuietHue, type StatusHue } from "./status-tokens";
 
 /**
  * A compact, state-toned chip for a single word or short phrase rendered
@@ -46,6 +46,29 @@ import { HUE_CLASSES, type StatusHue } from "./status-tokens";
  * `HUE_CLASSES` already held — two copies of one mapping, and the chip's
  * copy was missing three of the hues, so a caller wanting `expired` or
  * `parked` had no way to ask for it and reached for `className` instead.
+ *
+ * # `neutral` and `success` are quiet, not broken
+ *
+ * `--state-neutral-bg`/`-border` and `--state-success-bg`/`-border` are
+ * `transparent` in `theme.css`, on purpose: those two hues are the
+ * "quiet" half of the vocabulary, meant to read as a glyph and a word so
+ * a screen where most rows succeeded does not turn into a wall of green
+ * boxes. `StateChip` used to paint `hue.border`/`hue.bg` unconditionally
+ * for all seven tones, which is exactly the mistake `RadioGroup` and
+ * `ChipSelect` made from the *selection* side (see `be63a70`'s doc
+ * comment on `RadioGroup`): borrow a quiet hue for unconditional chrome
+ * and get an invisible box back. Here the two quiet tones rendered as
+ * bare text with no box at all, so they read as five chips and two
+ * rendering bugs instead of seven chips at two weights.
+ *
+ * `StatusPill` already solves this, but by a different route: its
+ * `attention` field is per-*state* data (a `pending` order can be quiet
+ * even though `paid` is also `success`), so it gates `hue.bg`/`hue.border`
+ * behind that field. `StateChip` has no per-instance attention field —
+ * its `tone` *is* the hue — so "is this hue quiet" has to be a static
+ * fact about the hue itself instead. That fact is [`isQuietHue`], which
+ * lives in `status-tokens.ts` beside the hue table it is a property of —
+ * not here, because it is not a property of this component.
  */
 export type StateChipTone = StatusHue;
 
@@ -55,12 +78,17 @@ export interface StateChipProps extends HTMLAttributes<HTMLSpanElement> {
 
 export function StateChip({ className, tone = "uncertain", ...props }: StateChipProps) {
   const hue = HUE_CLASSES[tone];
+  const quiet = isQuietHue(tone);
   return (
     <span
       className={cn(
         "rounded-sm border px-1.5 py-0.5 text-caption",
-        hue.border,
-        hue.bg,
+        // Quiet tones borrow the same achromatic bordered surface the
+        // rest of the library uses for a quiet box (`border-edge` +
+        // `bg-surface-2`, the same pair `InlineBanner`'s `neutral`
+        // variant already uses) instead of the hue's own transparent
+        // fill/border, so the chip is still legibly a chip.
+        quiet ? "border-edge bg-surface-2" : [hue.border, hue.bg],
         hue.fg,
         className,
       )}
