@@ -527,9 +527,34 @@ A few guards are worth knowing about before you trip one:
 
 ## Releasing
 
-Tag `vX.Y.Z` matching `package.json`; `.github/workflows/release.yml`
-publishes to npm through Trusted Publishing (OIDC), with no token stored
-in this repository.
+Two halves, owned by different things on purpose.
+
+**The version number is [changesets](https://www.npmjs.com/package/@changesets/cli).**
+Alongside a change, in the same PR:
+
+```sh
+pnpm changeset
+```
+
+At release time, on `main`:
+
+```sh
+pnpm bump          # changeset version: collapses pending changesets into one bump
+pnpm changeset:status   # what is pending, and what version it would produce
+```
+
+Changesets' own changelog generator is **off** (`changelog: false`), and
+it does not publish. `CHANGELOG.md` here is prose that explains what
+broke and why the obvious fix was wrong — several entries are the only
+record of a measurement — which a generator cannot produce and would
+overwrite. `.changeset/README.md` has the full reasoning for both, and
+for why there is no `changesets/action` bot.
+
+**Publishing is a tag.** Tag `vX.Y.Z` matching `package.json`;
+`.github/workflows/release.yml` publishes to npm through Trusted
+Publishing (OIDC), with no token stored in this repository. The workflow
+refuses a tag that disagrees with the manifest, so `pnpm bump` comes
+first and the tag follows the commit that lands it.
 
 **Except the very first publish, which that workflow cannot do.** npm
 attaches a trusted publisher to an *existing* package, so there is

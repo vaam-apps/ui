@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+## 0.1.2
+
+Versions are managed with [changesets](https://www.npmjs.com/package/@changesets/cli)
+from this release on: `pnpm changeset` alongside a change, `pnpm bump` to
+collapse the pending ones into a version. The changelog is still written
+by hand and publishing is still a tag — `.changeset/README.md` says why
+for both.
+
+**This is a patch number carrying real behaviour changes.** At `0.x`
+that is allowed and it is the maintainer's call, but it is worth being
+explicit that upgrading is not a no-op. Four things render differently
+without any API change:
+
+- `SideNav` defaults to the floating rail below `xl`, and the in-flow
+  `1024–1279px` icon rail is gone. `smallScreen="off-canvas"` restores
+  the previous shape.
+- `DetailRow`'s `stacked` and `inline` variants adopt `divided`'s
+  label/value type pairing, changing size and colour at every existing
+  call site.
+- `TimestampDisplay` writes `2026-08-08 14:03:07 Z` — a space before the
+  zone — where it previously wrote `…14:03:07Z`.
+- `Table`'s `label` now names the scroll wrapper only while it is
+  actually scrollable, and only as a `role="region"`. It previously sat
+  on a roleless `<div>`, where assistive tech ignored it.
+
+Everything below was already listed under Unreleased.
+
 ### The nav has one in-flow shape, and the rail turns on a phone
 
 **The bug:** at 1024–1279px the floating rail vanished and a full-height
