@@ -2,6 +2,44 @@
 
 ## Unreleased
 
+### A skill, for integrating this package somewhere else
+
+```sh
+npx skills add vaam-apps/ui
+```
+
+`skills/vaam-ui/` — a short entry point plus four references (setup, the
+status system, which component to reach for, pitfalls), in the
+[`skills`](https://github.com/vercel-labs/skills) layout, so an agent
+working in vpay or vsms can install it and know how to consume this
+package without reading this repository.
+
+It exists because **both ways this package fails at integration time are
+silent**: a missing `@source` renders every component completely
+unstyled, and leaving daisyUI's built-in themes on quietly overrides
+`base-100`/`200`/`300`/`content` at a specificity no custom theme block
+can reach. Neither produces an error anybody can search for, and both
+have cost real time.
+
+Verified against the real CLI rather than against the documented layout —
+`npx skills add vaam-apps/ui --list` reports `Found 1 skill`, and a test
+install into a throwaway project lands `SKILL.md` and all four references
+under `.claude/skills/vaam-ui/`.
+
+**`src/lib/skill.test.ts` resolves the package's actual export surface
+and fails if the skill names anything that is not in it.** `src/index.ts`
+is almost entirely `export * from`, so the check reads the re-exported
+modules rather than the barrel. This matters more than it sounds: the
+skill is copied *into other repositories*, where nothing in this suite
+runs, so a rename here would go on recommending the old name
+indefinitely — invisible from inside this repo, and wrong in someone
+else's.
+
+It caught four on the first run — `MoneyDisplay`, `ScreenLayout`, `Tabs`
+and `Toast`, none of which exist; the real names are `Money`,
+`ScreenStack`/`ScreenHeader`, `ValueTabs` and `toast`/`Toaster`. Both the
+export check and the reference-link check are mutation-tested.
+
 ### The dark theme applies without `data-theme`, which the README already promised
 
 **Fixed: on a page with no `data-theme` attribute, every token this
