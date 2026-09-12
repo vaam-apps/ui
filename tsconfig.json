@@ -13,6 +13,6 @@
     "noEmit": true,
     "isolatedModules": true
   },
-  "include": ["src/**/*", ".storybook/**/*"],
+  "include": ["src/**/*", ".storybook/**/*", "types.d.ts"],
   "exclude": ["node_modules", "dist", "storybook-static"]
 }

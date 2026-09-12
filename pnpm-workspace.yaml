@@ -1,4 +1,4 @@
-# Single-package repo, but pnpm 11 reads its build allowlist from here.
+# Single-package repo, but pnpm reads its build allowlist from here.
 # Without it, `pnpm run <script>` fails with ERR_PNPM_IGNORED_BUILDS behind
 # a stack trace that reads like an internal pnpm crash rather than a config
 # gap — the same trap vsms documents in its own workspace file.
@@ -7,3 +7,10 @@ packages:
 
 allowBuilds:
   esbuild: true
+
+# Deliberately NO `minimumReleaseAgeExclude` here. pnpm quarantines
+# versions published in the last day, and it offers to add an exclusion
+# rather than hold a package back — which silently defeats the gate at
+# exactly the moment it is doing its job. If an install wants to add
+# entries here, widen the range in package.json instead and let the
+# resolver pick the newest version that clears the quarantine.
