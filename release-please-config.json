@@ -3,8 +3,7 @@
   "separate-pull-requests": false,
   "packages": {
     ".": {
-      "release-type": "node",
-      "component": "",
+      "release-type": "simple",
       "changelog-path": "CHANGELOG.md",
       "include-component-in-tag": false,
       "include-v-in-tag": true,
@@ -59,6 +58,13 @@
           "type": "style",
           "section": "Styles",
           "hidden": true
+        }
+      ],
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "package.json",
+          "jsonpath": "$.version"
         }
       ]
     }
