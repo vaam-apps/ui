@@ -118,9 +118,12 @@ comment claiming 40px. Assert computed values.
 
 **A tag pushed by a workflow using `GITHUB_TOKEN` triggers no other
 workflow.** GitHub suppresses it; `workflow_dispatch` and
-`repository_dispatch` are the only exceptions. `version.yml` pushes the tag
-and then dispatches `release.yml` explicitly. This is documented in
-`.changeset/README.md` because it otherwise looks like a bug.
+`repository_dispatch` are the only exceptions. `release-please.yml`
+avoids the problem by minting a real GitHub App token and pushing the tag
+with that instead — a genuine push event, so `release.yml`'s own
+`push: tags:` trigger fires it without anything having to relay it. See
+`release-please.yml`'s own header comment for the full reasoning and for
+why the org standardised on an App token rather than a stored PAT.
 
 ## The gates, and what each exists for
 
@@ -137,7 +140,6 @@ broken. That is the point of the list.
 | `*.render.test.tsx` | a valid `classNames` key carrying a class string written against a DOM shape that does not exist. |
 | `side-nav.portal.test.tsx` | the portal target and the landmark count, neither visible to a component-scoped audit. |
 | `table.scroll.test.tsx` | the scrollable branch jsdom can never reach, with `ResizeObserver` and `scrollWidth` stubbed. |
-| `lib/stamp-changelog.test.ts` | mostly refusals — the release must fail rather than ship an undescribed version. |
 | `e2e/` | contrast in situ, focus rings, clipping, hit targets. |
 
 **Mutation-check new guards.** Break the thing, confirm the guard fails,
@@ -171,16 +173,34 @@ skill's entry for it before you finish.
 
 ## Releasing
 
-Versions are [changesets](https://www.npmjs.com/package/@changesets/cli);
-`changelog: false`, because `CHANGELOG.md` is hand-written prose and a
-generator would overwrite it. Publishing is npm Trusted Publishing (OIDC)
-from a tag — there is no npm token in this repository and there is not
-meant to be one.
+Versions are [release-please](https://github.com/googleapis/release-please),
+org-wide (`vaam-apps/vsms` is the reference implementation; the mechanics
+and the ways it has already failed silently elsewhere in the org are in
+`vaam-apps/.github`'s `docs/releasing.md`). A conventional-commit PR title
+is the only input: `release-please.yml` maintains a standing release PR
+from every one on `main`, and merging it bumps `package.json`, writes a
+generated `CHANGELOG.md` entry, and creates the tag. Publishing is
+unchanged — npm Trusted Publishing (OIDC) from that tag, in
+`release.yml`, still with no npm token in this repository.
 
-Add `pnpm changeset` alongside a change; write the entry under
-`## Unreleased`; run the **Version** workflow to release. It refuses when
-`## Unreleased` is empty, which is the one failure `changelog: false`
-trades for prose. `.changeset/README.md` has the full reasoning.
+**This replaced changesets, and the changeover cost something worth
+naming rather than burying.** `CHANGELOG.md` used to be hand-written
+prose — `changelog: false`, on the reasoning that a generator would
+overwrite the kind of entry that records *why* a decision was made, not
+just that a commit landed — and a release refused outright when nobody
+had written one. release-please generates the changelog from commit
+*subjects* instead, and only the subject: read straight from
+`release-please`'s own `DefaultChangelogNotes.buildNotes` (every commit
+maps to `{ body: '', subject: commit.bareMessage, ... }`, a hardcoded
+empty body), a commit's body text never reaches `CHANGELOG.md` at all —
+so a change worth a long doc comment or a rich PR description is still
+worth writing one, but it will not surface there any more, only in git
+history and the PR itself. That refusal-when-undescribed guarantee is
+also gone outright: a release with a bare `fix: …` subject and nothing
+else now ships silently, where the old mechanism would have failed the
+release for it. Weighed against `AGENTS.md`'s own repeated insistence
+elsewhere on measured, explained decisions, and accepted anyway — see
+the pull request that made this change for the full reasoning.
 
 ## Working here
 

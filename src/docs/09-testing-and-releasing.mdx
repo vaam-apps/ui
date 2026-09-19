@@ -158,113 +158,101 @@ shipped bug), `role="region"` without a name is also wrong and not a
 lesser wrong, a `tabIndex` with no visible focus state trades one problem
 for another, and a table that fits must gain no tab stop at all.
 
-### `stamp-changelog.test.ts` — a release nobody described
-
-`changelog: false` means nothing generates `CHANGELOG.md` and nothing
-checks it, so `scripts/stamp-changelog.mjs` is the only thing standing
-between "released" and "released with nothing said about it".
-
-Its **refusals** are the interesting half and are where this file spends
-its cases: an empty unreleased section, whitespace that only looks like
-an entry, a missing `## Unreleased` heading, a version the changelog
-already documents, and a string that is not a version. A rename is easy
-to get right; refusing to rename an empty section is the behaviour that
-has to survive someone editing the script in a hurry to unblock a
-release. It also runs against the real `CHANGELOG.md`, because the
-parsing is only worth anything if it matches the document's actual shape.
-
 ## Releasing
 
 Two halves, owned by different things on purpose.
 
-### The version number is changesets
+### The version number and the changelog are release-please
 
-Alongside a change, in the same PR:
+This repository, and every other repository in `vaam-apps`, uses
+[release-please](https://github.com/googleapis/release-please) rather
+than a per-repo mechanism. `vaam-apps/vsms` is the reference
+implementation it was copied from; `vaam-apps/.github`'s
+`docs/releasing.md` is the org-wide writeup of the mechanics and, more
+usefully, every way it has already been seen to fail silently.
 
-```sh
-pnpm changeset
-```
+The input is a conventional-commit **PR title** — `feat: …`, `fix: …`,
+and so on — nothing else. `.github/workflows/release-please.yml` reads
+every one merged to `main` and keeps a standing release PR up to date;
+merging that PR bumps `package.json`'s version, appends a generated
+`CHANGELOG.md` entry built from those commit subjects, and creates the
+tag. `.github/workflows/pr-title.yml` is the reason this is reliable
+rather than "usually reliable": it rejects a non-conventional title
+outright, and, separately, re-parses the *whole* squash message — title
+plus every commit subject and body the PR would land — with
+release-please's own strict parser. That second check exists because a
+title can be perfectly fine while a commit **body** silently breaks it: a
+body line beginning with a call-like token containing nested parentheses
+(`A(B(c)) is a build failure`) reads to the grammar as a malformed
+type-and-scope header, and release-please does not warn about that — it
+drops the entire commit from the changelog and the version calculation,
+and reports success. `ci/commit-message-parse/parse.mjs` has the exact
+rule and the real incident (on `vaam-apps/vsms`) that motivated writing
+this check rather than trusting the title alone.
 
-Pick `patch` / `minor` / `major` and write one line. That line is for
-whoever decides the next release, not for users — `CHANGELOG.md` is where
-users are addressed, and its entry is written under `## Unreleased` as
-the work happens.
+### What this replaced, and what the changeover cost
 
-Changesets' own changelog generator is **off** (`changelog: false`), and
-changesets does not publish. Both are deliberate.
+This used to be [changesets](https://www.npmjs.com/package/@changesets/cli),
+run through a `Version` workflow: `pnpm changeset` alongside a change,
+a hand-written entry under `## Unreleased` in `CHANGELOG.md`, and a
+release that **refused outright** when that section was empty — because
+`changelog: false` meant nothing else was going to generate one.
 
-The generated changelog would be one-line summaries with commit hashes.
-This file is prose: it explains what broke, what the obvious fix would
-have been and why it was wrong, and what a consumer has to change.
-Several entries are the only written record of a measurement — the
-contrast ratios a palette was searched against, the geometry of a
-skeleton layer, the scrollport offsets behind a sticky header. A
-generator cannot produce that and pointing one at the same file would
-either overwrite it or interleave two registers in one document. The cost
-is that writing the changelog is a manual step nothing enforces, which is
-the trade, taken knowingly.
+`CHANGELOG.md` here was prose, deliberately: it explained what broke,
+what the obvious fix would have been and why it was wrong, and what a
+consumer had to change. Several entries were the only written record of
+a measurement — the contrast ratios a palette was searched against, the
+geometry of a skeleton layer, the scrollport offsets behind a sticky
+header — and a generator was never going to produce that.
 
-### Releasing is one button
-
-Run the **`Version`** workflow from the Actions tab. It consumes the
-pending changesets, bumps the manifest, stamps `## Unreleased` with the
-version it produced, commits, tags, and hands the tag to `release.yml`.
-Its `dry_run` input does all of that and pushes nothing.
-
-**It refuses to release when `## Unreleased` is empty**, and that refusal
-is the reason the workflow exists rather than a `sed` in a release step:
-nothing generates the changelog and nothing checks it, so the failure it
-trades for prose is a published version nobody described — most likely at
-exactly the moment someone is in a hurry.
-
-By hand, the same thing:
-
-```sh
-pnpm changeset:status              # what is pending, and what version it produces
-pnpm bump                          # changeset version
-node scripts/stamp-changelog.mjs 0.1.3
-```
+A generator is what writes it now. release-please's own notes builder
+constructs each changelog line from `commit.bareMessage` with the body
+hardcoded to an empty string — read directly from its source before
+relying on it, not assumed — so a commit's body **never** reaches
+`CHANGELOG.md`, only its subject. Two consequences follow directly: the
+kind of long, measured explanation this page keeps asking for still
+belongs in the PR description and the commit body, for git history and
+for whoever reviews the PR, but it will not appear in the published
+changelog any more; and the refuse-if-undescribed guarantee is gone
+outright — a release built from nothing but a bare `fix: …` subject now
+ships exactly as easily as a well-explained one. That is a real,
+considered tradeoff, not an oversight, and it is stated here rather than
+left for the next reader to notice at a release nobody described.
 
 ### Publishing is a tag
 
-Tag `vX.Y.Z` matching `package.json`. `.github/workflows/release.yml`
-runs lint, typecheck, tests and the build, validates the tarball, and
-publishes to npm through **Trusted Publishing (OIDC)** — `pnpm publish`
-with `id-token: write` and no `NODE_AUTH_TOKEN`, because there is no npm
-token in this repository at all. It refuses a tag that disagrees with the
-manifest, and refuses to run on anything but a `v*` tag ref.
+Tag `vX.Y.Z` matching `package.json`. `.github/workflows/release.yml` —
+**unrenamed, unrestructured, on purpose** — runs lint, typecheck, tests
+and the build, validates the tarball, and publishes to npm through
+**Trusted Publishing (OIDC)**: `pnpm publish` with `id-token: write` and
+no `NODE_AUTH_TOKEN`, because there is no npm token in this repository at
+all. It refuses a tag that disagrees with the manifest, and refuses to
+run on anything but a `v*` tag ref.
 
-### Why the tag push is followed by an explicit dispatch
+`release-please.yml` mints a real **GitHub App token** — not the default
+`GITHUB_TOKEN` — and pushes the release tag with it. That matters for the
+identical reason the old `Version` workflow had to dispatch `release.yml`
+explicitly: GitHub suppresses workflow runs triggered by the default
+`GITHUB_TOKEN`, with `workflow_dispatch` and `repository_dispatch` as the
+only documented exceptions, so a tag pushed with it would fire nothing.
+An App-token push is a genuine event, so `release.yml`'s own
+`push: tags:` trigger now fires on its own — nothing has to relay it, and
+`release.yml` keeps its `workflow_dispatch` trigger only as a manual
+fallback for re-running a publish that failed partway.
 
-This is the part that looks like a bug if you do not know it.
+**Why `release.yml`'s name and trigger are untouched by any of this:**
+npm's Trusted Publisher for this package is bound to this repository plus
+this exact workflow filename. Renaming or restructuring it — even in a
+way that changes nothing else about what it does — breaks publishing
+until the trusted publisher entry on npmjs.com is repointed. Renaming a
+workflow file is a cheap-looking edit with an expensive, silent failure
+mode; if it is ever renamed, repoint the trusted publisher first.
 
-`version.yml` pushes the tag and then **dispatches** `release.yml` at
-that ref, rather than relying on the tag push to trigger
-`on: push: tags`. That trigger does not fire: GitHub suppresses workflow
-runs from events raised by the default `GITHUB_TOKEN`, with
-`workflow_dispatch` and `repository_dispatch` as the only documented
-exceptions. The obvious implementation — push `v0.1.3`, let `release.yml`
-notice — silently does nothing.
-
-Both alternatives cost something real:
-
-- **A stored personal access token** would trigger the tag normally, and
-  this repository deliberately has no publishing credential. That is the
-  entire point of Trusted Publishing.
-- **Making `release.yml` a reusable `workflow_call`** would change the
-  OIDC claim npm matches its trusted publisher against — and that breaks
-  only at publish time, which is the worst place to find out.
-
-Dispatching leaves `release.yml` identical from npm's point of view.
-`release.yml` therefore carries a `workflow_dispatch` trigger and a guard
-that it is running on a `v*` tag ref at all; dispatched on `main` it
-would otherwise report `tag vmain disagrees with package.json`, which is
-true and reads like the wrong problem.
-
-### The one publish that workflow cannot do
+### The one publish that no workflow can do
 
 npm attaches a trusted publisher to an **existing** package, so there is
-nothing to configure until the name exists. The first publish is by hand:
+nothing to configure until the name exists. The first publish is by
+hand:
 
 ```sh
 npm login
@@ -274,8 +262,6 @@ pnpm publish --access public
 
 Then add the trusted publisher on npmjs.com against this repository and
 the `release.yml` workflow filename. Every later tag publishes
-tokenlessly.
-
-`.changeset/README.md` has the full reasoning for `changelog: false`, for
-why there is no `changesets/action` bot, and for the dispatch; the
-README's Releasing section is the short form.
+tokenlessly. (`@vaam-apps/ui` already went through this — npm shows
+`0.1.0` through `0.2.0` published this way — so it is history here, not
+a pending step.)

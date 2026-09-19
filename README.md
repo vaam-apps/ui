@@ -553,46 +553,43 @@ A few guards are worth knowing about before you trip one:
 
 Two halves, owned by different things on purpose.
 
-**The version number is [changesets](https://www.npmjs.com/package/@changesets/cli).**
-Alongside a change, in the same PR:
+**The version number and the changelog are
+[release-please](https://github.com/googleapis/release-please), org-wide.**
+Every conventional-commit PR title merged to `main` updates a standing
+release PR (`.github/workflows/release-please.yml`); merging that PR
+bumps `package.json`, writes a generated `CHANGELOG.md` entry from the
+commits it contains, and creates the tag. `.github/workflows/
+pr-title.yml` is what makes this reliable: it rejects a non-conventional
+PR title outright, and separately re-parses the whole squash message with
+release-please's own parser, because a message that *looks* fine can
+still contain a body line the parser reads as a syntax error and silently
+drops — see `ci/commit-message-parse/parse.mjs` for the exact grammar
+rule and the incident that motivated it. The mechanics, and every way
+this has already failed silently across the org, are written up in
+`vaam-apps/.github`'s `docs/releasing.md`; `vaam-apps/vsms` is the
+reference implementation this repository's setup was copied from.
 
-```sh
-pnpm changeset
-```
-
-At release time, **run the `Version` workflow** from the Actions tab. It
-consumes the pending changesets, bumps the manifest, renames
-`## Unreleased` in `CHANGELOG.md` to the version it produced, commits,
-tags, and dispatches the publish. It has a `dry_run` input that does all
-of that and pushes nothing, and it refuses to release when
-`## Unreleased` is empty.
-
-By hand, the same thing:
-
-```sh
-pnpm changeset:status              # what is pending, and what version it produces
-pnpm bump                          # changeset version
-node scripts/stamp-changelog.mjs 0.1.3
-```
-
-Changesets' own changelog generator is **off** (`changelog: false`), and
-it does not publish. `CHANGELOG.md` here is prose that explains what
-broke and why the obvious fix was wrong — several entries are the only
-record of a measurement — which a generator cannot produce and would
-overwrite. `.changeset/README.md` has the full reasoning for both, and
-for why there is no `changesets/action` bot.
+This replaced [changesets](https://www.npmjs.com/package/@changesets/cli)
+and the `Version` workflow that used to drive them, and the changeover is
+not free: `CHANGELOG.md` used to be hand-written prose, and a release
+refused outright when nobody had written an entry. A generated entry is
+the commit subject alone — release-please's own notes builder hardcodes
+an empty commit body — so that refusal is gone, and a change worth the
+kind of explanation this file's other entries give will not get one in
+`CHANGELOG.md` automatically any more. See `AGENTS.md`'s "Releasing"
+section for the full tradeoff.
 
 **Publishing is a tag.** Tag `vX.Y.Z` matching `package.json`;
 `.github/workflows/release.yml` publishes to npm through Trusted
 Publishing (OIDC), with no token stored in this repository. It refuses a
 tag that disagrees with the manifest, and refuses to run on anything but
-a `v*` tag ref.
-
-`Version` pushes that tag and then *dispatches* the publish rather than
-relying on the tag push to trigger it — a tag pushed by a workflow's own
+a `v*` tag ref. `release-please.yml` pushes that tag with a real GitHub
+App token rather than the default `GITHUB_TOKEN`, specifically so the
+push is a genuine event and `release.yml`'s own `push: tags:` trigger
+fires it without anything having to relay it — a workflow's own
 `GITHUB_TOKEN` does not fire `on: push: tags`, by documented GitHub
-design. `.changeset/README.md` has the reasoning and what the
-alternatives cost.
+design, which is what forced the old `Version` workflow to dispatch
+`release.yml` explicitly instead.
 
 **Except the very first publish, which that workflow cannot do.** npm
 attaches a trusted publisher to an *existing* package, so there is
