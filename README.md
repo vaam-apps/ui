@@ -198,16 +198,16 @@ Eight, and picking from the four obvious ones is the mistake this table
 exists to stop. The first three rows are all "not finished", and they are
 not interchangeable.
 
-| Hue | What it tells the reader | Example state |
-| --- | --- | --- |
-| `neutral` | Not finished, and nothing is happening to it | `pending` — accepted, nothing has claimed it |
-| `progress` | Not finished, and **this** system is working on it now | `charging` — the rail is taking the payment |
-| `parked` | Not finished, and somebody **outside** this system is holding it | `authorising` — waiting for the payer to approve on their handset |
-| `success` | Over, and it worked | `paid` |
-| `danger` | Over, and it did not work | `failed` |
-| `expired` | Over because a window closed — nobody decided anything | `lapsed` — no answer arrived in time |
-| `warning` | A recoverable condition needs a human | `stalled` — retryable in principle, but nothing is driving it |
-| `uncertain` | The outcome is unknown, and will not be learned | `unknown` — sent, and no acknowledgement ever arrived |
+| Hue         | What it tells the reader                                         | Example state                                                     |
+| ----------- | ---------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `neutral`   | Not finished, and nothing is happening to it                     | `pending` — accepted, nothing has claimed it                      |
+| `progress`  | Not finished, and **this** system is working on it now           | `charging` — the rail is taking the payment                       |
+| `parked`    | Not finished, and somebody **outside** this system is holding it | `authorising` — waiting for the payer to approve on their handset |
+| `success`   | Over, and it worked                                              | `paid`                                                            |
+| `danger`    | Over, and it did not work                                        | `failed`                                                          |
+| `expired`   | Over because a window closed — nobody decided anything           | `lapsed` — no answer arrived in time                              |
+| `warning`   | A recoverable condition needs a human                            | `stalled` — retryable in principle, but nothing is driving it     |
+| `uncertain` | The outcome is unknown, and will not be learned                  | `unknown` — sent, and no acknowledgement ever arrived             |
 
 Three clusters account for nearly every wrong pick:
 
@@ -249,29 +249,29 @@ want. `filled` is a separate channel: terminal marks sit on a filled
 silhouette and knock out of it, in-flight and unresolved marks are
 stroked on an empty one.
 
-| Mark | The distinction it draws | Reach for it when |
-| --- | --- | --- |
-| `pie-1` `pie-2` `pie-3` | A quarter, half and three-quarter progress wedge | **This** system is doing the work, and you can say roughly how far through it is |
-| `ring` | A completed stroke with a hollow centre | The work has left this system — the next event comes from outside, and no progress can be reported until it does |
-| `clock` | A window, not a worker | Nothing is being attempted; only time passing changes anything |
-| `pause` | Stopped, with nobody driving it | It could resume, and it will not resume on its own |
-| `check` | Over, and it worked | The happy terminal state |
-| `cross` | Over, and it failed | Something went wrong and stayed wrong |
-| `slash` | Over, on purpose | Cancelled, rejected, skipped — nothing failed |
-| `bar` | Over, with no verdict to report | Refunded, voided, superseded |
-| `question` | The outcome was never learned | Pair it with `uncertain`; it is not a failure |
+| Mark                    | The distinction it draws                         | Reach for it when                                                                                                |
+| ----------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `pie-1` `pie-2` `pie-3` | A quarter, half and three-quarter progress wedge | **This** system is doing the work, and you can say roughly how far through it is                                 |
+| `ring`                  | A completed stroke with a hollow centre          | The work has left this system — the next event comes from outside, and no progress can be reported until it does |
+| `clock`                 | A window, not a worker                           | Nothing is being attempted; only time passing changes anything                                                   |
+| `pause`                 | Stopped, with nobody driving it                  | It could resume, and it will not resume on its own                                                               |
+| `check`                 | Over, and it worked                              | The happy terminal state                                                                                         |
+| `cross`                 | Over, and it failed                              | Something went wrong and stayed wrong                                                                            |
+| `slash`                 | Over, on purpose                                 | Cancelled, rejected, skipped — nothing failed                                                                    |
+| `bar`                   | Over, with no verdict to report                  | Refunded, voided, superseded                                                                                     |
+| `question`              | The outcome was never learned                    | Pair it with `uncertain`; it is not a failure                                                                    |
 
 The four that overlap are `pie-*`, `ring`, `clock` and `pause` — all of
 them "not finished yet", and they split on the same question the hue axis
 splits on: *who is holding it*. That is not a coincidence, and the two
 axes are meant to agree:
 
-| Who has it | Hue | Mark |
-| --- | --- | --- |
-| This system, actively | `progress` | `pie-1` / `pie-2` / `pie-3` |
-| Somebody outside it | `parked` | `ring` |
-| Nobody — only the clock | `neutral` | `clock` |
-| Nobody at all, and it is stuck | `warning` | `pause` |
+| Who has it                     | Hue        | Mark                        |
+| ------------------------------ | ---------- | --------------------------- |
+| This system, actively          | `progress` | `pie-1` / `pie-2` / `pie-3` |
+| Somebody outside it            | `parked`   | `ring`                      |
+| Nobody — only the clock        | `neutral`  | `clock`                     |
+| Nobody at all, and it is stuck | `warning`  | `pause`                     |
 
 `ring` + `parked` is the combination a real state machine reaches for most
 and the one easiest to miss, because "submitted" sounds like progress this
