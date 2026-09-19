@@ -1,0 +1,146 @@
+name: pr-title
+
+# The pull request title must be a conventional commit.
+#
+# Not a style rule. This repository's squash setting is `PR_TITLE` (set as
+# part of adopting `release-please.yml`), so the PR title becomes the
+# subject of the one commit that lands on `main`, and that subject is the
+# ONLY thing `release-please.yml` reads to decide whether there is a
+# release to propose and whether it is a patch, a minor or a major. A title
+# of "Fix the sticky dialog header" is invisible to it; "fix: the sticky
+# dialog header" is a patch. Checked against this repository's own history
+# before writing this file: of the last 24 commit subjects on `main` before
+# the four `ci:`-prefixed ones, only those four were conventional — every
+# other merge ("A skill, for integrating this package somewhere else", "One
+# button to cut a release", "The sticky dialog header pinned 24px too low")
+# would have been invisible to release-please. Without this gate the
+# release PR would simply never appear, and nothing would say why.
+#
+# This is deliberately a separate workflow rather than a job in `ci.yml` /
+# `quality.yml`. A PR title is changed by editing it, which raises `edited`
+# and not `synchronize`; the existing gates do not listen for `edited`, and
+# adding it there would re-run the entire suite — lint, typecheck, test,
+# build, Storybook, the Playwright e2e gate — every time somebody fixes a
+# typo in a title.
+#
+# Implemented as a regex rather than a marketplace action on purpose,
+# mirroring `vaam-apps/vsms`'s own reasoning: an unpinned moving dependency
+# inside a release pipeline is a real future-breakage risk, and the whole
+# rule is one regex.
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+  # `commit-message-parses` lists the pull request's commits via the REST API.
+  pull-requests: read
+
+jobs:
+  conventional-title:
+    name: title is a conventional commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the title
+        env:
+          # Via the environment, never interpolated into the script body:
+          # a PR title is attacker-controlled text and `${{ }}` inside a
+          # `run:` is textual substitution, so a title containing a quote
+          # and a semicolon would execute.
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+
+          # type(optional scope)optional-!: subject
+          #
+          # The type list is exactly the one `release-please-config.json`
+          # declares changelog sections for — including `deps`, which
+          # `vaam-apps/vsms`'s own copy of this pattern omits despite its
+          # own config declaring a "Dependencies" section for it. That is
+          # a real inconsistency there, not a convention worth repeating
+          # here: this file's list matches its own config exactly. `feat`
+          # and `fix` move the version; `!` (or a `BREAKING CHANGE:`
+          # footer in the body) makes it a major. Everything else still
+          # produces a release, as a patch.
+          PATTERN='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert|deps)(\([a-zA-Z0-9,._/ -]+\))?!?: .+'
+
+          if printf '%s' "$TITLE" | grep -qE "$PATTERN"; then
+            echo "OK — $TITLE"
+            exit 0
+          fi
+
+          {
+            echo "### Pull request title is not a conventional commit"
+            echo
+            echo '```'
+            echo "$TITLE"
+            echo '```'
+            echo
+            echo "It must start with one of \`feat\` \`fix\` \`docs\` \`style\`"
+            echo "\`refactor\` \`perf\` \`test\` \`build\` \`ci\` \`chore\` \`revert\`"
+            echo "\`deps\`, an optional \`(scope)\`, an optional \`!\` for a"
+            echo "breaking change, then \`: \` and a subject. For example:"
+            echo
+            echo '```'
+            echo "fix: the sticky dialog header pinned 24px too low"
+            echo "feat(status): add a JobStatusPill alongside StatusPill"
+            echo "refactor(side-nav)!: smallScreen defaults to off-canvas"
+            echo '```'
+            echo
+            echo "This repository squash-merges with the PR title as the"
+            echo "commit subject on \`main\`, and it is the only thing"
+            echo "release-please reads to decide the next version. Edit the"
+            echo "title and this check re-runs on its own."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "::error title=Non-conventional PR title::${TITLE}"
+          exit 1
+
+  # The title is only line 1 of what lands. This job checks the WHOLE squash
+  # message with release-please's own parser, because a body line can make
+  # release-please discard the entire commit — silently, with the workflow
+  # green. See ci/commit-message-parse/parse.mjs for the incident (found on
+  # vaam-apps/vsms) and the exact grammar rule.
+  #
+  # It lives in `pr-title.yml` rather than its own file because it shares
+  # this trigger exactly: `edited` (the title changed) and `synchronize`
+  # (the commits changed) are both inputs to the assembled message, and the
+  # heavier gates above still must not listen for `edited`.
+  commit-message-parses:
+    name: the squash message parses as a conventional commit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '26'
+
+      # A standalone npm project with a committed lockfile and an exact pin,
+      # deliberately outside `pnpm-workspace.yaml` — a CI tool, not
+      # application code. The pin is `@conventional-commits/parser` 0.4.1,
+      # the only version satisfying release-please 17.6.0's own `^0.4.1`
+      # (release-please-action@v5.0.0 resolves to that release-please
+      # version — checked directly against its own `package.json`, not
+      # assumed), so this guard parses with exactly the grammar
+      # release-please will use. A looser range here would let the two
+      # disagree, which is the one way this check could report a verdict
+      # that does not match reality.
+      - name: Install the parser
+        working-directory: ci/commit-message-parse
+        run: npm ci
+
+      - name: Parse the message this pull request would land
+        working-directory: ci/commit-message-parse
+        env:
+          # Via the environment, never `${{ }}` inside `run:` — a pull
+          # request title is attacker-controlled text and `${{ }}` in a
+          # `run:` body is textual substitution.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node parse.mjs

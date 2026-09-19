@@ -1,0 +1,147 @@
+name: release-please
+
+# Proposes the next release as a pull request, and cuts the tag (and a real
+# GitHub Release) when that pull request merges.
+#
+# This REPLACES `version.yml` and `.changeset/` — see the PR that introduced
+# this file for the full reasoning. The short version: this repository used
+# to require a human to run `pnpm changeset`, hand-write a CHANGELOG.md
+# entry under `## Unreleased`, then dispatch the `Version` workflow from the
+# Actions tab. From here forward, every conventional-commit merge to `main`
+# updates a standing release PR on its own; merging that PR is the only
+# manual step left, and even that can be automated later if wanted.
+#
+# This workflow never publishes anything itself. It only ever writes the
+# version into the tree, stamps `CHANGELOG.md`, and creates the tag;
+# `release.yml` — UNCHANGED, same filename, same trigger — owns the actual
+# npm publish. That filename matters: npm's Trusted Publisher for
+# `@vaam-apps/ui` is bound to this repository's `release.yml` specifically,
+# so this PR does not touch that file's name or its `on: push: tags:`
+# trigger.
+#
+# ---------------------------------------------------------------------------
+# Why a GitHub App token and not GITHUB_TOKEN
+# ---------------------------------------------------------------------------
+# This is load-bearing, not hygiene. GitHub deliberately does not raise
+# workflow events for anything done with the default `GITHUB_TOKEN`, to stop
+# a workflow triggering itself. So with `GITHUB_TOKEN`:
+#
+#   - the `vX.Y.Z` tag would be created and `release.yml` would NOT run.
+#     No npm publish, no GitHub Release contents worth reading — a release
+#     that looks cut and published nothing, with nothing failing anywhere
+#     to say so.
+#   - the release PR would get no `quality.yml`/`ci.yml` run at all, which
+#     is the same failure class as a workflow that only triggers on
+#     push-to-`main`: its first execution of changed code is after merge.
+#
+# `version.yml`, the workflow this replaces, hit the identical GITHUB_TOKEN
+# restriction from the other direction — its own header explained why it had
+# to dispatch `release.yml` explicitly rather than rely on the tag push it
+# made with the default token. Minting a real App token here removes the
+# need for that dance entirely: the tag this workflow pushes is a genuine
+# push event, so `release.yml`'s existing `on: push: tags:` trigger fires it
+# on its own.
+#
+# The App needs, on this repository only: `contents: write` (branches,
+# tags, releases) and `pull-requests: write`. Store its id and private key
+# as RELEASE_PLEASE_APP_CLIENT_ID (the App's **Client ID**, `Iv23li…`, not
+# its numeric App ID) and RELEASE_PLEASE_APP_PRIVATE_KEY — both already
+# present as organization secrets with `visibility: all` (this repository
+# already consumes them in `quality.yml`/`issue-governance.yml` for the
+# org's reusable workflows, so nothing new needed to be provisioned). If
+# either is missing the token step fails outright rather than silently
+# falling back to `GITHUB_TOKEN` — a fallback would produce exactly the
+# silent publish-nothing release described above.
+#
+# ---------------------------------------------------------------------------
+# Why `release-type: node`, and why there is no lockfile-sync step
+# ---------------------------------------------------------------------------
+# Unlike `vaam-apps/vsms` — a Cargo workspace whose virtual root manifest
+# made `release-type: rust` hard-error, forcing `simple` plus a hand-listed
+# `extra-files` entry for its Node SDK's `package.json` — this repository
+# IS a real, single, publishable npm package at its root. `node` is
+# release-please's native strategy for exactly that shape: it updates this
+# package's own `package.json` version and `CHANGELOG.md`, and gracefully
+# no-ops on `package-lock.json` / `npm-shrinkwrap.json` / `samples/
+# package.json` / `changelog.json` when they don't exist (all four
+# `createIfMissing: false`) — verified with a real `release-please
+# release-pr --dry-run --debug` against this repository before trusting it:
+# the log shows each of those four reported "did not exist" and skipped,
+# while `package.json` and `CHANGELOG.md` were the only files it proposed
+# changing. No `extra-files` entry is needed here.
+#
+# This repository uses pnpm, not npm, so its lockfile is `pnpm-lock.yaml` —
+# and unlike vsms's `Cargo.lock` (which embeds every workspace member's own
+# version, making a version bump a guaranteed lockfile diff), a pnpm
+# lockfile's `importers` entry for the root package carries no version
+# field of its own. Verified directly, not assumed: bumping
+# `package.json`'s `version` locally and running `pnpm install
+# --frozen-lockfile` produced zero diff in `pnpm-lock.yaml`. So there is
+# nothing here for vsms's lockfile-refresh step to do, and it is
+# deliberately omitted rather than carried over as dead weight.
+#
+# ---------------------------------------------------------------------------
+# What this deliberately does NOT do
+# ---------------------------------------------------------------------------
+#   - It does not write to `.changeset/`. That directory, `@changesets/cli`,
+#     `scripts/stamp-changelog.mjs`, and the `version.yml` workflow are all
+#     removed in the same change that adds this file — running both
+#     mechanisms side by side would mean two independent ways to decide the
+#     next version and two independent things that can tag `main`, which is
+#     strictly worse than either alone.
+#   - It does not preserve the "CHANGELOG.md is hand-written prose, and a
+#     release refuses when `## Unreleased` is empty" guarantee `AGENTS.md`
+#     and `stamp-changelog.mjs` used to document as deliberate. That is a
+#     real, named tradeoff of this migration — see the PR description for
+#     the reasoning — not an oversight.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+# Never cancel a run that may be mid-way through pushing the release branch
+# or the release tag. Keyed per ref like `release.yml`, for the identical
+# reason its own comment gives: under a global key, a routine push to
+# `main` could cancel a release-please run that is about to push a tag,
+# which would look exactly like a release that never happened.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+# The App token below carries every write this workflow performs; the
+# workflow's own GITHUB_TOKEN needs nothing beyond reading the checkout.
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    name: propose the next release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mint a GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          # `client-id`, not the deprecated `app-id`. They are DIFFERENT
+          # values on the App's settings page — `app-id` is the numeric
+          # App ID, `client-id` is the `Iv23li…` Client ID — so the
+          # secret is named for the one this input actually wants.
+          client-id: ${{ secrets.RELEASE_PLEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+          # Without these, the minted token carries every permission the
+          # App's installation has — which, for an App installed org-wide
+          # for release-please/lint/Trivy/issue-governance across nine
+          # repositories, is broader than "open a PR and push a tag in
+          # this one repo" needs. `permission-<name>` inputs cap the token
+          # down to exactly that (zizmor's `github-app` audit, run as part
+          # of this org's lint gate, flags the unscoped default).
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Open or update the release PR
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

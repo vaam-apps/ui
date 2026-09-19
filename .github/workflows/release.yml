@@ -1,23 +1,51 @@
 name: Release
 
+# Publishes to npm. This file's NAME and its `push: tags:` trigger are
+# deliberately untouched by the move to release-please
+# (`.github/workflows/release-please.yml`, which now proposes the version
+# and creates the tag): npm's Trusted Publisher for `@vaam-apps/ui` is
+# bound to this repository plus this exact workflow filename, so renaming
+# or restructuring it — even in a way that changes nothing else — breaks
+# publishing until the trusted publisher entry on npmjs.com is repointed.
+# If this file is ever renamed, do that first.
+
 on:
   push:
     tags: ['v*.*.*']
 
-  # How `version.yml` reaches this workflow, and not a convenience.
+  # `.github/workflows/release-please.yml` — which replaced the old
+  # `version.yml` — mints a real GitHub App token and uses it to push the
+  # release tag, so that push is a genuine event and the trigger above
+  # fires it on its own; nothing has to relay it here any more.
   #
-  # A tag pushed by a job using the default GITHUB_TOKEN does not fire
-  # the `push` trigger above — GitHub suppresses it to prevent recursive
-  # runs, and documents `workflow_dispatch` and `repository_dispatch` as
-  # the only exceptions. So `version.yml` pushes the tag and then
-  # dispatches this workflow *at that tag ref*, which is why the guard
-  # below insists on a tag ref rather than assuming one.
+  # This stays only as a manual escape hatch: re-running a publish that
+  # failed partway (`gh workflow run release.yml --ref v<version>`)
+  # without needing a new tag. The guard below insists on a real tag ref
+  # regardless of which trigger fired, so a manual dispatch against
+  # `main` fails with a readable error rather than silently comparing
+  # `main` to a version number.
   #
-  # Dispatching rather than making this a reusable `workflow_call` is
-  # deliberate: npm matches its trusted publisher against this workflow's
-  # own identity, and being called from another workflow changes that
-  # claim. Breaking it would only show up at publish time.
+  # This is NOT made a reusable `workflow_call` for the same reason it
+  # never was: npm matches its trusted publisher against this workflow's
+  # own identity (this repository, this filename), and being called from
+  # another workflow changes that claim. Breaking it would only show up
+  # at publish time, which is why this file's name and structure are
+  # untouched by the move to release-please — see the file-level comment
+  # above.
   workflow_dispatch:
+
+# Never cancel a publish. This was a real gap relative to
+# `vaam-apps/vsms`'s own `release.yml`, which already has this block —
+# without it, a second trigger against the same ref (a manual re-dispatch
+# racing the tag push that's already running this workflow) can cancel a
+# `pnpm publish` mid-flight, which is the one failure here that cannot be
+# re-run into a clean state: npm refuses to republish a version, so a
+# cancelled partial publish leaves nothing to retry against. Keyed per
+# ref, matching `release-please.yml`'s own group, so this can never be
+# cancelled by an unrelated push either.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -29,12 +57,29 @@ jobs:
       # exists to leak or rotate.
       id-token: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # This job never pushes; nothing here needs the checkout's own
+          # git credentials to persist past the step that made them.
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 26
-          cache: pnpm
+          # Deliberately NO `cache: pnpm` here, unlike `ci.yml`/`version.yml`,
+          # and `package-manager-cache` explicitly forced off. This job runs
+          # on a tag push and ends by publishing to npm — exactly the
+          # "runtime artifacts" shape a poisoned dependency cache would
+          # target, and a publish is the one failure this repository cannot
+          # take back. setup-node v7 added `package-manager-cache`, DEFAULT
+          # true, which auto-enables caching from `package.json`'s own
+          # `packageManager` field with no `cache:` input needed at all — so
+          # leaving it at its default is not the same as omitting caching
+          # here, it is a second, easier-to-miss way to get it. Confirmed by
+          # re-running zizmor's `cache-poisoning` audit before and after this
+          # line: it still fired with only `cache:` removed, and stopped
+          # once this was added.
+          package-manager-cache: false
           registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
 
@@ -52,7 +97,7 @@ jobs:
           case "$GITHUB_REF" in
             refs/tags/v*) ;;
             *)
-              echo "::error::release must run on a v* tag ref, got $GITHUB_REF. Dispatch it with --ref v<version>, or let the Version workflow do it."
+              echo "::error::release must run on a v* tag ref, got $GITHUB_REF. Dispatch it with --ref v<version>, or let release-please.yml create the tag for you."
               exit 1
               ;;
           esac

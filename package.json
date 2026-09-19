@@ -55,9 +55,6 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node scripts/copy-styles.mjs && node scripts/specify-extensions.mjs dist",
     "build-storybook": "storybook build -o storybook-static",
-    "changeset": "changeset",
-    "bump": "changeset version",
-    "changeset:status": "changeset status",
     "clean": "rm -rf dist storybook-static",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
@@ -87,7 +84,6 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.13",
-    "@changesets/cli": "^3.0.2",
     "@playwright/test": "^1.63.0",
     "@storybook/addon-a11y": "10.6.0",
     "@storybook/addon-docs": "10.6.0",
