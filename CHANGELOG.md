@@ -13,6 +13,17 @@ decision the way the prose below does. The tradeoff is recorded in the
 pull request that made this change.
 -->
 
+## [0.2.1](https://github.com/vaam-apps/ui/compare/v0.2.0...v0.2.1) (2026-09-19)
+
+
+### Continuous Integration
+
+* adopt org-wide SAST, lint, Trivy and issue governance ([#17](https://github.com/vaam-apps/ui/issues/17)) ([373c44b](https://github.com/vaam-apps/ui/commit/373c44b9530b1eae89299765b45feaeee911b81f))
+* adopt release-please, retiring changesets and Version ([#19](https://github.com/vaam-apps/ui/issues/19)) ([f5968a3](https://github.com/vaam-apps/ui/commit/f5968a3f4f042be562997dfbf3512cc1375c971a))
+* re-pin org reusable workflows for the MD024 changelog fix ([f15027f](https://github.com/vaam-apps/ui/commit/f15027f53ba2639cd6035b3562ef64c1f3fb6283))
+* re-pin org reusable workflows for the MD024 changelog fix ([d341b0f](https://github.com/vaam-apps/ui/commit/d341b0fc42a8b1c3052243ccbee4d05491b99fa6))
+* re-pin org reusable workflows to current .github main ([#18](https://github.com/vaam-apps/ui/issues/18)) ([a507ae7](https://github.com/vaam-apps/ui/commit/a507ae76da2610183264301078a847eb01500682))
+
 ## 0.2.0
 
 **Releasing as a minor, not a patch.** 0.1.2 shipped behaviour changes
