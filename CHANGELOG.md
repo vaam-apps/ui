@@ -13,6 +13,14 @@ decision the way the prose below does. The tradeoff is recorded in the
 pull request that made this change.
 -->
 
+## [0.2.2](https://github.com/vaam-apps/ui/compare/v0.2.1...v0.2.2) (2026-09-19)
+
+
+### Bug Fixes
+
+* **release:** set an empty component so the merged release PR can be tagged ([832baf3](https://github.com/vaam-apps/ui/commit/832baf39cf2203455ade9e7fc1d6e580e0e2ed49))
+* **release:** use release-type simple so the merged release PR gets tagged ([350ff0e](https://github.com/vaam-apps/ui/commit/350ff0e5d3d817a8833c817a73a459c21caf529b))
+
 ## [0.2.1](https://github.com/vaam-apps/ui/compare/v0.2.0...v0.2.1) (2026-09-19)
 
 
