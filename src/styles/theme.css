@@ -771,6 +771,19 @@
  * content and drawing users' eyes to relevant material" — i.e. opt-in,
  * per instance, among structurally identical peers.
  *
+ * **One caveat on how much those values are worth, which the motion
+ * tokens above do not carry.** The line immediately before the first
+ * `*Emphasized*` declaration in `TypeScaleTokens.kt` reads `// TODO
+ * update with the generated tokens once available` — so the whole
+ * emphasised block is hand-written placeholder, flagged as provisional by
+ * androidx itself, unlike the generated baseline roles above it and
+ * unlike `ExpressiveMotionTokens.kt`'s real constants. Weight-only is the
+ * best reading available today and everything below follows from it, but
+ * it is a claim about a file Google has marked not-final. If a later
+ * androidx drop generates these for real and the sizes diverge, this
+ * paragraph is where to start — and the fact that nothing here declares a
+ * new `--text-*` step is exactly what makes that cheap to revisit.
+ *
  * Two things that finding rules out, both worth saying explicitly
  * because they were the two ways this could have gone wrong:
  *
