@@ -24,7 +24,35 @@ allowBuilds:
 # resolution the moment anything pulls in `color_spec_2025.js` or a
 # `scheme_*` module (which the package's own `index.js` does unconditionally
 # for every export). The patch below adds the missing extensions; nothing
-# else changes. Not yet filed upstream (material-foundation/
-# material-color-utilities) — worth doing before the next bump of this pin.
+# else changes.
+#
+# Upstream: material-foundation/material-color-utilities#195, open since
+# 2026-01-29 and unlabelled. Our findings are added as a comment there
+# rather than as a second issue — the cause is in the TypeScript source,
+# not the build (twelve value imports lack the `.js` their neighbours
+# carry, and `typescript/tsconfig.json`'s legacy `moduleResolution: "node"`
+# neither requires an extension nor rewrites one, so `tsc` emits the
+# specifier verbatim into a `type: module` package).
+#
+# **The workaround that issue documents does not work on 0.4.0**, which is
+# worth knowing before anyone tries it here: `package.json` declares only a
+# `"."` entry, so `@material/material-color-utilities/hct/hct.js` fails
+# with `ERR_PACKAGE_PATH_NOT_EXPORTED` before resolution ever reaches the
+# file — verified under both ESM and `require.resolve`. Every consumer goes
+# through the barrel, and the barrel loads the broken files unconditionally.
+# There is no import of this package that avoids them.
+#
+# Two alternatives were weighed and rejected, so they are not re-litigated
+# on the next bump. `@poupe/material-color-utilities` is a maintained fork
+# with the fix (0.4.1, last published 2026-05-08), but it trades Google's
+# own package for one person's fork as a supply-chain dependency, to check
+# two integers in a devDependency. Transcribing the constants and dropping
+# the package — the pattern `motion-tokens.test.ts` uses for the androidx
+# spring values — does not reach: `hct-neutrals.test.ts` needs real HCT
+# conversion, and that is Cam16, not a constant.
+#
+# So: stay on the authoritative package, patched. `pnpm patch` fails loudly
+# when the pinned version's file content changes, so a bump cannot silently
+# carry a stale patch. Delete this block and the patch file when #195 ships.
 patchedDependencies:
   '@material/material-color-utilities@0.4.0': patches/@material__material-color-utilities@0.4.0.patch
