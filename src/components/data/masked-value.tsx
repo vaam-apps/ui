@@ -4,6 +4,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { cn } from "../../lib/cn";
 import { maskSecret } from "../../lib/mask-secret";
+import { PRESS_SHAPE_MORPH } from "../../lib/press-shape";
 import { CopyButton } from "./copy-button";
 
 export interface MaskedValueProps {
@@ -90,7 +91,15 @@ export function MaskedValue({
           // moves). A worst-case pointer landing on that exact 2px sliver
           // resolves to whichever button paints on top; not worth widening
           // the row's gap to chase.
-          className="-m-1 shrink-0 rounded-full p-1 text-subtle-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
+          //
+          // `PRESS_SHAPE_MORPH` (`press-shape.ts`) replaces the plain
+          // `transition-colors` this used to carry with the M3 Expressive
+          // press morph, in the same lockstep as `Button size="icon"`,
+          // `DialogClose` and the toast dismiss button.
+          className={cn(
+            "-m-1 shrink-0 rounded-full p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
+            PRESS_SHAPE_MORPH,
+          )}
         >
           {revealed ? <EyeOff size={12} strokeWidth={1.5} /> : <Eye size={12} strokeWidth={1.5} />}
         </button>

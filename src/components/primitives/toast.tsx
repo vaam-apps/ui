@@ -4,6 +4,7 @@ import { cva } from "class-variance-authority";
 import { X } from "lucide-react";
 import { useSyncExternalStore } from "react";
 import { cn } from "../../lib/cn";
+import { PRESS_SHAPE_MORPH } from "../../lib/press-shape";
 
 /**
  * Toasts, no Radix — `dialog`/`dropdown-menu`/`select`/`tooltip`/`popover`
@@ -178,12 +179,19 @@ export function Toaster() {
                 icon. `rounded-full` and `hover:bg-surface-3` match those
                 two as well — icon-only controls are circular in this
                 package (`button.tsx`'s `icon` size), and a background
-                shift gives hover a signal beyond text colour alone. */}
+                shift gives hover a signal beyond text colour alone.
+                `PRESS_SHAPE_MORPH` (`press-shape.ts`) replaces the plain
+                `transition-colors` this used to carry with the M3
+                Expressive press morph in the same lockstep as `Button
+                size="icon"` and `DialogClose`. */}
             <button
               type="button"
               onClick={() => dismissToast(item.id)}
               aria-label="Dismiss"
-              className="-m-1 shrink-0 rounded-full p-1 text-subtle-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
+              className={cn(
+                "-m-1 shrink-0 rounded-full p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
+                PRESS_SHAPE_MORPH,
+              )}
             >
               <X size={16} strokeWidth={1.5} />
             </button>

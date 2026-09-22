@@ -18,6 +18,7 @@ import {
   useState,
 } from "react";
 import { cn } from "../../lib/cn";
+import { PRESS_SHAPE_MORPH } from "../../lib/press-shape";
 
 interface DialogContextValue {
   open: boolean;
@@ -245,12 +246,23 @@ export function DialogContent({ className, children, ...props }: ComponentPropsW
               DOM order, which already puts it on top, but the explicit
               `z-20` keeps that true even if `DialogHeader`'s own `z-10`
               (needed so its sticky background occludes scrolled content)
-              ever changes. */}
+              ever changes.
+
+              `PRESS_SHAPE_MORPH` (see `press-shape.ts`) replaces the
+              plain `transition-colors` this used to carry — it already
+              covers `color`/`background-color`, and folds in the M3
+              Expressive press morph: this circle steps to
+              `rounded-selector` while held and springs back on release,
+              in lockstep with `Button size="icon"` per that file's own
+              comment. */}
           <button
             type="button"
             aria-label="Close"
             onClick={() => setOpen(false)}
-            className="-m-1 absolute top-4 right-4 z-20 rounded-full p-1 text-subtle-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
+            className={cn(
+              "-m-1 absolute top-4 right-4 z-20 rounded-full p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
+              PRESS_SHAPE_MORPH,
+            )}
           >
             <X size={16} strokeWidth={1.5} />
           </button>

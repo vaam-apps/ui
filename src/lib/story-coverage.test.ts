@@ -44,6 +44,12 @@ const EXEMPT: Record<string, string> = {
   DrawerOverlay:
     "Same as DrawerPortal — `DrawerContent` renders one already; a second would double the " +
     "scrim.",
+  PRESS_SHAPE_MORPH:
+    "Not a component — a shared Tailwind class-string fragment (`press-shape.ts`) for the M3 " +
+    "Expressive press-shape morph, consumed by `Button`, `DialogClose`, the toast dismiss " +
+    "button, `MaskedValue`'s reveal toggle and `CopyButton`. Its effect is exercised by each " +
+    "of those components' own stories; the constant itself renders nothing on its own to " +
+    "mount a story around.",
   REGISTERED_FONT_SIZES:
     "Not a component. Exported from `cn.ts` purely so `theme-tokens.test.ts` can check the " +
     "registered scale against the stylesheet.",
