@@ -405,6 +405,7 @@ it lands.
 | Prop | Type | Notes |
 |---|---|---|
 | `animated` | `boolean` | Default `true`. `false` is the flat block, for a placeholder inside something already moving. |
+| `instrument` | `boolean` | Default `false`. Paints the drift with the `--aurora-*` hue ramp instead of the neutral tonal default — see below. |
 | `SkeletonText` `lines` | `number` | Default `3`. |
 | `SkeletonText` `lineClassName` | `string` | Match the real text's line-height. |
 
@@ -416,6 +417,14 @@ each other on coprime periods, with no edge, no direction and no shared
 phase. It says "still waiting, not stuck" and deliberately says nothing
 about how much longer. It goes still under `prefers-reduced-motion`, from
 the stylesheet — no call site has to decide that.
+
+**The drift is tonal by default, not hued.** It paints with
+`--color-base-content` — a brightness texture, no colour — because most
+`Skeleton`s stand in for diagnostic-register content (table cells, form
+fields) and colour is chrome reserved for the instrument register (see
+`InstrumentPanel` in `data-display.md`). Set `instrument` only on a
+placeholder standing in for content that will itself render inside
+`InstrumentPanel`/`StatTile`; everywhere else, leave it off.
 
 `SkeletonText`'s last line is short on purpose, which is why it is a
 component rather than a loop: a stack of equal-width bars reads as a table

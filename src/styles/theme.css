@@ -322,6 +322,16 @@
   --skeleton-aurora-3: color-mix(in oklab, var(--aurora-3) 22%, transparent);
   --skeleton-aurora-4: color-mix(in oklab, var(--aurora-4) 14%, transparent);
 
+  /* The default drift's paint (§3.8, "the skeleton's chaotic gradient"
+     below). `--color-base-content` carries no hue at all, so the same
+     four-tier falloff the aurora ramp uses — unchanged, on purpose, so
+     this is a hue swap and not a second set of tuned numbers — reads as
+     a brightness texture instead of a tint. */
+  --skeleton-tonal-1: color-mix(in oklab, var(--color-base-content) 30%, transparent);
+  --skeleton-tonal-2: color-mix(in oklab, var(--color-base-content) 26%, transparent);
+  --skeleton-tonal-3: color-mix(in oklab, var(--color-base-content) 22%, transparent);
+  --skeleton-tonal-4: color-mix(in oklab, var(--color-base-content) 14%, transparent);
+
   /* Overlay scrim. The only literal colour left in a component after the
      light theme landed was `bg-black/50`, hardcoded in three places —
      free in dark, and in light it crushes a near-white page to a dead
@@ -609,6 +619,13 @@
   --skeleton-aurora-2: color-mix(in oklab, var(--aurora-2) 17%, transparent);
   --skeleton-aurora-3: color-mix(in oklab, var(--aurora-3) 15%, transparent);
   --skeleton-aurora-4: color-mix(in oklab, var(--aurora-4) 10%, transparent);
+
+  /* Same falloff as dark's, reused unchanged — see the dark block's
+     comment on `--skeleton-tonal-1`. */
+  --skeleton-tonal-1: color-mix(in oklab, var(--color-base-content) 20%, transparent);
+  --skeleton-tonal-2: color-mix(in oklab, var(--color-base-content) 17%, transparent);
+  --skeleton-tonal-3: color-mix(in oklab, var(--color-base-content) 15%, transparent);
+  --skeleton-tonal-4: color-mix(in oklab, var(--color-base-content) 10%, transparent);
 
   --scrim: rgb(20 23 28 / 0.32);
 }
@@ -1115,22 +1132,87 @@
  * cannot know, and a grid of them beats in unison like a metronome.
  *
  * What replaces it is a *drift*: two soft, oversized gradient fields
- * translating and scaling past each other on coprime periods (23s and
- * 31s, so the pair only returns to its starting arrangement every 713s).
- * There is no sweep, no direction, no edge, and no shared phase between
- * two skeletons mounted a moment apart — which is what "chaotic" is
- * buying. It says "alive, still waiting" without saying anything about
- * how much longer.
+ * translating and scaling past each other on coprime periods (9s and 13s,
+ * so the pair only returns to its starting arrangement every 117s — this
+ * comment used to say 23s/31s/713s, the periods this drift shipped with
+ * before `a87a4c2` widened the amplitude and shortened both to 9s/13s
+ * without updating the prose beside them; measured against the
+ * `animation:` declarations below rather than trusted). There is no
+ * sweep, no direction, no edge, and no shared phase between two skeletons
+ * mounted a moment apart — which is what "chaotic" is buying. It says
+ * "alive, still waiting" without saying anything about how much longer.
+ *
+ * # Why this doesn't use the M3 Expressive spring tokens
+ *
+ * `--ease-spatial`/`--ease-spatial-fast`/`--ease-effects` and their
+ * `--dur-*` pairs (§3.8 above) are integrated springs — see
+ * `motion-tokens.test.ts`. Every one of them describes a *step response*:
+ * a value displaced once and settling, over 231–599ms, to a single target
+ * it then holds. `skeleton-drift-a`/`-b` are the opposite shape: an
+ * unbroken loop with no displacement and no target, restated over 9–13s
+ * per cycle for as long as the placeholder is mounted. Two consequences
+ * follow from that mismatch rather than from taste:
+ *
+ * - **Wrong order of magnitude.** The slowest spring (`--dur-spatial-slow`,
+ *   599ms) is 15–22× shorter than either drift period. Playing a loop
+ *   this long at spring speed would collapse "ambient" into "twitchy" —
+ *   the drift exists precisely to be slow enough that no single glance
+ *   catches it moving.
+ * - **A spring bounces toward rest; a `@keyframes` loop has no rest to
+ *   bounce toward.** `--ease-spatial-fast` overshoots by 9.5% *because*
+ *   it is approaching a value it then holds — that overshoot is legible
+ *   as "arrived, slightly too fast" precisely because motion stops
+ *   after it. Applied between two of `skeleton-drift-a`'s eight irregular
+ *   stops, the same curve would read as a stutter at each segment
+ *   boundary, once per stop, forever — the loop never holds still long
+ *   enough for a bounce to resolve into anything.
+ *
+ * So the bespoke `cubic-bezier()` curves below are the right tool for an
+ * ambient loop and the spring scheme is not, and that is a considered
+ * answer rather than an oversight: M3 Expressive itself changes only
+ * *spatial* (state-to-state) and *effects* (opacity/colour) motion — its
+ * own token set has no ambient-loop category to reach for here either.
+ *
+ * # Colour: tonal by default, aurora by explicit opt-in
+ *
+ * The drift used to paint with the `--aurora-*` ramp unconditionally —
+ * decorative chrome bound to the system's status hues, everywhere a
+ * `Skeleton` rendered, including inside a `Table` (`skeleton.stories.tsx`'s
+ * own `MatchesTheRealRowHeight` story puts one in a table cell). That
+ * contradicts the three-register split `instrument-panel.tsx` documents:
+ * a hairline-on-a-surface-step *diagnostic* register for tables, drawers
+ * and detail panes — the places a reader reads row by row — with hued
+ * chrome reserved for the *instrument* register alone, the dashboard
+ * surfaces a reader scans rather than reads. A skeleton standing in for a
+ * table cell is diagnostic-register content; the coloured wash it shipped
+ * with is instrument-register chrome, and most skeletons on screen at any
+ * moment are the former.
+ *
+ * So the default paint is now `--skeleton-tonal-*`: the same four-tier
+ * alpha falloff the aurora ramp already used, unchanged, mixed with
+ * `--color-base-content` instead of a hue — a brightness texture with no
+ * colour in it, which is what "a tonal step, not a coloured wash" means
+ * for a surface this stylesheet cannot express as an actual extra surface
+ * level (`--surface-3` is already the ladder's top step; see the surface
+ * ladder comment above). `Skeleton`'s `instrument` prop switches the same
+ * geometry back onto `--skeleton-aurora-*`, for the one case the register
+ * doctrine actually calls for it: a placeholder standing in for content
+ * inside `InstrumentPanel`/`StatTile`, the scanned dashboard surfaces the
+ * aurora ramp was drawn for in the first place.
  *
  * Three properties are deliberate and worth not undoing:
  *
  * - **Transform only.** Both layers animate `transform`, never
  *   `background-position` or `background-image`, so the whole effect is
  *   composited and a table of 200 skeleton cells costs no layout and no
- *   repaint.
- * - **Low amplitude, low contrast.** Four fields drawn from the aurora
- *   ramp at 7–20%, over `--surface-3`. At a glance it should read as a
- *   texture, not as a moving object — "silent".
+ *   repaint. Swapping the paint between tonal and aurora is a static
+ *   `background-image` chosen by class at render time, not an animated
+ *   property — it does not touch this.
+ * - **Low amplitude, low contrast.** Four fields at 14–30% in dark and
+ *   10–20% in light (both variants share the same falloff — see
+ *   `--skeleton-tonal-1`'s comment above), over `--surface-3`. At a
+ *   glance it should read as a texture, not as a moving object —
+ *   "silent".
  * - **Off under `prefers-reduced-motion`, and still correct.** Pausing
  *   leaves the gradients painted where they stand, so a reduced-motion
  *   reader gets a static mottled surface rather than a flat one: the
@@ -1204,19 +1286,43 @@
    * ruinous on two hundred table cells, and it would force the whole
    * skeleton onto its own composited layer for no visual gain — the
    * softness here comes from wide gradient stops, which cost nothing.
+   *
+   * Tonal by default (`--skeleton-tonal-*`); `Skeleton`'s `instrument`
+   * prop adds `.skeleton-instrument`, which repaints the identical
+   * geometry onto `--skeleton-aurora-*` below. Same specificity trick as
+   * `.aurora-glow`'s light override: `.skeleton-chaos.skeleton-instrument`
+   * is (0,2,1) against this rule's (0,1,1), so it wins on specificity and
+   * does not depend on source order.
    */
   .skeleton-chaos::before {
     background-image:
-      radial-gradient(58% 120% at 18% 30%, var(--skeleton-aurora-1), transparent 68%),
-      radial-gradient(46% 110% at 72% 78%, var(--skeleton-aurora-2), transparent 70%);
+      radial-gradient(58% 120% at 18% 30%, var(--skeleton-tonal-1), transparent 68%),
+      radial-gradient(46% 110% at 72% 78%, var(--skeleton-tonal-2), transparent 70%);
     animation: skeleton-drift-a 9s cubic-bezier(0.4, 0.1, 0.35, 1) infinite;
   }
 
   .skeleton-chaos::after {
     background-image:
+      radial-gradient(70% 130% at 58% 12%, var(--skeleton-tonal-3), transparent 66%),
+      radial-gradient(40% 90% at 8% 88%, var(--skeleton-tonal-4), transparent 72%);
+    animation: skeleton-drift-b 13s cubic-bezier(0.32, 0, 0.5, 0.9) infinite;
+  }
+
+  /* The instrument-register opt-in: the same two layers, repainted with
+     the hued aurora ramp instead of the neutral one. For a placeholder
+     standing in for content inside `InstrumentPanel`/`StatTile` — the
+     scanned dashboard surfaces `--aurora-*` exists for — not for general
+     use; see the header comment above. */
+  .skeleton-chaos.skeleton-instrument::before {
+    background-image:
+      radial-gradient(58% 120% at 18% 30%, var(--skeleton-aurora-1), transparent 68%),
+      radial-gradient(46% 110% at 72% 78%, var(--skeleton-aurora-2), transparent 70%);
+  }
+
+  .skeleton-chaos.skeleton-instrument::after {
+    background-image:
       radial-gradient(70% 130% at 58% 12%, var(--skeleton-aurora-3), transparent 66%),
       radial-gradient(40% 90% at 8% 88%, var(--skeleton-aurora-4), transparent 72%);
-    animation: skeleton-drift-b 13s cubic-bezier(0.32, 0, 0.5, 0.9) infinite;
   }
 
   /*
