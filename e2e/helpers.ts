@@ -474,6 +474,32 @@ export async function pseudoRect(target: Locator, pseudo: "::before" | "::after"
   };
 }
 
+/**
+ * The size of `target`'s D11 `.tap-target::before` overlay
+ * (`theme.css`'s own header on that class) — the invisible,
+ * comfortable-register-only expansion of an icon-only control's click
+ * area, distinct from its own visual box (`box()` above).
+ *
+ * Only the *size* is read, not the full `pseudoRect()` reconstruction:
+ * every assertion this backs is "did the hit area reach 48px", which
+ * `getComputedStyle(el, "::before").width/height` answers directly, and
+ * computing the pseudo's viewport *position* on top would be measuring
+ * something no test here needs — `theme.css`'s own comment on
+ * `--tap-border` already covers the one place the raw computed value
+ * would otherwise mislead (a bordered host's `::before` resolves against
+ * its padding edge, not its border edge, which is a *position* fact, not
+ * a *size* one — `width`/`height` are unaffected by it).
+ */
+export async function tapTargetSize(target: Locator): Promise<{ width: number; height: number }> {
+  return await target.evaluate((el) => {
+    const style = getComputedStyle(el, "::before");
+    return {
+      width: Number.parseFloat(style.width),
+      height: Number.parseFloat(style.height),
+    };
+  });
+}
+
 /** Clamps a box to the viewport, because `page.screenshot({ clip })`
  * refuses a region that starts off-screen — and a clipped tooltip is
  * exactly the case whose box starts off-screen. */

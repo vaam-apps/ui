@@ -65,11 +65,21 @@ export function Checkbox({
         // likely to be compared side by side — checked — they'd render
         // the same shape. Declined for the reason already on this line,
         // not a new one.
-        "group inline-flex size-4 shrink-0 items-center justify-center rounded-xs border border-edge-strong bg-surface-2",
+        "group relative inline-flex size-4 shrink-0 items-center justify-center rounded-xs border border-edge-strong bg-surface-2",
         "transition-colors data-checked:border-primary data-checked:bg-primary",
         "data-indeterminate:border-primary data-indeterminate:bg-primary",
         "data-focus:outline-none data-focus:ring-1 data-focus:ring-ring",
         "data-disabled:cursor-not-allowed data-disabled:opacity-50",
+        // D11 (`theme.css`'s own header on `.tap-target`): a bare 16×16
+        // box has no click target to spare — `CheckboxField`'s label
+        // widens it in practice, but a standalone `Checkbox` (the
+        // `aria-label` case its own module doc calls out) has nothing
+        // else. `relative` above gives the invisible `::before` overlay a
+        // positioning context; `16px` is this box's own `size-4`.
+        // `--tap-border:1px` matches the `border` utility three lines up
+        // — see `.tap-target`'s own header for why a bordered host needs
+        // it to actually reach 48px rather than landing 2px short.
+        "tap-target [--tap-size:16px] [--tap-border:1px]",
         className,
       )}
       {...aria}
