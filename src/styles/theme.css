@@ -435,6 +435,129 @@
 }
 
 /*
+ * D11 — comfortable tap-target floor (48dp), for the icon-only affordances
+ * whose own glyph the M3 Expressive register keeps small in BOTH
+ * densities: `Checkbox`, `Switch`, `CopyButton`, `MaskedValue`'s reveal
+ * toggle, `DialogClose`/the drawer and toast dismiss buttons,
+ * `DatePicker`'s inline Clear button, and `Calendar`'s prev/next nav. None
+ * of these read `--size-field` or `.btn-sm` (D10's own two hooks) — each
+ * is either a fixed-utility box (`size-4`, `h-5 w-9`, `size-7`) or a
+ * padding-grown one (`-m-1 p-1` around a 12–16px icon) with no `--density`
+ * term at all, so every one of them measured identically at both
+ * densities before this rule (`e2e/density.spec.ts`'s new assertions
+ * record the "before" numbers this fixes).
+ *
+ * # Why 48dp, and why these controls specifically
+ *
+ * Transcribed, not invented, from `androidx/androidx`'s own
+ * `compose/material3/material3/src/commonMain/kotlin/androidx/compose/
+ * material3/InteractiveComponentSize.kt` (`androidx-main`, commit
+ * `080d2b3e5326ba80392d93442c4a51a02dc22650`, read via `gh api
+ * repos/androidx/androidx/contents/...` on 2026-09-22 — `v0_11_0`, the tag
+ * this file's D10 section cites for the button tokens, does not resolve
+ * through the GitHub API for this file's own history; `androidx-main` at a
+ * pinned commit is the citable equivalent this rule is actually checked
+ * against). `LocalMinimumInteractiveComponentSize` defaults to `48.dp`,
+ * and its own doc comment calls that "the Material recommended minimum
+ * size of 48.dp x 48.dp" for target sizes, distinct from a component's
+ * visual size.
+ *
+ * Which components actually apply it is what draws this rule's list.
+ * `Checkbox.kt`, `RadioButton.kt`, `Switch.kt` and `IconButton.kt` each
+ * call `Modifier.minimumInteractiveComponentSize()` — confirmed by
+ * grepping their own source, not assumed from the name — and `Button.kt`
+ * does not, anywhere in the file. So a small glyph control gets an
+ * invisible touch target grown around it while its visual size stays put,
+ * and a text button's own already-sized container (D10's
+ * `--size-field`/`.btn-sm`, reaching 40dp/56dp at density 1) IS the touch
+ * target with no further padding — exactly the split this rule and D10's
+ * mechanism now draw between them.
+ *
+ * # The mechanism — an invisible `::before`, not a bigger padding box
+ *
+ * Growing the real padding/margin box to 48px (the same `-m-*`/`p-*`
+ * idiom these controls already use for their compact-register 20–24px hit
+ * area, just with a bigger number) was tried first, and has a real cost:
+ * `MaskedValue`'s reveal toggle and its `CopyButton` sibling sit 6px apart
+ * in a `gap-1.5` row, and 48px boxes there would roughly quadruple that
+ * row's rendered width and shift every value beside it — a layout change
+ * nobody asked for, on every row in the console that renders a masked
+ * secret, just to satisfy a density most consumers never turn on.
+ *
+ * `position: absolute` content on an already-positioned host solves it: a
+ * pseudo-element participates in hit-testing as part of its host (a click
+ * landing on it is a click on the button, not on a second, separate
+ * target), but taking it out of flow means growing it costs the
+ * surrounding layout nothing. This is the same "grow the hit area, not
+ * the glyph" idiom `copy-button.tsx`'s and `masked-value.tsx`'s own doc
+ * comments already describe for their fixed compact-register box —
+ * generalized across `--density` and moved off the real box so it stops
+ * competing with neighbouring controls for layout space. Each call site
+ * must already be (or become) `position`-anything-but-`static` itself —
+ * `.tap-target` deliberately does not set `position` on the host: several
+ * call sites are already `absolute` (`DialogClose`, `DatePicker`'s Clear
+ * button, `Calendar`'s nav buttons, via their own anchor offsets), and an
+ * unlayered `position: relative` here would win over that layered
+ * `absolute` utility outright (this file's own standing daisyUI-layer
+ * trap) and silently break their anchoring. The handful that were
+ * `position: static` (`CopyButton`, `MaskedValue`'s toggle, the drawer and
+ * toast dismiss buttons) pick up a plain `relative` utility at the call
+ * site instead, same as `Switch` already had for an unrelated reason.
+ *
+ * `--tap-w`/`--tap-h` name the control's own resting box, in px, so one
+ * rule computes the right expansion for a 16px checkbox, a 36×20 switch
+ * track, a 12–16px icon-in-padding circle or a 28px calendar nav button
+ * without each writing its own arithmetic. `--tap-size` is the square
+ * shorthand for a control whose two axes agree (every caller here except
+ * `Switch`). `min(0px, …)` is the guard: a control already at or past
+ * 48px in a given axis (none here are, today) would otherwise compute a
+ * *positive* inset and shrink itself.
+ *
+ * `--tap-border` (default `0px`) corrects for a real, measured discrepancy
+ * rather than an assumed one: CSS resolves an absolutely-positioned
+ * pseudo-element's `top`/`left`/`right`/`bottom` against its containing
+ * block's *padding* edge, not its border edge (CSS Position §4's own
+ * definition), so on a bordered host — `Checkbox`/`Switch`, both
+ * `border border-edge-strong` — the same formula that lands exactly on
+ * 48px for a borderless icon button (`CopyButton`, `DialogClose`, …,
+ * confirmed live) landed at 46px for a 1px-bordered one, measured before
+ * this term was added. Subtracting the border width once per side is
+ * what makes the *visual*, on-screen overlay reach the full 48px this
+ * rule claims regardless of whether the host happens to draw a border.
+ */
+.tap-target::before {
+  content: "";
+  position: absolute;
+  /* An inset has to be *negative* to grow the box outward, so this is
+     `(tap-size - 48) / 2`, not `(48 - tap-size) / 2` — the deficit with
+     its sign already flipped, not the raw gap. Read the other way around
+     the first time this was written, `min(0px, (48px - tap)/2)` picks the
+     *larger* (less negative, i.e. more positive) of the two operands
+     whenever tap < 48, which is 0px every time — `min()` degenerates to
+     "never expand", the exact silent no-op `density.spec.ts`'s new
+     assertions caught before this was corrected. `--tap-border` is
+     subtracted after the guard, not folded into it: it corrects for the
+     padding-edge-vs-border-edge gap above, which is unrelated to whether
+     this axis needed to expand at all. */
+  top: calc(
+    var(--density, 0) *
+    (min(0px, (var(--tap-h, var(--tap-size, 48px)) - 48px) / 2) - var(--tap-border, 0px))
+  );
+  bottom: calc(
+    var(--density, 0) *
+    (min(0px, (var(--tap-h, var(--tap-size, 48px)) - 48px) / 2) - var(--tap-border, 0px))
+  );
+  left: calc(
+    var(--density, 0) *
+    (min(0px, (var(--tap-w, var(--tap-size, 48px)) - 48px) / 2) - var(--tap-border, 0px))
+  );
+  right: calc(
+    var(--density, 0) *
+    (min(0px, (var(--tap-w, var(--tap-size, 48px)) - 48px) / 2) - var(--tap-border, 0px))
+  );
+}
+
+/*
  * Surface ladder (§3.1): --color-base-100/200/300 above already carry
  * background / surface-1 / surface-2. --surface-3 (row hover, pressed,
  * selected fill) is one step daisyUI's own three-tier base system doesn't

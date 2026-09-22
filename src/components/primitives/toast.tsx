@@ -192,8 +192,13 @@ export function Toaster() {
               onClick={() => dismissToast(item.id)}
               aria-label="Dismiss"
               className={cn(
-                "-m-1 shrink-0 rounded-full p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
+                "relative -m-1 shrink-0 rounded-full p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
                 "[--btn-press-radius:calc(24px*0.1)]",
+                // D11 (`theme.css`'s own header on `.tap-target`): in
+                // normal flow like the drawer close button, so `relative`
+                // (added above) gives its invisible comfortable-only
+                // overlay a positioning context.
+                "[--tap-size:24px] tap-target",
                 PRESS_SHAPE_MORPH,
               )}
             >

@@ -1,6 +1,13 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
-import { box, openStory, paintedFillRatio, settleTransitions, storyRoot } from "./helpers";
+import {
+  box,
+  openStory,
+  paintedFillRatio,
+  settleTransitions,
+  storyRoot,
+  tapTargetSize,
+} from "./helpers";
 import { STORY } from "./story-ids";
 
 /** The four corner radii of `target`, in px, via `getComputedStyle` —
@@ -242,5 +249,254 @@ test.describe("the press-shape morph steps the radius down while held", () => {
     } finally {
       await page.mouse.up();
     }
+  });
+});
+
+/**
+ * D11 — the comfortable-register tap-target floor (`theme.css`'s own
+ * header on `.tap-target`), for every icon-only affordance whose glyph
+ * stays visually small in both densities: a real browser is the only
+ * thing that can prove the invisible `::before` overlay both a) reaches
+ * 48px at comfortable and b) leaves the control's own visual box
+ * untouched — jsdom has no `getComputedStyle(el, "::before")` at all
+ * (`AGENTS.md`'s own standing trap), so `density.test.ts` cannot see this
+ * half of D11 the way it pins D10's own formulas.
+ *
+ * One assertion pair per control, not a table-driven loop: each needs its
+ * own story, its own way of becoming visible (several are behind a
+ * trigger click), and its own visual-box pair — folding that into a
+ * shared loop body would hide more than it would save. A *new* icon-only
+ * affordance joins this list the same way an existing one is checked
+ * here: open its story, locate it, assert `tapTargetSize` reaches 48 at
+ * `comfortable` and still matches its own resting box at `compact`.
+ */
+/** `toMatchObject` failed on a real, sub-pixel `getBoundingClientRect()`
+ * value (`24.00000762939453`) the first time this suite ran — Chromium's
+ * layout is not required to land on an exact integer, so every size
+ * assertion below goes through `toBeCloseTo(n, 0)` (±0.5px) instead, the
+ * same tolerance `density.spec.ts` already uses for the same reason. */
+function expectSize(
+  actual: { width: number; height: number },
+  expected: { width: number; height: number },
+  label: string,
+): void {
+  expect(actual.width, `${label} width`).toBeCloseTo(expected.width, 0);
+  expect(actual.height, `${label} height`).toBeCloseTo(expected.height, 0);
+}
+
+/** `tapTargetSize` reaching 48 on both axes — the one assertion every
+ * control below needs at `comfortable`, regardless of its own compact
+ * shape. `toBeGreaterThanOrEqual` rather than `expectSize`: the floor is
+ * a minimum, not a target to hit exactly, and `Switch`'s two axes reach
+ * it by different per-side amounts (see that test's own comment). */
+function expectFloor(actual: { width: number; height: number }): void {
+  expect(actual.width, "comfortable tap target width").toBeGreaterThanOrEqual(48);
+  expect(actual.height, "comfortable tap target height").toBeGreaterThanOrEqual(48);
+}
+
+test.describe("D11 — comfortable tap-target floor (48dp) on icon-only affordances", () => {
+  test("Checkbox: 16×16 visual box, unchanged; tap target reaches 48×48", async ({ page }) => {
+    await openStory(page, STORY.checkboxAndSwitch);
+    const checked = storyRoot(page).getByRole("checkbox", { name: "Checked", exact: true });
+    expectSize(await box(checked), { width: 16, height: 16 }, "compact visual box");
+    // Not 16×16: an absolutely-positioned pseudo-element resolves its
+    // `auto` width/height against its containing block's *padding* edge,
+    // not its border edge (CSS Position §4), and this host is `border`
+    // (1px) — `.tap-target`'s own `--tap-border` header explains why the
+    // *comfortable* number still lands on a clean 48 despite this; at
+    // `density: 0` every inset is exactly `0 * (…) = 0` regardless of
+    // `--tap-border`, so what's left is the bare padding-box size,
+    // 16 - 2×1 = 14. This is not a regression to guard against — the
+    // host's own native hit box is still its full 16×16 border box, and
+    // the (here inert) overlay never shrinks it, only ever grows it.
+    expectSize(await tapTargetSize(checked), { width: 14, height: 14 }, "compact tap target");
+
+    await openStory(page, STORY.checkboxAndSwitch, { density: "comfortable" });
+    const checkedComfortable = storyRoot(page).getByRole("checkbox", {
+      name: "Checked",
+      exact: true,
+    });
+    expectSize(
+      await box(checkedComfortable),
+      { width: 16, height: 16 },
+      "comfortable visual box, unchanged",
+    );
+    expectFloor(await tapTargetSize(checkedComfortable));
+  });
+
+  test("Switch: 36×20 visual track, unchanged; tap target reaches 48×48 on both axes", async ({
+    page,
+  }) => {
+    await openStory(page, STORY.checkboxAndSwitch);
+    const toggle = storyRoot(page).getByRole("switch", { name: "Toggle" });
+    expectSize(await box(toggle), { width: 36, height: 20 }, "compact visual box");
+    // 36 - 2×1, 20 - 2×1 — the same padding-edge-vs-border-edge gap the
+    // `Checkbox` test above explains; this host is `border` (1px) too.
+    expectSize(await tapTargetSize(toggle), { width: 34, height: 18 }, "compact tap target");
+
+    await openStory(page, STORY.checkboxAndSwitch, { density: "comfortable" });
+    const toggleComfortable = storyRoot(page).getByRole("switch", { name: "Toggle" });
+    expectSize(
+      await box(toggleComfortable),
+      { width: 36, height: 20 },
+      "comfortable visual box, unchanged",
+    );
+    // The narrower axis (height, 20px) needs a bigger per-side expansion
+    // than the wider one (width, 36px) to reach the same 48px floor —
+    // exactly the case `--tap-w`/`--tap-h` (rather than one `--tap-size`)
+    // exists for. `expectFloor` checks both axes independently.
+    expectFloor(await tapTargetSize(toggleComfortable));
+  });
+
+  test("CopyButton: 20×20 visual box (default size=12), unchanged; tap target reaches 48×48", async ({
+    page,
+  }) => {
+    await openStory(page, STORY.idsConstrained);
+    const copy = storyRoot(page).getByRole("button", { name: /^Copy / });
+    expectSize(await box(copy), { width: 20, height: 20 }, "compact visual box");
+    // No border on this host, so the padding-box gap `Checkbox`'s own
+    // comment explains does not apply — a genuine no-op at density 0.
+    expectSize(await tapTargetSize(copy), { width: 20, height: 20 }, "compact tap target");
+
+    await openStory(page, STORY.idsConstrained, { density: "comfortable" });
+    const copyComfortable = storyRoot(page).getByRole("button", { name: /^Copy / });
+    expectSize(
+      await box(copyComfortable),
+      { width: 20, height: 20 },
+      "comfortable visual box, unchanged",
+    );
+    expectFloor(await tapTargetSize(copyComfortable));
+  });
+
+  test("MaskedValue's reveal toggle: 20×20 visual box, unchanged; tap target reaches 48×48", async ({
+    page,
+  }) => {
+    await openStory(page, STORY.maskedValueDefault);
+    const reveal = storyRoot(page).getByRole("button", { name: /^Reveal / });
+    expectSize(await box(reveal), { width: 20, height: 20 }, "compact visual box");
+    expectSize(await tapTargetSize(reveal), { width: 20, height: 20 }, "compact tap target");
+
+    await openStory(page, STORY.maskedValueDefault, { density: "comfortable" });
+    const revealComfortable = storyRoot(page).getByRole("button", { name: /^Reveal / });
+    expectSize(
+      await box(revealComfortable),
+      { width: 20, height: 20 },
+      "comfortable visual box, unchanged",
+    );
+    expectFloor(await tapTargetSize(revealComfortable));
+  });
+
+  test("DialogClose: 24×24 visual box, unchanged; tap target reaches 48×48", async ({ page }) => {
+    async function openAndReturnClose(density: "compact" | "comfortable"): Promise<Locator> {
+      await openStory(page, STORY.dialogScrollingBody, { density });
+      await storyRoot(page).getByRole("button", { name: "Open tall dialog" }).click();
+      const close = page.locator('button[aria-label="Close"]');
+      await settleTransitions(page);
+      return close;
+    }
+
+    const close = await openAndReturnClose("compact");
+    expectSize(await box(close), { width: 24, height: 24 }, "compact visual box");
+    expectSize(await tapTargetSize(close), { width: 24, height: 24 }, "compact tap target");
+
+    const closeComfortable = await openAndReturnClose("comfortable");
+    expectSize(
+      await box(closeComfortable),
+      { width: 24, height: 24 },
+      "comfortable visual box, unchanged",
+    );
+    expectFloor(await tapTargetSize(closeComfortable));
+  });
+
+  test("Drawer's close button: 24×24 visual box, unchanged; tap target reaches 48×48", async ({
+    page,
+  }) => {
+    async function openAndReturnClose(density: "compact" | "comfortable"): Promise<Locator> {
+      await openStory(page, STORY.drawers, { density });
+      await storyRoot(page).getByRole("button", { name: "Quick detail" }).click();
+      const close = page.locator('button[aria-label="Close"]');
+      await expect(close).toBeVisible();
+      await settleTransitions(page);
+      return close;
+    }
+
+    const close = await openAndReturnClose("compact");
+    expectSize(await box(close), { width: 24, height: 24 }, "compact visual box");
+    expectSize(await tapTargetSize(close), { width: 24, height: 24 }, "compact tap target");
+
+    const closeComfortable = await openAndReturnClose("comfortable");
+    expectSize(
+      await box(closeComfortable),
+      { width: 24, height: 24 },
+      "comfortable visual box, unchanged",
+    );
+    expectFloor(await tapTargetSize(closeComfortable));
+  });
+
+  test("Toast's dismiss button: 24×24 visual box, unchanged; tap target reaches 48×48", async ({
+    page,
+  }) => {
+    async function openAndReturnDismiss(density: "compact" | "comfortable"): Promise<Locator> {
+      await openStory(page, STORY.toasts, { density });
+      await storyRoot(page).getByRole("button", { name: "Default" }).click();
+      const dismiss = page.locator('button[aria-label="Dismiss"]');
+      await expect(dismiss).toBeVisible();
+      return dismiss;
+    }
+
+    const dismiss = await openAndReturnDismiss("compact");
+    expectSize(await box(dismiss), { width: 24, height: 24 }, "compact visual box");
+    expectSize(await tapTargetSize(dismiss), { width: 24, height: 24 }, "compact tap target");
+
+    const dismissComfortable = await openAndReturnDismiss("comfortable");
+    expectSize(
+      await box(dismissComfortable),
+      { width: 24, height: 24 },
+      "comfortable visual box, unchanged",
+    );
+    expectFloor(await tapTargetSize(dismissComfortable));
+  });
+
+  test("DatePicker's Clear button: 14×14 visual box, unchanged; tap target reaches 48×48", async ({
+    page,
+  }) => {
+    await openStory(page, STORY.datePickerSingle);
+    const clear = storyRoot(page).getByRole("button", { name: /^Clear / });
+    expectSize(await box(clear), { width: 14, height: 14 }, "compact visual box");
+    // No `-m-*`/`p-*` idiom on this control at all (see `date-picker.tsx`'s
+    // own comment) — the pre-existing, out-of-scope-for-this-pass compact
+    // gap is exactly this: a 14×14 tap target, below even WCAG 2.2
+    // §2.5.8's 24px floor. Recorded here, not silently accepted: this
+    // assertion is what "unchanged" means, not an endorsement.
+    expectSize(await tapTargetSize(clear), { width: 14, height: 14 }, "compact tap target");
+
+    await openStory(page, STORY.datePickerSingle, { density: "comfortable" });
+    const clearComfortable = storyRoot(page).getByRole("button", { name: /^Clear / });
+    expectSize(
+      await box(clearComfortable),
+      { width: 14, height: 14 },
+      "comfortable visual box, unchanged",
+    );
+    expectFloor(await tapTargetSize(clearComfortable));
+  });
+
+  test("Calendar's prev/next nav: 28×28 visual box, unchanged; tap target reaches 48×48", async ({
+    page,
+  }) => {
+    await openStory(page, STORY.bareCalendar);
+    const prev = storyRoot(page).getByRole("button", { name: "Go to the Previous Month" });
+    expectSize(await box(prev), { width: 28, height: 28 }, "compact visual box");
+    expectSize(await tapTargetSize(prev), { width: 28, height: 28 }, "compact tap target");
+
+    await openStory(page, STORY.bareCalendar, { density: "comfortable" });
+    const prevComfortable = storyRoot(page).getByRole("button", {
+      name: "Go to the Previous Month",
+    });
+    expectSize(
+      await box(prevComfortable),
+      { width: 28, height: 28 },
+      "comfortable visual box, unchanged",
+    );
+    expectFloor(await tapTargetSize(prevComfortable));
   });
 });

@@ -88,8 +88,15 @@ export function CopyButton({
   // Same 0.1 circular ratio `.btn-circle` uses in `theme.css`, cast
   // through `CSSProperties` because that type has no index signature for
   // a custom property name.
+  //
+  // `--tap-size` rides the same object for the same reason (D11,
+  // `theme.css`'s own header on `.tap-target`): this control's compact box
+  // is already `size + 8`, which the `.tap-target` rule needs to know to
+  // compute how far its invisible comfortable-register overlay has to
+  // reach past it.
   const pressRadiusStyle = {
     "--btn-press-radius": `calc(${size + 8}px * 0.1)`,
+    "--tap-size": `${size + 8}px`,
   } as CSSProperties;
 
   return (
@@ -132,7 +139,11 @@ export function CopyButton({
         // site. Doesn't collide with the `opacity-*` utilities below for
         // the same reason `transition` didn't: those set `opacity`'s
         // *value*, this sets which properties transition and how fast.
-        "-m-1 shrink-0 rounded-full p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
+        "relative -m-1 shrink-0 rounded-full p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
+        // D11: see `pressRadiusStyle` above for `--tap-size`, and
+        // `theme.css`'s own header on `.tap-target` for why this is an
+        // invisible overlay rather than a bigger `-m-1 p-1`.
+        "tap-target",
         PRESS_SHAPE_MORPH,
         revealOnGroupHover && "opacity-0 focus-visible:opacity-100 group-hover:opacity-100",
         className,

@@ -422,7 +422,12 @@ function DetailDrawerContent({
                 focus already gets a ring for free from `theme.css`). */}
             <DrawerPrimitive.Close
               aria-label="Close"
-              className="-m-1 shrink-0 rounded-full p-1 text-subtle-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
+              // D11 (`theme.css`'s own header on `.tap-target`): unlike
+              // `dialog.tsx`'s close button, this one is in normal flow
+              // (`justify-between` row above), not `absolute` — `relative`
+              // is added here so the invisible comfortable-only overlay
+              // has a positioning context of its own.
+              className="relative -m-1 shrink-0 rounded-full p-1 text-subtle-foreground transition-colors hover:bg-surface-3 hover:text-foreground [--tap-size:24px] tap-target"
             >
               <X size={16} strokeWidth={1.5} />
             </DrawerPrimitive.Close>
