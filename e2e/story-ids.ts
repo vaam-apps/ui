@@ -26,6 +26,7 @@ export const STORY = {
   screenLayout: "patterns-screen-scaffolding--layout",
   selectLongValues: "primitives-select--long-values",
   statusPillQuietVersusLoud: "status-statuspill--quiet-versus-loud",
+  tokensSprings: "foundations-tokens--springs",
 } as const;
 
 export type StoryKey = keyof typeof STORY;

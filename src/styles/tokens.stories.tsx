@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useState } from "react";
 import { HUE_CLASSES, type StatusHue } from "../components/status/status-tokens";
 
 /**
@@ -268,4 +269,139 @@ export const Motion: Story = {
       ))}
     </div>
   ),
+};
+
+/**
+ * Track geometry for `SpringTrack` below, in pixels rather than the
+ * `VaamSpace`-style rung this package doesn't have — this is a
+ * measurement diagram, not layout, and the numbers below are load-bearing
+ * to what they demonstrate rather than incidental spacing.
+ *
+ * `TRAVEL` (240px) is the distance the chip moves. `--ease-spatial-fast`'s
+ * own peak overshoot is 9.5% of the step it is applied to (see
+ * `theme.css`'s comment on the scheme and `motion-tokens.test.ts`'s
+ * `overshootPercent`), so at this travel the chip should visibly pass the
+ * guideline by `0.095 * 240 ≈ 22.8px` before settling back — comfortably
+ * inside the track's remaining `TRACK_WIDTH - INSET - TRAVEL - CHIP ≈
+ * 52px` margin, so the peak never clips. `--ease-spatial`'s 1.5% overshoot
+ * (≈3.6px) is real but small enough that it reads as "arrives cleanly"
+ * next to the fast curve's visible bounce — which is the whole point of
+ * putting them side by side.
+ */
+const SPRING_TRACK_WIDTH = 320;
+const SPRING_CHIP_SIZE = 24;
+const SPRING_INSET = 4;
+const SPRING_TRAVEL = 240;
+
+function SpringTrack({
+  label,
+  durationVar,
+  easeVar,
+  overshoot,
+  moved,
+  chipTestId,
+}: {
+  label: string;
+  durationVar: string;
+  easeVar: string;
+  overshoot: string;
+  moved: boolean;
+  /** Read by `e2e/motion.spec.ts` via `[data-spring-chip="…"]` — a real
+   * Chromium render is the only way to measure whether `linear()`
+   * actually produces the overshoot the comment claims; nothing in this
+   * repo's unit tests can (see that file's own header). */
+  chipTestId: string;
+}) {
+  const restLeft = SPRING_INSET + SPRING_TRAVEL;
+  const guidelineLeft = restLeft + SPRING_CHIP_SIZE / 2;
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <span className="font-mono text-body text-foreground">{label}</span>
+        <span className="text-caption text-subtle-foreground">{overshoot}</span>
+      </div>
+      <div
+        className="relative h-8 rounded-sm border border-edge bg-surface-2"
+        style={{ width: SPRING_TRACK_WIDTH }}
+      >
+        {/* The resting position. Anything the chip clears to the right of
+            this line, before coming back to rest on it, is overshoot. */}
+        <div
+          className="absolute top-0 bottom-0 w-px bg-edge-strong"
+          style={{ left: guidelineLeft }}
+          aria-hidden="true"
+        />
+        <div
+          data-spring-chip={chipTestId}
+          className="absolute top-1/2 rounded-full bg-ring"
+          style={{
+            left: SPRING_INSET,
+            width: SPRING_CHIP_SIZE,
+            height: SPRING_CHIP_SIZE,
+            transform: `translate(${moved ? SPRING_TRAVEL : 0}px, -50%)`,
+            transitionProperty: "transform",
+            transitionDuration: `var(${durationVar})`,
+            transitionTimingFunction: `var(${easeVar})`,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The M3 Expressive spring tokens, side by side and replayable — the
+ * claim `theme.css`'s own comment makes (1.5% vs. 9.5% peak overshoot,
+ * "the signature bounce") as something you can watch rather than take on
+ * the comment's word. `motion-tokens.test.ts` proves the same numbers
+ * against the integrated spring; this story is the render `just`'s own
+ * gates cannot check — jsdom has no layout and no CSS transitions, so a
+ * unit test can assert the `linear()` stops are correct without ever
+ * showing what they look like in motion.
+ *
+ * Both tracks share one `moved` state so "Replay" starts them together —
+ * the comparison is about the *shape* of the two curves over the same
+ * distance and the same trigger, not about eyeballing two separately
+ * timed clips.
+ */
+export const Springs: Story = {
+  render: () => {
+    function SpringsDemo() {
+      const [moved, setMoved] = useState(false);
+      return (
+        <div className="flex flex-col gap-6">
+          <button
+            type="button"
+            onClick={() => setMoved((m) => !m)}
+            className="w-fit rounded-field border border-edge bg-surface-2 px-3 py-1.5 text-body text-foreground hover:bg-surface-3"
+          >
+            Replay
+          </button>
+          <SpringTrack
+            label="--ease-spatial / --dur-spatial"
+            overshoot="z 0.8 — 1.5% peak overshoot"
+            durationVar="--dur-spatial"
+            easeVar="--ease-spatial"
+            moved={moved}
+            chipTestId="spatial"
+          />
+          <SpringTrack
+            label="--ease-spatial-fast / --dur-spatial-fast"
+            overshoot="z 0.6 — 9.5% peak overshoot, two crossings"
+            durationVar="--dur-spatial-fast"
+            easeVar="--ease-spatial-fast"
+            moved={moved}
+            chipTestId="spatial-fast"
+          />
+          <p className="max-w-prose text-caption text-subtle-foreground">
+            Watch the chip against its own guideline: the top track settles in cleanly, the bottom
+            one visibly passes the line and comes back — the same distance, the same trigger, two
+            different damping ratios. An easing and its duration are one unit here; neither track
+            borrows the other's timing.
+          </p>
+        </div>
+      );
+    }
+    return <SpringsDemo />;
+  },
 };

@@ -41,7 +41,18 @@ export function Switch({ checked, onCheckedChange, disabled, className, ...aria 
       <span
         aria-hidden="true"
         className={cn(
-          "pointer-events-none ml-0.5 inline-block size-3.5 rounded-full bg-foreground transition-transform",
+          // The thumb's `translate-x` is spatial (position), so it takes
+          // the M3 Expressive spring — `--dur-spatial-fast` /
+          // `--ease-spatial-fast` (z 0.6, 9.5% overshoot), the "fast"
+          // pair for a small, local control. This is the token scheme's
+          // own signature case: a switch thumb overshooting its resting
+          // position and settling back is exactly the bounce
+          // `theme.css`'s comment calls out, on the control it reads
+          // best on. `transition-transform` only sets `transition-property:
+          // transform`, so `group-data-checked:bg-primary-content` below
+          // is not animated at all — it snaps, same as before this
+          // change; not touched here since it isn't spatial motion.
+          "pointer-events-none ml-0.5 inline-block size-3.5 rounded-full bg-foreground transition-transform duration-[var(--dur-spatial-fast)] ease-[var(--ease-spatial-fast)]",
           "group-data-checked:translate-x-4 group-data-checked:bg-primary-content",
         )}
       />

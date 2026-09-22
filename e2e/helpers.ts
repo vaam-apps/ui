@@ -482,3 +482,55 @@ export async function clampToViewport(page: Page, rect: Box): Promise<Box> {
     height: Math.max(1, Math.min(rect.y + rect.height, viewport.height) - y),
   };
 }
+
+/**
+ * Samples an element's `getBoundingClientRect().x` on every animation
+ * frame for `durationMs`, inside the page rather than round-tripped over
+ * CDP once per frame — a `page.evaluate` per sample would add its own
+ * latency on top of whatever it is trying to measure, which is exactly
+ * backwards for catching a transition's *peak*.
+ *
+ * This exists for one thing `motion-tokens.test.ts` cannot reach: that
+ * file integrates the spring's ODE and pins the `linear()` stops against
+ * it, entirely in Node, so it proves the curve is correct without ever
+ * asking a browser to run it. `linear()` easing functions are Baseline
+ * 2023 but not universal, and a CSS engine could in principle sample them
+ * differently than the spec's own linear interpolation between stops —
+ * this is what actually watches Chromium apply one to a real transition
+ * and measures what comes out, rather than trusting that a correct
+ * `linear()` string implies a correct render.
+ */
+export async function sampleBoundingClientX(
+  page: Page,
+  selector: string,
+  durationMs: number,
+): Promise<number[]> {
+  return await page.evaluate(
+    async ([sel, total]) => {
+      const found = document.querySelector(sel as string);
+      if (found === null) throw new Error(`no element for selector: ${sel}`);
+      // Re-bound with an explicit non-nullable type: `tick` below is a
+      // nested function declaration, and TS does not carry a `const`'s
+      // narrowed type across that boundary the way it would into a
+      // same-scope closure — `found`'s declared type is still
+      // `Element | null` there. `el`'s declared type is plain `Element`,
+      // which needs no narrowing to begin with.
+      const el: Element = found;
+      const samples: number[] = [];
+      const deadline = performance.now() + (total as number);
+      await new Promise<void>((resolve) => {
+        function tick() {
+          samples.push(el.getBoundingClientRect().x);
+          if (performance.now() < deadline) {
+            requestAnimationFrame(tick);
+          } else {
+            resolve();
+          }
+        }
+        requestAnimationFrame(tick);
+      });
+      return samples;
+    },
+    [selector, durationMs],
+  );
+}

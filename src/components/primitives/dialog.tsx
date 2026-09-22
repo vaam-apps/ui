@@ -213,7 +213,16 @@ export function DialogContent({ className, children, ...props }: ComponentPropsW
           transition
           className={cn(
             "relative flex max-h-[85vh] w-full max-w-[480px] flex-col overflow-hidden rounded-md border border-edge bg-surface-2 shadow-[var(--shadow-dialog)]",
-            "duration-150 ease-out data-closed:scale-95 data-closed:opacity-0",
+            // Spatial (scale), M3 Expressive — but the *default* pair
+            // (`--dur-spatial` / `--ease-spatial`, z 0.8, 1.5% overshoot),
+            // not `-fast`: this panel is a full modal surface, not a
+            // small local one, and the fast spring's 9.5% bounce reads
+            // right on a menu but gets increasingly odd the bigger the
+            // thing bouncing is. See `date-picker.tsx`'s `PANEL_CLASS` for
+            // why opacity rides the same duration/easing rather than
+            // getting its own. The backdrop above stays on `--ease-out` —
+            // it only fades, nothing about it is spatial.
+            "duration-[var(--dur-spatial)] ease-[var(--ease-spatial)] data-closed:scale-95 data-closed:opacity-0",
             className,
           )}
           {...props}

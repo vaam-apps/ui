@@ -344,7 +344,15 @@ function GroupSection({
                   <ChevronDown
                     size={14}
                     aria-hidden="true"
-                    className={cn("shrink-0 transition-transform", open && "rotate-180")}
+                    className={cn(
+                      // `rotate-180` is spatial (orientation/shape), same
+                      // family as the switch thumb's `translate-x` —
+                      // `--dur-spatial-fast` / `--ease-spatial-fast`, the
+                      // "fast" pair for a small, local affordance. See
+                      // `switch.tsx` for the fuller reasoning.
+                      "shrink-0 transition-transform duration-[var(--dur-spatial-fast)] ease-[var(--ease-spatial-fast)]",
+                      open && "rotate-180",
+                    )}
                   />
                 </DisclosureButton>
                 <DisclosurePanel className="flex flex-col gap-0.5">
