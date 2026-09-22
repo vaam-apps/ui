@@ -742,6 +742,93 @@
   --text-metric-lg--line-height: 44px;
 }
 
+/*
+ * M3 Expressive's "emphasised" type register — investigated for this
+ * redesign, and deliberately not built as a new size scale or a new
+ * custom-property family. What follows is the finding and the reasoning,
+ * transcribed the same way the motion tokens above were: from androidx
+ * source rather than m3.material.io, which publishes no numbers in a
+ * fetchable form.
+ *
+ * `compose/material3/material3/src/commonMain/kotlin/androidx/compose/
+ * material3/tokens/TypefaceTokens.kt` (`v0_103`) carries fifteen
+ * `*Emphasized*` entries — one per baseline role (Display/Headline/
+ * Title/Body/Label × Large/Medium/Small) — each pairing 1:1 with its
+ * baseline in `TypeScaleTokens.kt`. Comparing the two files role by
+ * role: **size and line-height are byte-identical between a role and its
+ * emphasised counterpart, every single time.** The only thing that
+ * changes is `FontWeight`, and it moves exactly one named step up the
+ * same Regular → Medium → Bold axis this system already uses:
+ * Display/Headline/BodyLarge/BodyMedium/BodySmall/TitleLarge go
+ * Regular → Medium; TitleMedium/TitleSmall/Label(L/M/S) go
+ * Medium → Bold. (A handful of roles also nudge `letter-spacing` by
+ * ±0.05–0.1sp, e.g. BodyLarge 0.5sp → 0.15sp — too small and
+ * inconsistent in direction to be a rule worth porting into a system
+ * that already overrides tracking with a single `-0.011em` on `html`.)
+ * `Typography.kt`'s own doc comment confirms this is an emphasis
+ * *toggle*, not a heavier theme: "used to further stylize select pieces
+ * of text... pragmatic uses, such as creating clearer division of
+ * content and drawing users' eyes to relevant material" — i.e. opt-in,
+ * per instance, among structurally identical peers.
+ *
+ * Two things that finding rules out, both worth saying explicitly
+ * because they were the two ways this could have gone wrong:
+ *
+ * 1. **No new `--text-*` step.** "Emphasised" is not a fourteenth size —
+ *    it is an existing size at a different weight. Adding
+ *    `--text-metric-emphasized` or similar would be a second, redundant
+ *    way to say a size this scale already has a name for, which is the
+ *    exact drift `--radius-xs`'s own comment above warns about for the
+ *    radius ladder.
+ * 2. **No new custom property for the weight step either.** The
+ *    emphasised weight is always one of Tailwind's own stock
+ *    `font-medium` (500) or `font-bold` (700) — both already in use
+ *    elsewhere in this package (`side-nav.tsx`'s active rail item is
+ *    `font-medium` over an unweighted sibling; `calendar.tsx`'s `today`
+ *    is `font-semibold`). There is nothing to register: `font-weight`
+ *    is not a custom scale the way `--text-*` is, so `tailwind-merge`
+ *    already resolves conflicting weight utilities with no entry in
+ *    `cn.ts`'s `ExtraClassGroupId` list.
+ *
+ * **The variable-font axis Compose leans on is for animating smoothly
+ * *between* the two weights** (`MaterialExpressiveTheme` can tween a
+ * `FontVariation.Settings('wght', …)` as a value changes) — it is not
+ * needed to render either endpoint. Both endpoints here are ordinary
+ * named weights (400/500/700), which every stack above already renders
+ * correctly with zero font files shipped: a static, non-variable
+ * fallback (`system-ui`, `ui-serif`, `ui-monospace`, …) matches or
+ * synthesises those weights the same way it already does for the
+ * `font-medium`/`font-semibold` this package ships today. So the
+ * self-hosting gap noted in the four-voices comment above is not a
+ * blocker for the register itself — only for the motion half (animating
+ * *through* the weight axis), which is out of scope on this branch
+ * regardless (`--ease-*`/`--dur-*` above belong to a sibling branch) and
+ * was never going to be attempted here.
+ *
+ * **Where it actually lands: `StatTile`'s `emphasized` prop**
+ * (`src/components/data/stat-tile.tsx`), and nowhere else, on purpose.
+ * `StatTile`'s own doc comment for `tone` already names the exact
+ * scenario M3 Expressive's emphasis toggle exists for — "leave unset
+ * unless the number's own colour carries meaning; a wall of coloured
+ * tiles makes the one that matters harder to find" — and then offers no
+ * other way to do it, because colour is reserved for status
+ * (`--state-*`) and a tile singled out for *importance* is not carrying
+ * status. That was a genuine, load-bearing gap: `InstrumentPanel`'s own
+ * dashboard story (`instrument-panel.stories.tsx`) renders three tiles
+ * of equal weight — Delivered, Unresolved, Spend — with no way to say
+ * which one a reader should find first without reaching for colour and
+ * lying about what it means. `font-medium` on the value only (never the
+ * label or caption, which stay the reference the reader compares the
+ * emphasised figure against) is the Regular → Medium step this system's
+ * own headline-scale roles (`--text-metric`/`--text-metric-lg`) take in
+ * M3 Expressive, applied the same way `side-nav.tsx` already applies it
+ * to a selected rail item — completing a pattern this library had
+ * already arrived at independently, not inventing one. It does not
+ * touch `font-variant-numeric: tabular-nums slashed-zero` (§3.3 above):
+ * that is a glyph-substitution feature, orthogonal to weight, and the
+ * slash survives at 500 exactly as it does at 400.
+ */
+
 @layer base {
   :root {
     /* §3.8 motion tokens. Not Tailwind-registered (no `duration-*` utility
