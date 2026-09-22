@@ -61,6 +61,21 @@ import { cn } from "../../lib/cn";
  * achromatic `primary` fill in a real radio glyph, on a `surface-3` row
  * with a `edge-strong` border. That also makes it legible with no colour
  * at all, which a tint alone never was.
+ *
+ * **M3 Expressive shape audit: two declines, not one.** The glyph
+ * (`rounded-full`, below) is already at the top of the register in both
+ * states — nothing to morph into, same as `Switch`'s thumb and track.
+ * The option row itself (`rounded-sm`) *could* morph on `data-checked`,
+ * but doesn't: unlike `NavLink`'s active indicator, this row's shape
+ * carries no reference-lock decision to preserve, so the reason to
+ * decline is different — a wrapped `flex-wrap` group of these sits side
+ * by side, and letting only the checked one change shape would read as a
+ * layout glitch in the row it shares a baseline with, not as a selection
+ * signal. The existing `border-edge` → `border-edge-strong` and
+ * `bg-surface-2` → `bg-surface-3` pair already carries that signal
+ * redundantly (fill *and* border), which is the same "shape, fill,
+ * colour" redundancy standard the radio glyph's own comment above
+ * applies — it just doesn't need a fourth channel on top.
  */
 export interface RadioGroupOption<T extends string> {
   value: T;

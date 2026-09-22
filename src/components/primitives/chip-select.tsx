@@ -115,7 +115,12 @@ export function ChipSelect<T extends string>({
               {/* Same box as the `Checkbox` primitive draws, down to the
                   radius tier — a chip is a checkbox with its label inside
                   the hit area, and two spellings of "checked" in one
-                  library is one too many. */}
+                  library is one too many. That includes the M3 Expressive
+                  audit: `checkbox.tsx`'s own comment declines a
+                  checked→circle shape morph because `Radio` already owns
+                  "circle" as a resting shape, and the same reasoning holds
+                  here down to the shared box — two spellings of "why this
+                  isn't a circle" would be one too many as well. */}
               <span
                 className={cn(
                   "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-xs border transition-colors",

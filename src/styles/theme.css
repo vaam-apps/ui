@@ -128,7 +128,54 @@
      explicit that it is "not fully pill-shaped either", and a data table's
      own row/cell chrome would look novelty-bubbly at pill radius — but
      within that ceiling this is the confident end of the range, not the
-     cautious one. */
+     cautious one.
+
+     **M3 Expressive shape-scale audit (verdict: keep the three-tier
+     register, no fourth step).** Google's own Expressive shape scale is
+     wider than this — roughly eleven named corner sizes (none through
+     extra-extra-large, several with an "increased" variant in between)
+     against this file's three plus the `--radius-xs` glyph-scale outlier
+     below. Checked against what this package actually renders, not
+     against the spec page in isolation, for three reasons the wider scale
+     does not survive here:
+
+     1. The extra Google steps above `--radius-box` (large-increased,
+        extra-large, extra-large-increased, extra-extra-large) exist for
+        surfaces this library doesn't have at all — phone-scale bottom
+        sheets and extended FABs at 28dp+ — and this file's own D8
+        reasoning already rejects that register for the surfaces it *does*
+        have: a data table's row/cell chrome "would look novelty-bubbly at
+        pill radius", the same objection at a smaller number. A desktop
+        operator console grounded in Polar's/Column's drawer and card
+        corners has no reference screen calling for a fourth, larger step,
+        and "one register, no fourth" (this comment's own opening line) is
+        a standing rule, not a rule that resets per redesign.
+     2. The "increased" variants (extra-small-increased,
+        large-increased, extra-large-increased) are Google's own
+        *interpolation waypoints* for their polygon-based shape-morph
+        system — named intermediate shapes a discrete state machine steps
+        through. CSS `border-radius` has no such need: a `transition` on
+        the property is continuously interpolated by the browser between
+        whatever two values a component names, so the "waypoint" problem
+        those extra tokens solve for Compose's shape-morph library doesn't
+        exist here. Confirmed empirically, not just argued: implementing
+        this file's own press-shape morph (`src/lib/press-shape.ts`)
+        needed exactly one additional value, and it didn't need to be a
+        new one — `--radius-selector` itself, already declared below,
+        covers it.
+     3. The 35-shape polygon library (cookies, clovers, arches, bursts —
+        Expressive's other shape axis, for avatars, FABs and loading
+        indicators) is explicitly out of scope for this pass; nothing in
+        this package's component set (form controls, tables, panels,
+        toasts) is a shape *outline* that would ever read as one of those
+        polygons rather than a rounded rectangle, so there is no register
+        gap to fill for it either.
+
+     So: three tiers plus the checkbox-only `--radius-xs` outlier already
+     say everything this component set needs said. Widening the register
+     "to match the spec" without a reference screen or a real interaction
+     calling for the extra step would be exactly the unargued change this
+     file's own conventions rule out. */
   --radius-selector: 8px;
   --radius-field: 12px;
   --radius-box: 20px;

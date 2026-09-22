@@ -194,6 +194,15 @@ export function ValueTabsList({
 // Underline variant only (design doc §5.2: "no pill/segmented variant — pill
 // tabs are consumer furniture"). 2px bottom rule in --foreground on the
 // active tab.
+//
+// M3 Expressive shape audit: nothing to morph. A shape-morph needs a
+// shape to morph, and §5.2 already rules out the one M3 gives its own
+// tabs (a pill/segmented active indicator) for this component — the
+// active state here is a border width and a colour, not a corner radius,
+// so there is no register value for `data-selected` to step between.
+// Porting a pill indicator just to have something to morph would be
+// widening the visual language to manufacture a use for the motion
+// tokens, backwards from how every other decision in this file works.
 export function ValueTabsTrigger({
   value,
   className,

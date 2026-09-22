@@ -52,6 +52,19 @@ export function Checkbox({
         // `theme.css`'s own note on `--radius-xs`. Shape is the only
         // channel that tells "pick any" from "pick one" before the user
         // clicks, so it has to survive.
+        //
+        // M3 Expressive shape audit: no checked→circle morph here, on
+        // purpose. Google's own Expressive checkbox does exactly that —
+        // square unchecked, circle checked — but it works there because
+        // nothing else in that vocabulary is a permanently-circular
+        // control the checked state could be confused with. Here `Radio`
+        // (`radio-group.tsx`) already owns "circle" as radio's resting
+        // shape, so morphing a checked `Checkbox` to a circle wouldn't add
+        // a signal, it would spend the checked state undoing the one this
+        // comment just explained: at the moment both controls are most
+        // likely to be compared side by side — checked — they'd render
+        // the same shape. Declined for the reason already on this line,
+        // not a new one.
         "group inline-flex size-4 shrink-0 items-center justify-center rounded-xs border border-edge-strong bg-surface-2",
         "transition-colors data-checked:border-primary data-checked:bg-primary",
         "data-indeterminate:border-primary data-indeterminate:bg-primary",

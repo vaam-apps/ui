@@ -189,6 +189,17 @@ function NavLink({
 }) {
   const Icon = item.icon;
   const rail = variant === "rail";
+  // M3 Expressive shape audit: `rounded-field` stays constant across
+  // `active`, not a candidate for a selected-state morph. This is a
+  // locked decision, not an oversight — D8's own reference lock (theme.css)
+  // names this exact row: judged against LottieFiles' active nav row,
+  // "not fully pill-shaped either", so `rounded-full` on selection would
+  // directly contradict a cited reference screen. And below in this same
+  // file, a different active row growing to two lines is flagged as a bug
+  // precisely because it "turns the active row's filled rectangle into a
+  // different shape from all the others" — the established reading here
+  // is that every row in a list shares one shape so the *fill* alone
+  // carries selection, which is what `bg-base-300` below already does.
   const rowClass = cn(
     "flex items-center gap-3 rounded-field px-3 py-2 transition-colors",
     dim ? "text-caption" : "text-body",
