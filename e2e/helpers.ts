@@ -484,11 +484,20 @@ export async function clampToViewport(page: Page, rect: Box): Promise<Box> {
 }
 
 /**
- * Samples an element's `getBoundingClientRect().x` on every animation
- * frame for `durationMs`, inside the page rather than round-tripped over
- * CDP once per frame — a `page.evaluate` per sample would add its own
- * latency on top of whatever it is trying to measure, which is exactly
- * backwards for catching a transition's *peak*.
+ * Samples one or more elements' `getBoundingClientRect().x` together, on
+ * every animation frame, for `durationMs` — inside the page rather than
+ * round-tripped over CDP once per sample, which would add its own latency
+ * on top of whatever it is trying to measure, exactly backwards for
+ * catching a transition's *peak*.
+ *
+ * Plural rather than one selector at a time so two elements triggered by
+ * the *same* event (e.g. one "Replay" click starting two chips at once)
+ * are read from the *same* rAF loop, on the *same* frames — the only way
+ * to compare their peaks without also asking whether two separate runs
+ * happened to sample at the same point in their respective transitions.
+ * `e2e/motion.spec.ts` is the one caller today, and it uses this to
+ * compare two curves started by one click; a single-selector read is
+ * just this with a one-element array.
  *
  * This exists for one thing `motion-tokens.test.ts` cannot reach: that
  * file integrates the spring's ODE and pins the `linear()` stops against
@@ -500,27 +509,30 @@ export async function clampToViewport(page: Page, rect: Box): Promise<Box> {
  * and measures what comes out, rather than trusting that a correct
  * `linear()` string implies a correct render.
  */
-export async function sampleBoundingClientX(
+export async function sampleBoundingClientXs(
   page: Page,
-  selector: string,
+  selectors: string[],
   durationMs: number,
-): Promise<number[]> {
+): Promise<number[][]> {
   return await page.evaluate(
-    async ([sel, total]) => {
-      const found = document.querySelector(sel as string);
-      if (found === null) throw new Error(`no element for selector: ${sel}`);
-      // Re-bound with an explicit non-nullable type: `tick` below is a
-      // nested function declaration, and TS does not carry a `const`'s
-      // narrowed type across that boundary the way it would into a
-      // same-scope closure — `found`'s declared type is still
-      // `Element | null` there. `el`'s declared type is plain `Element`,
-      // which needs no narrowing to begin with.
-      const el: Element = found;
-      const samples: number[] = [];
+    async ([sels, total]) => {
+      // Resolved and null-checked here, in the same scope as the throw —
+      // `nodes`'s declared type is `Element[]`, never `(Element | null)[]`,
+      // so the nested `tick` function below (a hoisted function
+      // declaration; TS does not carry a same-scope `const`'s narrowing
+      // across that boundary) never needs its own narrowing to begin with.
+      const nodes: Element[] = (sels as string[]).map((sel) => {
+        const found = document.querySelector(sel);
+        if (found === null) throw new Error(`no element for selector: ${sel}`);
+        return found;
+      });
+      const samples: number[][] = nodes.map(() => []);
       const deadline = performance.now() + (total as number);
       await new Promise<void>((resolve) => {
         function tick() {
-          samples.push(el.getBoundingClientRect().x);
+          nodes.forEach((el, i) => {
+            samples[i]?.push(el.getBoundingClientRect().x);
+          });
           if (performance.now() < deadline) {
             requestAnimationFrame(tick);
           } else {
@@ -531,6 +543,6 @@ export async function sampleBoundingClientX(
       });
       return samples;
     },
-    [selector, durationMs],
+    [selectors, durationMs],
   );
 }
