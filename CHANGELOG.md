@@ -47,20 +47,20 @@ twice knowingly is worse than doing it once by accident, and this
 release changes what renders for an existing caller in six ways with no
 API change at all:
 
-- `SideNav` stops taking width below `xl` — a 16px strip at 375 and 900,
+* `SideNav` stops taking width below `xl` — a 16px strip at 375 and 900,
   40px at 1262, gone. Anything that compensated for it now has 16px too
   much padding.
-- `RadioGroup` option names lose their descriptions, which is the fix,
+* `RadioGroup` option names lose their descriptions, which is the fix,
   but it changes what a screen reader says and what a `getByRole` query
   with an exact name matches.
-- `DropdownMenuCheckboxItem`'s checked state moves out of `aria-checked`
+* `DropdownMenuCheckboxItem`'s checked state moves out of `aria-checked`
   and into the accessible name, for the same reason and with the same
   consequence for name-based queries.
-- `Tooltip`'s `position` starts actually positioning. Bubbles that
+* `Tooltip`'s `position` starts actually positioning. Bubbles that
   silently rendered above their trigger now appear where the prop asked.
-- `DialogTrigger` / `DialogClose` stop submitting an enclosing `<form>`.
+* `DialogTrigger` / `DialogClose` stop submitting an enclosing `<form>`.
   Anything that relied on that submit — accidentally — loses it.
-- The dark theme applies with **no** `data-theme` attribute, so a page
+* The dark theme applies with **no** `data-theme` attribute, so a page
   that set none goes from half-themed to themed.
 
 README's own versioning note is the rule being followed here: pre-1.0,
@@ -135,7 +135,7 @@ change what a component means rather than what it is called.
 Documenting every export against the source, rather than against the
 comments, found these:
 
-- **`<DialogTrigger as={Button}>` inside a `<form>` submitted the form.**
+* **`<DialogTrigger as={Button}>` inside a `<form>` submitted the form.**
   `DialogTrigger` set `type="button"` only when `as` was undefined;
   `as={Button}` renders a `<button>` with no `type`, and HTML's default
   there is `submit`. So the most natural way to write it posted the form
@@ -143,17 +143,17 @@ comments, found these:
   working dialog. `DialogClose` had it too. Both now type any element
   that could be a button, leaving intrinsic non-button tags alone, and
   `dialog.trigger.test.tsx` pins it.
-- **`drawer.tsx` said `direction` defaults to `"right"`.** vaul's default
+* **`drawer.tsx` said `direction` defaults to `"right"`.** vaul's default
   is `"bottom"`, and the same file says so 110 lines further down.
   `DrawerContent` is CSS-positioned at the right edge, so a generic
   `<Drawer>` with no `direction` sits right and animates and drags
   vertically.
-- **`MoreDetailDrawer`'s doc recommended a nested `Dialog`** for a
+* **`MoreDetailDrawer`'s doc recommended a nested `Dialog`** for a
   destructive confirmation, citing a z-index fix. `inline-confirm.tsx`
   documents that composition as broken for a reason no z-index reaches —
   vaul's document-level focus scope against Headless UI's own portal
   root. `InlineConfirm` exists because of it.
-- **`form-field.tsx` claimed `Select` forwards both `aria-describedby`
+* **`form-field.tsx` claimed `Select` forwards both `aria-describedby`
   and `aria-invalid`.** It forwards `aria-invalid` only, and `select.tsx`
   explains at length why the other cannot work.
 
@@ -213,7 +213,7 @@ passing tests.
 
 #### Fixed
 
-- **`RadioGroup` folded each option's description into its name.** Both
+* **`RadioGroup` folded each option's description into its name.** Both
   spans render inside the `role="radio"` element, so content naming
   concatenated them: the shipped fixture's option was named
   `"ApproveThe provider accepted it."`, and a screen-reader user heard the
@@ -226,14 +226,14 @@ passing tests.
   ancestor. A per-option `<Field className="contents">` fixes it while
   keeping the whole card clickable. `ThemeSwitcher` is fixed with it.
 
-- **`DropdownMenuCheckboxItem`'s checked state reached nobody.** It asked
+* **`DropdownMenuCheckboxItem`'s checked state reached nobody.** It asked
   for `role="menuitemcheckbox"`; Headless UI owns `role` and rendered
   `menuitem` regardless. `aria-checked` survived onto a role that does not
   permit it — invalid ARIA, and a tick that was visual only. The state is
   now an `sr-only` ", checked" after the label, which is what the role
   would have announced and does not depend on out-arguing the library.
 
-- **`Tooltip`'s `position` prop was only accidentally alive.** The class
+* **`Tooltip`'s `position` prop was only accidentally alive.** The class
   was built as `` `tooltip-${position}` `` — a name appearing nowhere as
   text, so Tailwind generated it only when something else in the scanned
   tree happened to spell it. In a real build where nothing did, the
@@ -241,7 +241,7 @@ passing tests.
   rendered above their trigger**, prop silently accepted. The four names
   are a literal lookup now.
 
-- **`SideNav` took width below `xl`, which its own comment forbids.**
+* **`SideNav` took width below `xl`, which its own comment forbids.**
   Three wrapper `<div>`s carried `px-2` and laid out even with every child
   `display: none`: a 16×510px strip at 375 and 900, and 40px at 1262 where
   it also painted two hairlines beside the floating rail. `e2e/` now
@@ -253,37 +253,37 @@ Every one was a comment asserting something about the code beside it.
 That is the one job these comments exist for, so each correction says
 what was measured:
 
-- `theme.css` argued `filter: blur()` *is* correct for the aurora glow.
+* `theme.css` argued `filter: blur()` *is* correct for the aurora glow.
   The argument is sound and was never applied — the glow is four offset
   `box-shadow`s and `grep blur` returns comments only. The 0.1.2 entry
   repeated it and is corrected in place.
-- `theme.css` §3.6 claimed "one focus-ring definition, every focusable
+* `theme.css` §3.6 claimed "one focus-ring definition, every focusable
   element, no exceptions". daisyUI's own rules win on `.btn` and
   `.input`, which ring in `currentColor` while `--ring` is `#5b8def`.
   Proven by mutation: zeroing our rule left those two ringed and stripped
   only a rail link and a tab. Both clear WCAG 1.4.11, so it is a
   consistency gap, not an accessibility one — but a reader of the old
   sentence would have hunted a bug elsewhere.
-- `contrast.test.ts`'s header disclaimed composited grounds as future
+* `contrast.test.ts`'s header disclaimed composited grounds as future
   work, in a file whose third `describe` block does exactly that.
-- `side-nav.tsx` asserted twice that the rail renders a `<div>` and that
+* `side-nav.tsx` asserted twice that the rail renders a `<div>` and that
   exactly one `<nav>` exists in the file, while its own test asserts
   three; and its band table still described the `1024–1279px` icon rail
   0.1.2 removed.
-- `dialog.tsx` and `drawer.tsx` said their close button is "roughly
+* `dialog.tsx` and `drawer.tsx` said their close button is "roughly
   32×32px". Measured: **24×24** — exactly WCAG 2.2 §2.5.8's floor with
   nothing to spare. `e2e/` pins it against shrinking.
-- `tooltip.stories.tsx` said the clipped bubble is "clipped to nothing".
+* `tooltip.stories.tsx` said the clipped bubble is "clipped to nothing".
   With `position` actually working, 44.3px of a 276.6px bubble still
   paints — a fragment, which is worse to read than nothing and is the
   real argument for the native `title` fallback.
 
 #### Known and not fixed
 
-- Vertical floating-rail links are 38×32px. The bottom rail forces 44px
+* Vertical floating-rail links are 38×32px. The bottom rail forces 44px
   because it is the touch band; the vertical one inherits content size and
   is asserted only against a 24px floor.
-- Markdown pipe tables do not compile in this MDX pipeline — they render
+* Markdown pipe tables do not compile in this MDX pipeline — they render
   as literal text. Three pages hit it; all docs tables are JSX now. Biome
   does not check `.mdx` at all, so nothing but `build-storybook` and a
   reader will catch a bad one.
@@ -338,15 +338,15 @@ that is allowed and it is the maintainer's call, but it is worth being
 explicit that upgrading is not a no-op. Four things render differently
 without any API change:
 
-- `SideNav` defaults to the floating rail below `xl`, and the in-flow
+* `SideNav` defaults to the floating rail below `xl`, and the in-flow
   `1024–1279px` icon rail is gone. `smallScreen="off-canvas"` restores
   the previous shape.
-- `DetailRow`'s `stacked` and `inline` variants adopt `divided`'s
+* `DetailRow`'s `stacked` and `inline` variants adopt `divided`'s
   label/value type pairing, changing size and colour at every existing
   call site.
-- `TimestampDisplay` writes `2026-08-08 14:03:07 Z` — a space before the
+* `TimestampDisplay` writes `2026-08-08 14:03:07 Z` — a space before the
   zone — where it previously wrote `…14:03:07Z`.
-- `Table`'s `label` now names the scroll wrapper only while it is
+* `Table`'s `label` now names the scroll wrapper only while it is
   actually scrollable, and only as a `role="region"`. It previously sat
   on a roleless `<div>`, where assistive tech ignored it.
 
@@ -370,13 +370,13 @@ showed.
 Now only one shape takes space out of the page — the sidebar — and
 everything narrower floats over it:
 
-- **Below 640px:** a horizontal pill along the bottom. Four destinations
+* **Below 640px:** a horizontal pill along the bottom. Four destinations
   and a menu for the rest. A 52px column is 14% of a 375px screen,
   permanently, down the side the writing starts on, and it sits where a
   thumb cannot reach — both are problems with the *axis*, so the rail
   turns rather than shrinks.
-- **640–1279px:** the vertical floating rail.
-- **≥1280px:** the sidebar, in flow — or, with the new **`collapsed`**
+* **640–1279px:** the vertical floating rail.
+* **≥1280px:** the sidebar, in flow — or, with the new **`collapsed`**
   prop, the vertical rail again. Collapsing does not mean "a narrower
   sidebar": the sidebar stops existing and the rail takes over, which is
   the only version that actually gives the content its width back.
@@ -386,19 +386,19 @@ caller who already owns a drawer and wants every band in flow.
 
 Three things found by building it rather than by reasoning about it:
 
-- **The tiny rail's tap targets were 16×32px.** `NavLink`'s rail variant
+* **The tiny rail's tap targets were 16×32px.** `NavLink`'s rail variant
   is `px-0` and takes its width from the parent, which works in the
   vertical rail because `items-stretch` hands it the full column. In a
   horizontal row there is nothing to stretch to, so it collapsed to the
   glyph — on the one form factor where that matters most. Measured, not
   noticed: they are an explicit 44px now, and so is the menu button.
-- **The rails had no landmark.** They were `<div>`s portalled to
+* **The rails had no landmark.** They were `<div>`s portalled to
   `document.body`, and below `sm` the in-flow `<nav>` is `display: none`
   — so a phone got its navigation outside any landmark at all. Found by
   extending the a11y gate to audit `document.body`, which it had to do
   because a portal escapes the host every other fixture is audited
   inside. All three shapes are `<nav aria-label="Primary">` now.
-- That made axe report `landmark-unique` instead, which **is** a false
+* That made axe report `landmark-unique` instead, which **is** a false
   positive: only one of the three is ever displayed, and jsdom applies no
   CSS. That one rule is disabled for that one block, with the reason
   written down, and the invariant it would have checked is pinned on the
@@ -419,12 +419,12 @@ timescale a person watches a loading state for. The periods are 9s and
 
 Two things the wider motion broke, both caught by watching the render:
 
-- **Hard diagonal edges swept across rows.** The drift layers were twice
+* **Hard diagonal edges swept across rows.** The drift layers were twice
   their element (`inset: -50%`), sized for the old amplitude; the new one
   walked the layer's own straight edge into frame. They are three times
   the element now, and the comment carries the arithmetic so the next
   amplitude change has a number to check against.
-- **`rotate()` and `skewY()` had to go, for geometric reasons rather than
+* **`rotate()` and `skewY()` had to go, for geometric reasons rather than
   taste.** A skeleton is a very wide, very short box — the shipped stack
   is 576×44, 13:1. Rotating its layer by θ sweeps the long edge
   vertically by `(layerWidth / 2) × sin θ`: 120px at 8°, against 44px of
@@ -442,7 +442,7 @@ appropriate in one and not the other.
 
 ### Three layout bugs that needed a scrollbar to see
 
-- **A tall `Dialog` hid its own footer.** `DialogPanel` had no `max-h`
+* **A tall `Dialog` hid its own footer.** `DialogPanel` had no `max-h`
   and no `overflow-y`, so a body taller than the viewport pushed
   `DialogFooter` — and the only button that closes the dialog — off the
   bottom with no scrollbar anywhere. Not below the fold: unreachable.
@@ -462,13 +462,13 @@ appropriate in one and not the other.
   above it. Measured: scrollport top 55px, stuck header top 79px;
   `-top-6` puts it at 55px. `DialogFooter` carries the mirror.
 
-- **`TableHeader`'s `sticky top-0` never stuck**, because nothing
+* **`TableHeader`'s `sticky top-0` never stuck**, because nothing
   bounded the wrapper — `sticky` needs a scrollport, and a page-level
   scroll is not one. `Table` takes `maxHeight` now, and the two stories
   show both sides: unbounded, the header's top goes 72 → −228 on a 300px
   page scroll (1:1, no stickiness at all); bounded, 16 → 16.
 
-- **`Tooltip`'s bubble is still clipped by a scrolling ancestor** — that
+* **`Tooltip`'s bubble is still clipped by a scrolling ancestor** — that
   needs a portal or CSS anchor positioning, and this component has
   neither. What changed is that the label is no longer *lost*: a native
   `title` alongside `data-tip` means a clipped bubble degrades to the
@@ -485,7 +485,7 @@ write, and it **reports** rather than fails. `src/lib/a11y.test.tsx`
 makes it a build failure — axe over every component mounted for real,
 on every `pnpm test`.
 
-- **The gate is a client render, and the obvious version of it was
+* **The gate is a client render, and the obvious version of it was
   wrong.** The first cut used `renderToStaticMarkup`, matching
   `form-field.render.test.tsx`'s precedent, and reported violations
   across most of the library. They were false. Headless UI wires a
@@ -502,7 +502,7 @@ on every `pnpm test`.
   worse than no gate. `contrast.test.ts` had exactly that failure
   earlier in this cycle and it is what those cases exist to prevent.
 
-- **`StatusPill`'s accessible name never included `detail`.** The
+* **`StatusPill`'s accessible name never included `detail`.** The
   non-interactive pill rendered `role="img"` with a synthetic
   `aria-label` built from `literal` + `meta.label`. `img` flattens its
   subtree: the label string is the whole name and nothing inside is
@@ -525,7 +525,7 @@ on every `pnpm test`.
   content — and the assertion was mutation-checked: putting `role="img"`
   back fails exactly those cases and nothing else in the suite.
 
-- **A `LiveRow` wash could hang forever.** Not found by the gate but by
+* **A `LiveRow` wash could hang forever.** Not found by the gate but by
   rewriting the component onto the new `useReducedMotion` hook. The
   single effect was keyed on `[washTrigger, reducedMotion]`, so flipping
   the OS reduced-motion setting *mid-wash* re-ran it, the guard returned
@@ -534,7 +534,7 @@ on every `pnpm test`.
   stuck `true` for the life of the row. Split into two effects, one
   owning detection and one owning the timer.
 
-- **`useReducedMotion` is exported.** Every animated surface here gated
+* **`useReducedMotion` is exported.** Every animated surface here gated
   on a bare `matchMedia(...).matches` read during render — frozen at
   mount, so neither a live OS change nor Storybook's own reduced-motion
   toolbar ever reached the component. It is a `useSyncExternalStore`
@@ -542,7 +542,7 @@ on every `pnpm test`.
   is: a consumer building its own animated surface has the identical
   need.
 
-- **A blanket `prefers-reduced-motion` rule**, at `0.01ms` rather than
+* **A blanket `prefers-reduced-motion` rule**, at `0.01ms` rather than
   `0` — deliberately. A zero-duration transition never fires
   `transitionend`, and `vaul` closes its drawer on one; a drawer that
   can be opened but not closed is a worse outcome than a 0.01ms
@@ -562,28 +562,28 @@ to the drawer's box.
 The rail is `createPortal`ed to `document.body` now, which puts it
 outside any wrapper by construction, and `"floating"` is the default.
 
-- **This changes rendering for existing callers.** A consumer on the old
+* **This changes rendering for existing callers.** A consumer on the old
   default gets the floating rail below `lg` instead of the off-canvas
   tree. Pass `smallScreen="off-canvas"` to keep the previous behaviour.
-- **One property is genuinely narrower:** the portalled rail cannot be
+* **One property is genuinely narrower:** the portalled rail cannot be
   server-rendered, so it is invisible until hydration — only the rail,
   only in `"floating"` mode. The `lg` icon rail, the `xl` sidebar and
   the whole off-canvas tree are still in first-paint HTML. A consumer
   with a hard no-JS requirement should pass `smallScreen="off-canvas"`.
-- `side-nav.portal.test.tsx` pins both halves — portal target is
+* `side-nav.portal.test.tsx` pins both halves — portal target is
   `document.body` even under a transformed ancestor, and there is still
   exactly **one** `nav[aria-label="Primary"]` in the whole document, a
   duplicate-landmark check the component-scoped a11y gate cannot make
   because the portal escapes its host node. Mutation-checked in both
   directions: removing the portal and un-flipping the default each fail
   exactly one case.
-- The rail carries `data-floating-rail` — a real hook, not a test wart.
+* The rail carries `data-floating-rail` — a real hook, not a test wart.
   It is the one part of `SideNav` a caller cannot reach through the
   element they rendered.
 
 ### Two things that were the wrong kind of right
 
-- **`Calendar`'s "today" was dead CSS.** The class read
+* **`Calendar`'s "today" was dead CSS.** The class read
   `font-semibold text-state-uncertain-fg` — amber, from the *status*
   vocabulary, for a fact that is not a status. It also never painted:
   `day_button` declares its own `text-foreground`, and inherited colour
@@ -595,7 +595,7 @@ outside any wrapper by construction, and `"floating"` is the default.
   achromatic token every other present-but-unselected control state
   uses.
 
-- **`DetailRow`'s three variants disagreed about which text is the
+* **`DetailRow`'s three variants disagreed about which text is the
   label.** `divided` paired a small quiet label with a body-size value.
   `stacked` had it inverted — the label rendering *larger* than the
   value it labelled. `inline` set neither size nor colour, so a label
@@ -658,7 +658,7 @@ Five asks, and the one that looked like a switch was a week. The other
 four are contained. Nothing here removes an export or narrows a
 signature — every break below is in **defaults and pixels**.
 
-- **There is a light theme.** The README said "dark only … a second theme
+* **There is a light theme.** The README said "dark only … a second theme
   is a real amount of work to keep honest and nothing here pretends to
   have done it". The work is done rather than the constraint dropped.
   Every status foreground in the dark set is a 300-level tint chosen for
@@ -687,7 +687,7 @@ signature — every break below is in **defaults and pixels**.
   boilerplate was matching no rule at all and falling through to the dark
   values; that attribute now matches.
 
-- **`ThemeSwitcher`, and the headless `useTheme` behind it.** Three
+* **`ThemeSwitcher`, and the headless `useTheme` behind it.** Three
   states — system / light / dark — not a toggle, because `dark` carries
   `prefersdark` and a two-state control cannot express "follow my OS" at
   all: it has to start somewhere, and wherever it starts is a decision
@@ -700,7 +700,7 @@ signature — every break below is in **defaults and pixels**.
   and put `suppressHydrationWarning` on `<html>` — the script mutates
   that exact element pre-hydration.
 
-- **Four type voices, one superfamily.** `--font-display` (IBM Plex
+* **Four type voices, one superfamily.** `--font-display` (IBM Plex
   Serif) for screen and card and dialog titles; `--font-sans` (IBM Plex
   Sans, replacing Inter) for everything else; `--font-italic` for **human
   commentary** — a `StateTimeline` annotation is a person explaining a
@@ -722,13 +722,13 @@ signature — every break below is in **defaults and pixels**.
   nothing gets a working page with two voices instead of four — see the
   README's new third setup step.
 
-- **The skeleton drifts in colour.** Ribbons rather than blobs (radial
+* **The skeleton drifts in colour.** Ribbons rather than blobs (radial
   stops 58%×120%, plus a shear in the keyframes), on longer coprime
   periods — 23s and 31s, so the pair returns to its starting arrangement
   every 713s rather than every 247s. Still transform-only, still no
   `filter: blur()`, still dead under `prefers-reduced-motion`.
 
-- **A third surface register.** `InstrumentPanel` is an aurora mesh
+* **A third surface register.** `InstrumentPanel` is an aurora mesh
   ground for data you *scan* rather than read, and `Card glow` is the
   same register at card scale. This is a deliberate exception to
   "borders, not shadows", not a loosening of it: the rule still governs
@@ -747,14 +747,14 @@ signature — every break below is in **defaults and pixels**.
   all. The argument for why blur would be affordable on six cards and
   ruinous on two hundred table cells is sound, and was never applied.)*
 
-- **`--aurora-*` is one ramp, bound to the system's own hues.** The first
+* **`--aurora-*` is one ramp, bound to the system's own hues.** The first
   version declared it "named rather than borrowed"; all four values were
   in fact the status palette copy-pasted as literals, with nothing
   binding them and the two themes borrowing inconsistently. They are
   `color-mix`-derived now and the comment says what is true. They carry
   no meaning: nothing infers a state from a glow.
 
-- **`SideNav` gains `smallScreen`, defaulting to `"off-canvas"`** — the
+* **`SideNav` gains `smallScreen`, defaulting to `"off-canvas"`** — the
   existing behaviour, unchanged. `"floating"` renders a `fixed` icon rail
   below `lg` instead of the drawer-hosted accordion, and is opt-in for a
   reason: a `fixed` element's containing block is the nearest ancestor
@@ -766,7 +766,7 @@ signature — every break below is in **defaults and pixels**.
   element, and no navigation at all below `lg` while that drawer is
   closed.
 
-- **`Button size="icon"` is circular — for the first time.** Two bugs,
+* **`Button size="icon"` is circular — for the first time.** Two bugs,
   stacked. `square`/`circle` shared a `tailwind-merge` group with
   `xs…xl`, so `cn()` deleted the shape class outright and what shipped
   was a `btn-sm` rounded rectangle. Fixing that revealed the second:
@@ -782,7 +782,7 @@ signature — every break below is in **defaults and pixels**.
   affordance, and the two that had no hit-area padding gained the
   `-m-1 p-1` idiom the others already had.
 
-- **The overlay scrim is a token.** `bg-black/50` was hardcoded in three
+* **The overlay scrim is a token.** `bg-black/50` was hardcoded in three
   places — free over near-black, and over a near-white page it crushed
   the surround to a dead mid-grey with nothing able to say otherwise.
   `--scrim` is per-theme now (`rgb(20 23 28 / 0.32)` in light) and
@@ -809,18 +809,18 @@ record stops being tellable apart from a settled one.
 10%/28% for the fill and border — the construction every tinted sibling
 here already uses. Chosen by measurement, not by eye:
 
-- Nearest status sibling is `neutral` at ΔE2000 25.3; `success` is 31.0
+* Nearest status sibling is `neutral` at ΔE2000 25.3; `success` is 31.0
   away. Teal-300 was rejected at 16.9 from `success` — near enough to be
   the same colour inside a 14px glyph, and "processing" against
   "succeeded" is the one pair on a payments table that must never be
   confusable. That is the same failure `--state-warning-fg`'s own comment
   records from the first value tried for it.
-- Contrast measured on a **rendered** pill, not from the class names:
+* Contrast measured on a **rendered** pill, not from the class names:
   11.71:1 loud on `base-100` and 10.90:1 on `base-200` (the demanding
   case, where the label is composited over the hue's own 10% tint),
   13.58:1 / 12.93:1 quiet. Second-highest of the eight hues, against
   `uncertain` 11.64, `warning` 10.28, `expired` 6.89.
-- **This sits close to the theme's own "blue is selection-only, never a
+* **This sits close to the theme's own "blue is selection-only, never a
   status hue" rule, and is a judgement call a maintainer may want to
   overrule.** The cyan gap is 71° of Lab hue and ΔE2000 32.2 from the
   selection ring's `#5b8def`, wider than the `warning`/`uncertain`
@@ -831,15 +831,15 @@ Nothing existing changes colour. `StatusHue` is a union, so a consumer's
 own `Record<StatusHue, …>` — anyone mirroring `HUE_CLASSES` — needs the
 new key; a `StatusSystem` table does not.
 
-- `HUE_CLASSES` gains the matching `state-progress-*` entry, and
+* `HUE_CLASSES` gains the matching `state-progress-*` entry, and
   `theme.css` the `--state-progress-{fg,bg,border}` trio plus its
   `@theme inline` aliases.
-- New `StatusPill` story **EveryHue**: every hue × quiet/loud × page and
+* New `StatusPill` story **EveryHue**: every hue × quiet/loud × page and
   card. This is the surface the contrast numbers above were measured on.
-- `StateChip`'s story now derives its tone list from `HUE_CLASSES`
+* `StateChip`'s story now derives its tone list from `HUE_CLASSES`
   instead of retyping it. That literal had already fallen behind the
   vocabulary once.
-- New `src/components/status/status-tokens.test.ts`. `HUE_CLASSES` is a
+* New `src/components/status/status-tokens.test.ts`. `HUE_CLASSES` is a
   `Record<StatusHue, …>`, so the compiler catches a *missing* hue but not
   a *wrong* one — and a hue is added by copying the block above it, so
   the natural bug is an entry keyed `progress` whose classes still say
@@ -848,7 +848,7 @@ new key; a `StatusSystem` table does not.
   and that each `--state-<hue>-*` is declared with a value rather than
   only aliased in `@theme inline` — the half `theme-tokens.test.ts`
   cannot see, where the utility is emitted but resolves to nothing.
-- The README documents the in-flight mapping concretely, so a consumer
+* The README documents the in-flight mapping concretely, so a consumer
   does not have to make this choice by guessing.
 
 Visual-coherence pass. Four of the fixes below are latent rendering bugs
@@ -867,7 +867,7 @@ defects in the fixes, including one that made its own target worse; those
 are folded in rather than listed separately. **Three of these can break a
 build or a screen, so they come first.**
 
-- **`formatMoney` throws for a `number` past `Number.MAX_SAFE_INTEGER`.**
+* **`formatMoney` throws for a `number` past `Number.MAX_SAFE_INTEGER`.**
   `Number.isInteger(1e21)` is `true`, so the existing integer guard let it
   through — but `(1e21).toFixed(0)` is `"1e+21"` (the spec falls back to
   `ToString` at that magnitude) and the decimal shift turned that into
@@ -879,16 +879,16 @@ build or a screen, so they come first.**
   not print a figure that only looks exact. `bigint` and digit strings
   are unaffected at any size. This rejects input that used to work for
   anyone holding large zero-decimal amounts (XAF, VND, JPY) as `number`.
-- **`Toaster` caps the stack at four, dropping the oldest.** Nothing
+* **`Toaster` caps the stack at four, dropping the oldest.** Nothing
   capped it before; ten rapid calls stacked 600px of cards with no
   ceiling.
-- **`ValueTabsList` renders a scroll container, and takes a second prop.**
+* **`ValueTabsList` renders a scroll container, and takes a second prop.**
   `className` still lands on the `role="tablist"` row it always did —
   routing it to the new wrapper would have been a silent break, since a
   caller's `gap-2` would have merged against nothing and quietly stopped
   working. The wrapper has its own `wrapperClassName`.
 
-- **`StateTimeline` renders real offsets.** `Asia/Kolkata` came out as
+* **`StateTimeline` renders real offsets.** `Asia/Kolkata` came out as
   `+5:30` rather than `+05:30` — the padding regex was anchored to a
   single trailing digit and never matched a zone with minutes. UTC came
   out as `+00`, because the `raw === "GMT"` test never fires: modern ICU
@@ -899,30 +899,30 @@ build or a screen, so they come first.**
   renders with its real sign instead of `+-5000ms`, and a malformed one
   renders an em dash instead of `+NaNh NaNm`; neither is clamped, because
   clamping hides an ordering bug in the caller's data.
-- **`MaskedValue` stopped disclosing the length of the secret.** The dot
+* **`MaskedValue` stopped disclosing the length of the secret.** The dot
   run was `Math.min(Math.max(hiddenCount, 6), 12)`, which reads as a clamp
   and is the identity function on exactly [6, 12] — the common case for a
   masked key. It is a fixed run of eight now.
-- **`InlineBanner`'s `success` variant and `StateChip`'s `success` and
+* **`InlineBanner`'s `success` variant and `StateChip`'s `success` and
   `neutral` tones rendered with no box at all.** All three painted tokens
   `theme.css` declares `transparent` on purpose, so they read as *less*
   present than their loud siblings. Third and fourth instance of a mistake
   already fixed twice, so the fact is written down once now — `isQuietHue`
   in `status-tokens.ts` — and `theme-tokens.test.ts` asserts it against
   the stylesheet rather than trusting the list.
-- **`truncate` on a flex row never ellipsized anything.** `text-overflow`
+* **`truncate` on a flex row never ellipsized anything.** `text-overflow`
   applies to block containers and a flex container is not one, so
   `DropdownMenuItem`, `DropdownMenuCheckboxItem` and `CommandMenuItem`
   hard-cut their labels mid-glyph under comments claiming an ellipsis —
   a mistake introduced by the previous entry in this changelog. The label
   moves one level in. `DatePicker`'s trigger was a fourth instance,
   missing the `min-w-0` that lets a flex item shrink at all.
-- **A disabled `CheckboxField`, `SwitchField` or `ChipSelect` had a
+* **A disabled `CheckboxField`, `SwitchField` or `ChipSelect` had a
   live-looking label.** Headless UI's `Label` reads disabled state from
   `Field`'s context and nowhere else, and `disabled` was reaching only the
   inner control — so the `data-disabled:` classes already written on those
   labels were dead.
-- **`FormField` wires the control to its own hint and error**, with
+* **`FormField` wires the control to its own hint and error**, with
   derived ids, a merged `aria-describedby` and `aria-invalid`; `Input` and
   `Textarea` render an `aria-invalid:` danger treatment to match. What a
   control actually emits is now pinned by a render test, because the first
@@ -933,7 +933,7 @@ build or a screen, so they come first.**
   them win, so `Select` does not accept a prop it could not honour.
   Closing that gap means adopting Headless UI's `Field`/`Description`
   pair library-wide, which is a design decision and not a patch.
-- **`ValueTabs` had no focus indicator at all** — the trigger carried
+* **`ValueTabs` had no focus indicator at all** — the trigger carried
   `outline-none` with no substitute. Deleting the utility is the whole
   fix: the global `:focus-visible` rule is in `@layer base` and the
   utility suppressing it is in `@layer utilities`, which wins. The list
@@ -943,34 +943,34 @@ build or a screen, so they come first.**
   painted only across the first viewport-width and the last tabs had no
   rule under them at all. That regression was introduced by the scroll fix
   and caught in review.
-- **`LiveRow`'s wash faded in and vanished out.** The transition and the
+* **`LiveRow`'s wash faded in and vanished out.** The transition and the
   tint were gated together, so the decay edge landed on a style with no
   transition. Only the *duration* is gated now — making the whole
   transition unconditional overshot and left every `LiveRow` hovering at
   240ms beside plain rows at 90ms.
-- `Toaster` no longer re-announces the whole stack on every change:
+* `Toaster` no longer re-announces the whole stack on every change:
   `role="status"` carries an implicit `aria-atomic="true"`, so one expiry
   re-read every toast on screen. The container keeps the live region with
   an explicit `aria-atomic="false"`. An intermediate attempt also moved
   `role="status"` onto each card; that is backwards — a live region must
   exist *before* its content changes to announce it, and a populated
   inserted region shadows the container that can — and was reverted.
-- Close buttons in `Dialog`, `Drawer` and `Toast` are ~32×32px hit targets
+* Close buttons in `Dialog`, `Drawer` and `Toast` are ~32×32px hit targets
   without moving; the toast's `×` glyph is the same Lucide `X` as the
   others. `DialogHeader` reserves the gutter that long title had been
   running under.
-- `SelectTrigger` accepts `aria-label`/`aria-labelledby`; `ChipSelect`
+* `SelectTrigger` accepts `aria-label`/`aria-labelledby`; `ChipSelect`
   accepts the `aria-labelledby` that `FormField`'s own documentation had
   been telling callers to pass to a component whose type did not declare
   it; `Dialog`'s controlled props accept an explicit `undefined`, the same
   `exactOptionalPropertyTypes` fix `Select` and `ValueTabs` already had.
-- `input-bordered`, `select-bordered` and `textarea-bordered` are gone —
+* `input-bordered`, `select-bordered` and `textarea-bordered` are gone —
   daisyUI v4 modifiers that v5 ships no rule for, so they had been
   matching nothing. Zero rendered pixels changed, checked by compiling the
   Tailwind output with and without them and diffing.
-- `Progress`'s `tone` was documented as rendering an indeterminate bar
+* `Progress`'s `tone` was documented as rendering an indeterminate bar
   when unset. It defaults to `"neutral"` and always has.
-- `maskSecret` and the two instant formatters moved to `src/lib`, which
+* `maskSecret` and the two instant formatters moved to `src/lib`, which
   the public barrel does not re-export. All three had been exported purely
   so a test could reach them, which had put `mask`, `formatAbsolute` and
   `formatElapsed` on the published API under three of the most generic
@@ -995,17 +995,17 @@ under `prefers-reduced-motion` — leaving the gradients painted where
 they stand, so reduced motion degrades to a different still image
 rather than a broken one.
 
-- `Skeleton` takes `animated` (default `true`) for a placeholder sitting
+* `Skeleton` takes `animated` (default `true`) for a placeholder sitting
   inside something that is already moving.
-- New `SkeletonText`: a paragraph placeholder whose last line is short,
+* New `SkeletonText`: a paragraph placeholder whose last line is short,
   the way real prose ends.
-- `Skeleton` is now `aria-hidden` — a dozen empty boxes read aloud is
+* `Skeleton` is now `aria-hidden` — a dozen empty boxes read aloud is
   worse than silence — and `RouteSkeleton` carries the `role="status"`
   live region that announces the wait once instead.
 
 ### Four rendering bugs, all found by looking
 
-- **`SideNav`'s icon rail had a stray horizontal scrollbar, and its
+* **`SideNav`'s icon rail had a stray horizontal scrollbar, and its
   tooltips had never once appeared.** One cause, two symptoms: daisyUI's
   `.tooltip` draws its bubble as an absolutely positioned pseudo-element
   at `left: 100%`, and the `<nav>` is a scroll container, so the bubble
@@ -1016,12 +1016,12 @@ rather than a broken one.
   paints outside the page and nothing can clip. The nav also has real
   per-band widths (`w-full` / `lg:w-16` / `xl:w-64`) instead of sizing
   itself to whatever a 16px icon plus padding happens to measure.
-- **`Select` rendered two disclosure indicators.** daisyUI's `.select`
+* **`Select` rendered two disclosure indicators.** daisyUI's `.select`
   paints its own arrow as a pair of `linear-gradient` background images
   for a native `<select>`; this trigger also renders a real
   `ChevronDown`. `bg-none` removes daisyUI's, and `pe-3` reclaims the
   1.75rem it had reserved.
-- **`RadioGroup` and `ChipSelect` rendered their *selected* option with
+* **`RadioGroup` and `ChipSelect` rendered their *selected* option with
   no fill and no border.** Both used the `state-success-*` trio, and
   `--state-success-bg`/`--state-success-border` are declared
   `transparent` on purpose — `success` is one of the two quiet status
@@ -1031,7 +1031,7 @@ rather than a broken one.
   `primary`/`surface-3` vocabulary every other checked control uses, and
   `RadioGroup` draws a real radio dot so the choice survives with no
   colour at all.
-- **`Checkbox` was a perfect circle, indistinguishable from a radio.** A
+* **`Checkbox` was a perfect circle, indistinguishable from a radio.** A
   `border-radius` larger than half the box is clamped to half, and
   `--radius-selector` (8px) is exactly half of the 16px box. New
   `--radius-xs` (4px) makes the register a real four-step ladder —
@@ -1045,7 +1045,7 @@ stat-tile labels and captions, checkbox/switch/radio/chip descriptions,
 dropdown and command-palette items, toast titles and bodies, and the
 screen header's description.
 
-- **`Card` and `StatTile` gained `min-w-0`, which is what made the
+* **`Card` and `StatTile` gained `min-w-0`, which is what made the
   truncation real.** `white-space: nowrap` sets an element's min-content
   width to the whole string — `overflow: hidden` hides the text, it does
   not shrink the box — and a grid or flex item defaults to `min-width:
@@ -1054,36 +1054,36 @@ screen header's description.
   measured at 375px, cards laid out at 617px each on a page that
   scrolled sideways. A `truncate` that looks correct and silently does
   nothing.
-- `DetailRow`'s inline variant keeps the label whole and gives the value
+* `DetailRow`'s inline variant keeps the label whole and gives the value
   the room, so a 60-character provider reference no longer widens the
   drawer it is in.
-- `DropdownMenuContent` is bounded at `min(20rem, 100vw - 2rem)`.
+* `DropdownMenuContent` is bounded at `min(20rem, 100vw - 2rem)`.
 
 ### The gallery
 
 59 stories to 92, and a guard so the count cannot quietly fall behind
 the exports again.
 
-- **`src/lib/story-coverage.test.ts` fails when an exported component is
+* **`src/lib/story-coverage.test.ts` fails when an exported component is
   mentioned by no story.** The README already tells the story this
   closes: the hand-written gallery this Storybook replaced claimed to
   render every export and had silently missed thirteen, three of them
   carrying live rendering bugs. Colocating stories made that drift
   visible in a diff; this makes it a build failure. Exemptions are a
   short, justified list, and a stale one fails too.
-- New: **Foundations/Tokens** (surfaces, edges, text tiers, the type
+* New: **Foundations/Tokens** (surfaces, edges, text tiers, the type
   scale, the seven status hues, the radius register, the motion
   tokens), **Primitives/Skeleton**, **Primitives/Card**,
   **Primitives/Tooltip**.
-- `SideNav` pins each of its three bands to a named viewport, so a
+* `SideNav` pins each of its three bands to a named viewport, so a
   breakpoint story can show its own breakpoint. `Select`, `Tabs` and
   `Table` gained stories for the states that were breaking: a select
   inside a drawer, long values, an empty table, a loading table, a
   sticky header.
-- `Tooltip` has a story that *demonstrates* the scroll-container
+* `Tooltip` has a story that *demonstrates* the scroll-container
   clipping rather than describing it, so the next person meets the
   limitation before they hit it.
-- Story fixtures use `max-w-*` rather than fixed widths, so the gallery
+* Story fixtures use `max-w-*` rather than fixed widths, so the gallery
   itself no longer scrolls sideways on a phone.
 
 
@@ -1099,10 +1099,10 @@ than overridden: the theme stylesheet was exported from
 `@vaam-apps/ui/styles/theme.css`; and `declarationMap`/`sourceMap`
 emitted 112 maps pointing back into `src/`.
 
-- The build copies `src/styles/` into `dist/styles/`, and the published
+* The build copies `src/styles/` into `dist/styles/`, and the published
   `exports` points there. Everything published now lives in one
   directory — the same one the README already tells Tailwind to scan.
-- Declaration and source maps are off. They are only useful when the
+* Declaration and source maps are off. They are only useful when the
   sources they reference are present, and a map pointing at an absent
   `src/` is worse than none: a debugger reports it as broken rather than
   falling back to the built output.
@@ -1127,7 +1127,7 @@ missed thirteen, among them the three carrying live rendering bugs.
 
 ### Accessibility
 
-- **`--subtle-foreground` failed WCAG AA on every surface** — 4.06:1 on
+* **`--subtle-foreground` failed WCAG AA on every surface** — 4.06:1 on
   `--background` down to 3.40:1 on `--surface-3`, against the 4.5:1
   normal text requires, across 38 usages all at 11–12px. Raised to
   `#838a95`, the minimum that clears AA on the worst case. This
@@ -1137,58 +1137,58 @@ missed thirteen, among them the three carrying live rendering bugs.
 
 ### API
 
-- `Select` and `ValueTabs` accept an explicit `undefined` for their
+* `Select` and `ValueTabs` accept an explicit `undefined` for their
   controlled props. Under `exactOptionalPropertyTypes` a bare `value?:
   string` rejects `useState<string>()`'s own output, which made the
   ordinary controlled pattern a type error.
 
 ### Generalised for release
 
-- **The status system is parameterised.** `StatusMeta`, the glyph
+* **The status system is parameterised.** `StatusMeta`, the glyph
   geometry and the hue classes stay here; the per-state-machine tables
   moved to the consuming application. `createStatusPill(system)` binds
   one table to a pill whose `state` prop accepts exactly that machine's
   literals, replacing three near-identical pill components that differed
   only in which table they indexed (and had already drifted: one set
   `role="img"`, one did not; one supported `interactive`, two did not).
-- `StateMark` now takes a `StatusMeta` rather than one application's
+* `StateMark` now takes a `StatusMeta` rather than one application's
   state enum. The previous meta-based export, `StateMarkFromMeta`, is
   gone — this is it, renamed.
-- `StateTimeline` is generic over the state machine, takes its `system`
+* `StateTimeline` is generic over the state machine, takes its `system`
   and its per-state `annotations` as props, and accepts any IANA
   timezone. It previously hard-coded one application's message states,
   that application's own explanatory notes, and a two-value timezone
   union whose UTC-offset suffix was literal (`"Z"` or `"+01"`) — wrong
   for every other zone and across DST. The offset is now read from
   `Intl`.
-- `MsisdnDisplay` → **`PhoneDisplay`**, with the Cameroon digit grouping
+* `MsisdnDisplay` → **`PhoneDisplay`**, with the Cameroon digit grouping
   and carrier table replaced by a `format` callback and a `tag` prop.
-- `StateChip`'s tones are the shared `StatusHue` vocabulary rather than a
+* `StateChip`'s tones are the shared `StatusHue` vocabulary rather than a
   private four-entry copy, so `expired` and `parked` are now reachable.
-- `EncodingPreview` (GSM-7/UCS-2 SMS segment counting) was removed. It is
+* `EncodingPreview` (GSM-7/UCS-2 SMS segment counting) was removed. It is
   application domain knowledge, not a component.
-- `components/bespoke/` → `components/patterns/`.
+* `components/bespoke/` → `components/patterns/`.
 
 ### Fixed
 
-- **`cn()` silently deleted custom font sizes.** `tailwind-merge`
+* **`cn()` silently deleted custom font sizes.** `tailwind-merge`
   classifies an unrecognised `text-*` value as a colour, so
   `cn("text-caption text-state-danger-fg")` returned only the colour —
   affecting `FieldError`, `DetailList`, `CardHeader` and others, which
   had been rendering at the browser default size. The theme's font-size
   and radius scales are now registered. Present in tailwind-merge 2.6.0
   as well as 3.x; a latent bug, not an upgrade regression.
-- **`cn()` did not resolve daisyUI component modifiers**, so
+* **`cn()` did not resolve daisyUI component modifiers**, so
   `cn("btn btn-primary", "btn-ghost")` kept both and let stylesheet order
   decide. Now grouped — with `btn`/`badge` *colour* and *style* kept
   separate, because daisyUI 5's `.btn-outline` reads the variable
   `.btn-primary` sets and collapsing them discards the colour.
-- **`--state-warning-*` was referenced but never declared.**
+* **`--state-warning-*` was referenced but never declared.**
   `StateChip tone="warning"` and every `InlineBanner variant="warning"`
   (so every `StaleWriteBanner`) emitted classes matching no rule and
   rendered with no colour. Both bug classes are now build failures: see
   `lib/theme-tokens.test.ts`.
-- **The copy-to-clipboard affordance leaked a timer and swallowed
+* **The copy-to-clipboard affordance leaked a timer and swallowed
   rejections.** Unmounting inside the 1.5s confirmation window called
   `setState` on a dead component, and a refused `navigator.clipboard`
   write (insecure origin, permissions policy) was an unhandled rejection
@@ -1196,21 +1196,21 @@ missed thirteen, among them the three carrying live rendering bugs.
 
 ### Added
 
-- `Money` and `formatMoney` — minor units in, `Intl`-derived exponents,
+* `Money` and `formatMoney` — minor units in, `Intl`-derived exponents,
   string-based scaling that stays exact past `Number.MAX_SAFE_INTEGER`.
-- `Calendar`, `DatePicker`, `DateRangePicker` on `react-day-picker`,
+* `Calendar`, `DatePicker`, `DateRangePicker` on `react-day-picker`,
   exchanging `YYYY-MM-DD` strings rather than `Date` objects.
-- `Checkbox` / `CheckboxField`, `Switch` / `SwitchField`, `Spinner`,
+* `Checkbox` / `CheckboxField`, `Switch` / `SwitchField`, `Spinner`,
   `Progress`, `Pagination`, `ConfirmDialog`, `MaskedValue`, `StatTile`,
   `CopyButton`.
 
 ### Dependencies
 
-- `tailwind-merge` 2.6 → 3.6 (the 3.x line targets Tailwind v4, which
+* `tailwind-merge` 2.6 → 3.6 (the 3.x line targets Tailwind v4, which
   this package already required).
-- `lucide-react` 0.469 → 1.44.
-- `react-day-picker` 10.0 added.
-- `@radix-ui/react-dialog` added as a direct dependency. It arrives
+* `lucide-react` 0.469 → 1.44.
+* `react-day-picker` 10.0 added.
+* `@radix-ui/react-dialog` added as a direct dependency. It arrives
   transitively through `vaul` regardless; declaring it is what lets
   TypeScript name the drawer's re-exported types in the emitted
   declarations (TS2742).
