@@ -28,6 +28,7 @@ export const STORY = {
   // `#sb-long` lives here, not on `LongValues` — that story's own
   // `SelectTrigger` carries no `id` at all (a bare, unlabelled `Select`).
   selectDisabledAndScrolling: "primitives-select--disabled-and-scrolling",
+  selectInsideADrawer: "primitives-select--inside-a-drawer",
   statusPillQuietVersusLoud: "status-statuspill--quiet-versus-loud",
   tokensSprings: "foundations-tokens--springs",
 } as const;
