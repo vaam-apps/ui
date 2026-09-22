@@ -111,7 +111,18 @@ function PickerTrigger({
           type="button"
           onClick={onClear}
           aria-label={`Clear ${placeholder}`}
-          className="-translate-y-1/2 absolute top-1/2 right-2 text-subtle-foreground hover:text-foreground"
+          // D11 (`theme.css`'s own header on `.tap-target`): this button
+          // carries no `-m-*`/`p-*` hit-area padding at all today — its
+          // click target is the bare 14×14 icon, in both densities, which
+          // is below even WCAG 2.2 §2.5.8's 24px floor. Left unchanged at
+          // density 0 (compact must render byte-identically to before
+          // this pass); `[--tap-size:14px] tap-target` only adds an
+          // invisible comfortable-register overlay reaching 48px — it does
+          // not retroactively fix the pre-existing compact-register gap,
+          // which is outside this pass's scope. Already `absolute`, so no
+          // extra `relative` is needed for the overlay's positioning
+          // context.
+          className="-translate-y-1/2 absolute top-1/2 right-2 text-subtle-foreground hover:text-foreground [--tap-size:14px] tap-target"
         >
           <X size={14} strokeWidth={1.5} />
         </button>

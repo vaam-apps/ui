@@ -65,15 +65,22 @@ export function Calendar({
         // was the one it missed. `day_button` below stays `rounded-sm` on
         // purpose: it's a labelled calendar cell (a date, not an icon),
         // not an icon-only control, so the convention doesn't apply to it.
+        // D11 (`theme.css`'s own header on `.tap-target`): both nav
+        // buttons are a fixed `size-7` (28px) icon-only circle in both
+        // densities — RDP positions them `absolute` itself, which already
+        // gives the invisible comfortable-only overlay a positioning
+        // context, so only `[--tap-size:28px] tap-target` needs adding.
         button_previous: cn(
           "absolute top-3 left-3 inline-flex size-7 items-center justify-center rounded-full",
           "text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground",
           "disabled:pointer-events-none disabled:opacity-40",
+          "[--tap-size:28px] tap-target",
         ),
         button_next: cn(
           "absolute top-3 right-3 inline-flex size-7 items-center justify-center rounded-full",
           "text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground",
           "disabled:pointer-events-none disabled:opacity-40",
+          "[--tap-size:28px] tap-target",
         ),
         month_grid: "w-full border-collapse",
         weekdays: "flex",
