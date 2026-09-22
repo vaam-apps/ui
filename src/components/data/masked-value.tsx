@@ -77,9 +77,15 @@ export function MaskedValue({
           // `-m-1 p-1 rounded-full`: same hit-area idiom as `copy-button.tsx`
           // and the `dialog`/`drawer`/`toast` close buttons — negative
           // margin cancels the padding, so this grows the clickable box to
-          // roughly 32×32px without moving the icon or shifting the
-          // `gap-1.5` row it sits in. Previously bare, a ~12px icon with no
-          // hit-area padding at all.
+          // 20×20px (a 12px icon plus 4px of padding each side — border-box,
+          // per Tailwind's preflight reset) without moving the icon or
+          // shifting the `gap-1.5` row it sits in. This comment said
+          // "roughly 32×32px" until the arithmetic was checked while wiring
+          // D10's press-morph radius below, which needs the real number:
+          // `dialog.tsx`'s own close button carries the identical idiom at
+          // a 16px icon and its comment records the same class of stale
+          // claim (also corrected, to 24×24px) for the same reason.
+          // Previously bare, a ~12px icon with no hit-area padding at all.
           //
           // This is the one place two `-m-1` controls sit next to each
           // other (this button, then `CopyButton` below, both inside the
@@ -96,8 +102,14 @@ export function MaskedValue({
           // `transition-colors` this used to carry with the M3 Expressive
           // press morph, in the same lockstep as `Button size="icon"`,
           // `DialogClose` and the toast dismiss button.
+          // `[--btn-press-radius:calc(20px*0.1)]`: this control's own
+          // fixed 20×20 box (12px icon, see above) fed through the same
+          // 0.1 circular ratio `.btn-circle` uses in `theme.css` —
+          // `PRESS_SHAPE_MORPH` reads `--btn-press-radius` rather than
+          // naming a value itself, per its own header.
           className={cn(
             "-m-1 shrink-0 rounded-full p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
+            "[--btn-press-radius:calc(20px*0.1)]",
             PRESS_SHAPE_MORPH,
           )}
         >

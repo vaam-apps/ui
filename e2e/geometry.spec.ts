@@ -144,7 +144,7 @@ test("the dialog's close button is a real target, not just an icon", async ({ pa
  * real browser proves the radius actually changes and actually reverts.
  */
 test.describe("the press-shape morph steps the radius down while held", () => {
-  test("a text button steps from --radius-field to --radius-selector", async ({ page }) => {
+  test("a text button steps from --radius-field to a fifth of its own height", async ({ page }) => {
     await openStory(page, STORY.buttonVariants);
     const button = storyRoot(page).getByRole("button", { name: "Primary" });
 
@@ -157,8 +157,13 @@ test.describe("the press-shape morph steps the radius down while held", () => {
     const pressed = await pressAndSettle(page, button);
     try {
       for (const radius of pressed) {
-        // `--radius-selector` — one tier down the same register, not a
-        // number invented for this test.
+        // D10: no longer `--radius-selector` by name — `--btn-press-radius`
+        // now computes `calc(var(--size) * 0.2)` per `theme.css`'s
+        // "Density register" section, and this button's compact/`md`
+        // `--size` is 40px, so 40 * 0.2 = 8, the exact same number the
+        // flat constant produced here before. Compact stays
+        // byte-identical; `density.spec.ts` covers the comfortable
+        // register, where this button is 56px and the target is ~11.2.
         expect(radius, "pressed corner radius").toBeCloseTo(8, 0);
       }
     } finally {
@@ -177,7 +182,9 @@ test.describe("the press-shape morph steps the radius down while held", () => {
     }
   });
 
-  test("a circular icon button steps from a true circle to --radius-selector", async ({ page }) => {
+  test("a circular icon button eases off the circle by a tenth of its height, not to a square", async ({
+    page,
+  }) => {
     await openStory(page, STORY.buttonSizes);
     const icon = storyRoot(page).getByRole("button", { name: "Icon button" });
     const rect = await box(icon);
@@ -192,10 +199,13 @@ test.describe("the press-shape morph steps the radius down while held", () => {
     const pressed = await pressAndSettle(page, icon);
     try {
       for (const radius of pressed) {
-        // 8px on a ~32px box reads as a square with softened corners, not
-        // a smaller circle — see `press-shape.ts`'s own comment for the
-        // ratio this reuses from `--radius-xs`'s reasoning in `theme.css`.
-        expect(radius, "pressed corner radius").toBeCloseTo(8, 0);
+        // D10: this used to be 8px — a flat quarter of the 32px box, the
+        // exact "becoming a square on long-press" bug report `theme.css`'s
+        // "Density register" section quotes. `.btn-circle`'s own
+        // `--btn-press-radius: calc(var(--size) * 0.1)` now drives it:
+        // 32 * 0.1 = 3.2, a gentler proportional nudge instead of a flat
+        // quarter-box step.
+        expect(radius, "pressed corner radius").toBeCloseTo(3.2, 1);
         expect(radius, "pressed corner radius is no longer a circle").toBeLessThan(rect.width / 2);
       }
     } finally {
@@ -223,7 +233,11 @@ test.describe("the press-shape morph steps the radius down while held", () => {
     const pressed = await pressAndSettle(page, close);
     try {
       for (const radius of pressed) {
-        expect(radius, "pressed corner radius").toBeCloseTo(8, 0);
+        // D10: `DialogClose` is a fixed 24×24 box (16px icon, `-m-1 p-1`),
+        // not a `.btn-circle`, so it supplies its own
+        // `--btn-press-radius: calc(24px * 0.1)` — see `dialog.tsx`'s own
+        // comment on the close button. 24 * 0.1 = 2.4.
+        expect(radius, "pressed corner radius").toBeCloseTo(2.4, 1);
       }
     } finally {
       await page.mouse.up();

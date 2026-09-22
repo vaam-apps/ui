@@ -183,13 +183,17 @@ export function Toaster() {
                 `PRESS_SHAPE_MORPH` (`press-shape.ts`) replaces the plain
                 `transition-colors` this used to carry with the M3
                 Expressive press morph in the same lockstep as `Button
-                size="icon"` and `DialogClose`. */}
+                size="icon"` and `DialogClose`. `[--btn-press-radius:
+                calc(24px*0.1)]`: same fixed-box supply `DialogClose`
+                needs and for the same reason — see that file's own
+                comment on `PRESS_SHAPE_MORPH`'s header. */}
             <button
               type="button"
               onClick={() => dismissToast(item.id)}
               aria-label="Dismiss"
               className={cn(
                 "-m-1 shrink-0 rounded-full p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
+                "[--btn-press-radius:calc(24px*0.1)]",
                 PRESS_SHAPE_MORPH,
               )}
             >
