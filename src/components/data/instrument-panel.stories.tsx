@@ -28,7 +28,13 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /** What it is for: a row of metrics reading as one instrument, without
- * six competing outlines doing the grouping by repetition. */
+ * six competing outlines doing the grouping by repetition.
+ *
+ * `Delivered` carries `emphasized` — the one number in the row a reader
+ * should find first, singled out by weight rather than colour, since
+ * colour here is reserved for status and this tile is not reporting
+ * one. See `stat-tile.tsx`'s `emphasized` prop doc for the M3 Expressive
+ * source. */
 export const AsADashboard: Story = {
   render: () => (
     <InstrumentPanel
@@ -37,7 +43,7 @@ export const AsADashboard: Story = {
       className="w-full max-w-[46rem]"
     >
       <div className="grid gap-3 sm:grid-cols-3">
-        <StatTile label="Delivered" value="12,481" caption="98.2% of 12,710 terminal" />
+        <StatTile label="Delivered" value="12,481" caption="98.2% of 12,710 terminal" emphasized />
         <StatTile label="Unresolved" value="37" tone="uncertain" caption="Outcome never learned" />
         <StatTile
           label="Spend"

@@ -34,6 +34,24 @@ export interface StatTileProps {
    * meaning — a wall of coloured tiles makes the one that matters harder
    * to find, which is the opposite of the point. */
   tone?: StatusHue | undefined;
+  /** Singles this tile's value out among structurally identical peers —
+   * M3 Expressive's "emphasised" type register, ported to this package's
+   * own scale (see `theme.css`'s comment above the `--text-metric*`
+   * tokens for the androidx source and the full reasoning). Bumps the
+   * value one weight step, `font-mono`'s unweighted default (400) to
+   * `font-medium` (500) — the same Regular → Medium step
+   * `DisplayLargeEmphasized`/`HeadlineSmallEmphasized`/etc. take in
+   * androidx's own tokens for a role at this size, applied the same way
+   * `SideNav`'s active rail item already bumps to `font-medium` over its
+   * unweighted siblings.
+   *
+   * Deliberately not `tone`: colour is reserved for status, so it is the
+   * wrong tool for "this is the one to look at first" and would read as
+   * a status that is not there. Leave unset on every tile in a row
+   * except the one the reader should find first — a row where every
+   * tile is emphasised has no emphasis, the same argument `Card`'s
+   * `glow` doc makes for its own register. */
+  emphasized?: boolean | undefined;
   /** Top-right slot — a sparkline, a `StateChip`, a refresh button. */
   action?: ReactNode;
   className?: string | undefined;
@@ -50,7 +68,15 @@ export interface StatTileProps {
  * definition, and the semantics make a row of them navigable rather than
  * an undifferentiated wall of text to a screen reader.
  */
-export function StatTile({ label, value, caption, tone, action, className }: StatTileProps) {
+export function StatTile({
+  label,
+  value,
+  caption,
+  tone,
+  emphasized,
+  action,
+  className,
+}: StatTileProps) {
   return (
     <div
       className={cn(
@@ -85,6 +111,7 @@ export function StatTile({ label, value, caption, tone, action, className }: Sta
           className={cn(
             "min-w-0 break-words font-mono text-metric tabular-nums",
             tone === undefined ? "text-foreground" : HUE_CLASSES[tone].fg,
+            emphasized === true && "font-medium",
           )}
         >
           {value}
