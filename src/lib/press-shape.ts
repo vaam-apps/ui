@@ -1,23 +1,45 @@
 /**
  * M3 Expressive's "press" shape morph — the interaction-driven half of the
  * shape story (the other half, the register itself, is D8/theme.css's own
- * job and is not touched here). A control's corner radius steps down to
- * `--radius-selector` (8px) for as long as `:active` holds and springs
- * back on release, using the `--ease-spatial-fast`/`--dur-spatial-fast`
- * pair (`theme.css`'s "signature bounce" spring, z=0.6) so the release
- * genuinely bounces rather than just easing back.
+ * job and is not touched here). A control's corner radius steps down for
+ * as long as `:active` holds and springs back on release, using the
+ * `--ease-spatial-fast`/`--dur-spatial-fast` pair (`theme.css`'s
+ * "signature bounce" spring, z=0.6) so the release genuinely bounces
+ * rather than just easing back.
  *
- * `--radius-selector` is the target for every control regardless of its
- * resting shape, not a new value invented for this: it is the smallest
- * general-purpose step already in D8's three-tier register (`selector` 8px
- * / `field` 12px / `box` 20px), one step below the checkbox-only
- * `--radius-xs` (4px) outlier that `theme.css` documents as reading square
- * only at a 16px glyph scale. On a ~24–32px icon-shaped control (`Button
- * size="icon"`, and the four call sites below), 8px is ~1/4–1/3 of the
- * box — the same "quarter of the box reads as a square with softened
- * corners, not a smaller circle" ratio `--radius-xs`'s own comment
- * establishes for the 16px checkbox, re-applied at this scale rather than
- * re-derived from nothing.
+ * # D10: the target is proportional to size, not a flat constant
+ *
+ * This used to step every control to the same flat `--radius-selector`
+ * (8px), regardless of its own box — and that read fine on a ~40px text
+ * button (8px is a fifth of 40, a gentle nudge) and "bizarre […] becoming
+ * a square on long-press" (the owner's own bug report) on `Button
+ * size="icon"`'s 32×32 box, where the identical 8px is a full quarter of
+ * the width. `theme.css`'s D10 "Density register" section now computes a
+ * `--btn-press-radius` custom property per control instead — `calc(var(
+ * --size) * 0.2)` on `.btn`, half that (`* 0.1`, deliberately gentler for
+ * a circle) on `.btn-circle` — transcribed from androidx's
+ * `PressedContainerShape` tokens (`ButtonSmallTokens`/`ButtonMediumTokens`/
+ * `ButtonLargeTokens`, `compose/material3/material3/…/tokens/` in
+ * `androidx/androidx`): 8dp/40dp, 12dp/56dp and 16dp/96dp, "about a fifth"
+ * each time. See that file's own comment for the full derivation,
+ * including why `.btn-circle` needs its own, gentler ratio rather than
+ * reusing 0.2. `PRESS_SHAPE_MORPH` below no longer names a value at all —
+ * it reads `var(--btn-press-radius)`, and **every call site is
+ * responsible for defining that custom property against its own actual
+ * box**, the same way `.btn`/`.btn-circle` do for `Button`.
+ *
+ * The four bare-`<button>` call sites below share one shape (`-m-1 p-1
+ * rounded-full` around a fixed-size icon — see "why these four call
+ * sites" further down) but not one *size*: `dialog.tsx`'s `DialogClose`
+ * and `toast.tsx`'s dismiss button wrap a 16px icon (24×24 box),
+ * `masked-value.tsx`'s reveal toggle a 12px icon (20×20 box), and
+ * `copy-button.tsx`'s icon size is itself a prop (12/14/16px, 20/22/24px
+ * box) — so none of them can share one literal target the way `.btn-sm`/
+ * `.btn-circle` can (those are fixed classes over a fixed `--size`). Each
+ * sets `--btn-press-radius` itself, as `calc(<own box>px * 0.1)` — the
+ * *same* 0.1 circular ratio `.btn-circle` uses, applied to each control's
+ * own known box instead of a shared `--size`, since these controls carry
+ * no daisyUI `--size` custom property to read from at all.
  *
  * # Why this is one arbitrary CSS property, not `transition-*` classes
  *
@@ -72,7 +94,7 @@
  * the shape answers the same way.
  */
 export const PRESS_SHAPE_MORPH =
-  "active:rounded-selector " +
+  "active:[border-radius:var(--btn-press-radius)] " +
   "[transition-property:color,background-color,opacity,border-radius] " +
   "[transition-duration:var(--dur-fast),var(--dur-fast),var(--dur-fast),var(--dur-spatial-fast)] " +
   "[transition-timing-function:var(--ease-out),var(--ease-out),var(--ease-out),var(--ease-spatial-fast)]";

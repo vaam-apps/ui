@@ -260,16 +260,24 @@ export function DialogContent({ className, children, ...props }: ComponentPropsW
               `PRESS_SHAPE_MORPH` (see `press-shape.ts`) replaces the
               plain `transition-colors` this used to carry — it already
               covers `color`/`background-color`, and folds in the M3
-              Expressive press morph: this circle steps to
-              `rounded-selector` while held and springs back on release,
-              in lockstep with `Button size="icon"` per that file's own
-              comment. */}
+              Expressive press morph: this circle steps to a
+              size-proportional radius while held and springs back on
+              release, in lockstep with `Button size="icon"` per that
+              file's own comment. `[--btn-press-radius:calc(24px*0.1)]`:
+              `PRESS_SHAPE_MORPH` reads that custom property rather than
+              naming a value itself (see its own header, "D10"), and this
+              is a fixed 24×24 box (16px icon, `-m-1 p-1` above) rather
+              than a `--size`-driven `.btn`/`.btn-circle`, so this call
+              site supplies it directly — the same 0.1 circular ratio
+              `.btn-circle` uses in `theme.css`, applied to its own known
+              box. */}
           <button
             type="button"
             aria-label="Close"
             onClick={() => setOpen(false)}
             className={cn(
               "-m-1 absolute top-4 right-4 z-20 rounded-full p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
+              "[--btn-press-radius:calc(24px*0.1)]",
               PRESS_SHAPE_MORPH,
             )}
           >

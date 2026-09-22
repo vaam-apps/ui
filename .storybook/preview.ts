@@ -40,7 +40,7 @@ import "./preview.css";
  * of its own, so the toolbar remains the sole writer everywhere else.
  */
 const preview: Preview = {
-  initialGlobals: { theme: "dark" },
+  initialGlobals: { theme: "dark", density: "compact" },
   globalTypes: {
     theme: {
       description: "Theme",
@@ -50,6 +50,28 @@ const preview: Preview = {
         items: [
           { value: "dark", title: "Dark", icon: "circle" },
           { value: "light", title: "Light", icon: "circlehollow" },
+        ],
+        dynamicTitle: true,
+      },
+    },
+    // D10: a second, independent toolbar control, same reasoning as
+    // `theme` above — a comfortable-register regression deserves the same
+    // on-demand visibility a light-theme one already gets, rather than
+    // depending on whatever `data-density` a previous session happened to
+    // leave set. `initialGlobals` pins `"compact"`, matching `theme.css`'s
+    // own default (`--density: 0` at bare `:root`, no attribute required),
+    // so a fresh Storybook load renders exactly what a consumer who sets
+    // nothing gets — the same determinism the theme control's own comment
+    // above describes. `e2e/helpers.ts`'s `openStory` reads this same
+    // `globals=density:…` channel, not a decorator it reimplements.
+    density: {
+      description: "Density",
+      toolbar: {
+        title: "Density",
+        icon: "ruler",
+        items: [
+          { value: "compact", title: "Compact", icon: "collapse" },
+          { value: "comfortable", title: "Comfortable", icon: "expandalt" },
         ],
         dynamicTitle: true,
       },
@@ -80,6 +102,10 @@ const preview: Preview = {
       if (!context.parameters.theme?.ownedByStory) {
         document.documentElement.setAttribute("data-theme", context.globals.theme ?? "dark");
       }
+      // No story owns `data-density` itself (there is no `DensitySwitcher`
+      // component — D10 is a plain HTML attribute a consuming app sets,
+      // not a library export), so this stamp has no analogous opt-out.
+      document.documentElement.setAttribute("data-density", context.globals.density ?? "compact");
       return Story();
     },
   ],

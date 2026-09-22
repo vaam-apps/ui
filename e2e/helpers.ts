@@ -8,9 +8,15 @@ import { expect, type Locator, type Page } from "@playwright/test";
  */
 
 export type Theme = "dark" | "light";
+export type Density = "compact" | "comfortable";
 
 export interface StoryOptions {
   theme?: Theme;
+  /** D10: the same `globals=…` channel as `theme`, defaulting to
+   * `"compact"` — `.storybook/preview.ts`'s own `initialGlobals` default,
+   * so a test that never passes this measures exactly what a consumer who
+   * sets nothing gets. */
+  density?: Density;
   width?: number;
   height?: number;
   /** `ThemeSwitcher`'s stories own `data-theme` themselves and opt out of
@@ -32,11 +38,11 @@ export interface StoryOptions {
  * the ones used here so a renamed story fails loudly in one place.
  */
 export async function openStory(page: Page, id: string, options: StoryOptions = {}): Promise<void> {
-  const { theme = "dark", width, height, expectThemeStamp = true } = options;
+  const { theme = "dark", density = "compact", width, height, expectThemeStamp = true } = options;
   if (width !== undefined) {
     await page.setViewportSize({ width, height: height ?? 800 });
   }
-  await page.goto(`/iframe.html?id=${id}&viewMode=story&globals=theme:${theme}`);
+  await page.goto(`/iframe.html?id=${id}&viewMode=story&globals=theme:${theme};density:${density}`);
   // The story is mounted, not merely fetched. `#storybook-root` exists in
   // `iframe.html` before React runs, so its emptiness is the only honest
   // "not yet" signal available.
@@ -48,6 +54,7 @@ export async function openStory(page: Page, id: string, options: StoryOptions = 
   if (expectThemeStamp) {
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
   }
+  await expect(page.locator("html")).toHaveAttribute("data-density", density);
 }
 
 /**

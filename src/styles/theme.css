@@ -231,10 +231,207 @@
   --radius-field: 12px;
   --radius-box: 20px;
   --size-selector: 0.25rem;
-  --size-field: 0.25rem;
+  /* Density axis (D10) — see the standalone "Density register" block below
+     this theme's closing brace for the full derivation. `--size-field` is
+     daisyUI's own per-theme scale unit: every `.btn`/`.input`/`.select`
+     multiplies it (`--size: calc(var(--size-field) * N)`, `N` = 10 for the
+     default/`md` size) to get its rendered height, so this one line is
+     what makes `Button`'s default size, `Input` and `Select` all track
+     `--density` for free, with zero component-level changes. `--density`
+     is 0 (compact) unless an ancestor sets `[data-density="comfortable"]`,
+     so a consumer who sets nothing gets exactly 0.25rem, unchanged. */
+  --size-field: calc(0.25rem + var(--density, 0) * 0.1rem);
   --border: 1px;
   --depth: 0;
   --noise: 0;
+}
+
+/*
+ * Density register (D10) — the fifth M3 Expressive pass. The first four
+ * (motion, shape, colour, type) changed this library's *vocabulary*
+ * without changing its *density*: measured in the built Storybook before
+ * this pass, `Button size="sm"`/`"md"` rendered 32px/40px and `Input`/
+ * `Select` rendered 40px, against M3's real Button tokens of 40dp/56dp —
+ * a deliberately dense operator-console register, correct for an admin
+ * console and wrong for a touch-first client app trying to reuse the same
+ * library. See the pull request description for the full before/after
+ * table; every number quoted below is re-derived from it, not invented.
+ *
+ * # The mechanism: a numeric `--density` custom property, `calc()`-driven
+ *
+ * `--density` is `0` (compact) or `1` (comfortable), read back everywhere
+ * a control's size needs to change as `calc(<compact value> + var(--density)
+ * * <delta>)` — one such formula per property, each with its own delta,
+ * which is what makes a *non-linear* register expressible at all: M3's
+ * own scale is not a fixed ratio (Button small→medium is 40dp→56dp, a
+ * +16dp step, while this library's compact register is 32px→40px, a
+ * +8px step — see the `.btn-sm` override below for the exact arithmetic
+ * this forces), so one global scalar multiplied through every control
+ * cannot hit both targets at once. A `calc()` expression scoped to one
+ * property can: the non-linearity lives in each formula's own delta
+ * constant, not in the axis itself, so `--density` stays one real,
+ * inheriting, genuinely-var-driven number the whole tree shares — not a
+ * design that needed to be linear to work.
+ *
+ * Two other mechanisms were weighed and rejected, on evidence rather than
+ * on taste:
+ *
+ * **`@container style(--density: …)` container style queries** — the
+ * candidate that reads best on paper, since it queries a custom property
+ * by name rather than leaning on an attribute selector. Rejected on two
+ * independent, both disqualifying, grounds:
+ *
+ * 1. Browser support, checked against caniuse directly rather than
+ *    recalled (`caniuse.com/css-container-queries-style`, read
+ *    2026-09-22): Chrome 111+ and Safari 18+ ship only *partial* support,
+ *    and Firefox's full support lands at version 151 — a browser with no
+ *    stable release at the time of writing. 91.7% global usage sounds
+ *    survivable until it is read as "excludes every Safari below 18",
+ *    i.e. every iOS/iPadOS release before March 2024 — a real floor for
+ *    a component library with no control over its consumers' users.
+ * 2. `container-type` is not free: establishing a query container sets
+ *    `contain: layout style` (or `size`) on that element, and `contain`
+ *    is exactly one of the five properties this file's own `AGENTS.md`
+ *    already names as breaking `position: fixed` for any descendant
+ *    (alongside `transform`/`filter`/`backdrop-filter`/
+ *    `will-change: transform`) — the reason `SideNav`'s floating rails
+ *    are portalled to `document.body` today. Scoping density at a root
+ *    element a consumer chooses is precisely the kind of ancestor this
+ *    trap already burned the library on once; reintroducing a
+ *    `contain`-bearing property at arbitrary root scopes is a second
+ *    chance for the same defect, for a feature that gains nothing a
+ *    `calc()` axis does not already provide.
+ *
+ * **A `[data-density="comfortable"]` selector setting literal values
+ * directly** (`.btn-sm[data-density="comfortable"] { --size: 40px }` and
+ * so on, no intermediate custom property) — robust and universally
+ * supported, but not honestly a CSS *variable*: nothing would actually
+ * cascade or interpolate, and every sized primitive would need its own
+ * per-density selector rather than reading one shared axis. Kept anyway,
+ * but only as the *toggle*: `[data-density="comfortable"]` below sets
+ * `--density: 1` and nothing else, so the ergonomic, zero-JS,
+ * set-once-at-a-root-scope API survives while every actual size still
+ * resolves through the one real variable.
+ *
+ * # Where it resolves — one place, not per screen
+ *
+ * `--density` is read in exactly three places, so a screen cannot end up
+ * half-dense by missing one: `--size-field` above (covers `Button`'s
+ * default/`md` size, `Input`, `Select` — everything daisyUI's own field
+ * scale drives), and the `.btn-sm` / `.btn` / `.btn-circle` rules below
+ * (the one daisyUI multiplier that cannot share `--size-field`, and the
+ * press-morph target, D10's other half). `src/lib/density.test.ts` pins
+ * this list and fails if a sized primitive's height stops resolving
+ * through one of the three.
+ *
+ * `--density: 0` is declared at bare `:root` — not `[data-theme="dark"]`
+ * — so it is reachable even outside a `data-theme`-stamped tree, the
+ * exact gap the surface-ladder comment two sections up already found
+ * Storybook's own documentation pages falling through (that comment's
+ * "Measured on a page with no attribute" applies verbatim here: a
+ * consumer relying on this file's own claim that density defaults to
+ * compact deserves that to be true with zero attributes set, not just
+ * with `data-theme` set). `var(--density, 0)` in every formula is the
+ * same guarantee restated at the point of use, for a browser or a
+ * fragment where even `:root` never loaded this stylesheet at all.
+ */
+:root {
+  --density: 0;
+}
+
+/* Comfortable is opt-in, set once at whatever root scope a consumer's
+   client app renders under (`<html data-density="comfortable">`, or a
+   wrapping element) — `--density` inherits from there to every control
+   beneath it, with no context to thread and no per-component prop.
+   `[data-density="compact"]` needs no rule of its own: `--density: 0` is
+   already `:root`'s default, so naming it explicitly is a documented
+   no-op, not a second code path. */
+[data-density="comfortable"] {
+  --density: 1;
+}
+
+/*
+ * The one daisyUI multiplier `--size-field` cannot cover, and the
+ * press-morph target — both driven by `--density` directly against each
+ * control's own resolved `--size`, so neither needs its own copy of the
+ * axis logic above.
+ *
+ * **`.btn-sm`'s `--size` is an explicit override, not `--size-field`.**
+ * daisyUI computes it as `--size-field * 8` (`node_modules/daisyui/
+ * components/button.css`, confirmed by reading the compiled output, not
+ * assumed) against `--size-field * 10` for the default/`md` size — two
+ * different multipliers sharing one scalar. Hitting `Button`'s own two
+ * comfortable targets (`ButtonSmallTokens.ContainerHeight` 40dp,
+ * `ButtonMediumTokens.ContainerHeight` 56dp — both transcribed from
+ * `androidx/androidx`'s `compose/material3/material3/src/commonMain/
+ * kotlin/androidx/compose/material3/tokens/`, tag `v0_11_0`) needs two
+ * different unit values at once: 40dp / 8 = 5px for `sm`, 56dp / 10 =
+ * 5.6px for `md` — and `--size-field` above is already committed to
+ * 5.6px (0.35rem) at density 1, the value every other field control
+ * shares. So `.btn-sm` gets its own literal formula instead, bypassing
+ * `--size-field` entirely for this one class; every other daisyUI size
+ * class this package does not expose (`.btn-lg`, `.btn-xs`, `.megamenu-*`,
+ * `.fileinput-*`) is deliberately left on the shared scalar, unreachable
+ * from any exported `size` variant, so drifting off M3's own numbers
+ * there costs nothing today. This rule is plain, unlayered CSS — the
+ * same "an unlayered Tailwind utility (or, here, an unlayered plain
+ * rule) outranks daisyUI's nested `@layer daisyui.l1.l2.l3`" mechanism
+ * this file's own `AGENTS.md` already documents twice — so it wins
+ * outright over daisyUI's own layered `.btn-sm{--size:…}` regardless of
+ * source order. `Button size="icon"` is `btn-circle btn-sm`, so it reads
+ * this same override for its diameter — comfortable icon buttons become
+ * 40×40, matching `ButtonSmallTokens` exactly, the same bucket their text
+ * counterpart already lived in at rest.
+ */
+.btn-sm {
+  --size: calc(32px + var(--density, 0) * 8px);
+}
+
+/*
+ * The press-shape morph's target radius (`src/lib/press-shape.ts`), made
+ * proportional to each control's own rendered size instead of the flat
+ * `--radius-selector` (8px) constant it used to be. Measured before this
+ * change: on `Button size="icon"` (32×32 at rest) the flat 8px target was
+ * 25% of the box — "obviously square" per the bug report this fixes — while
+ * on a 40px-tall text button the same 8px was already a fifth of the
+ * height and read fine, which is why the defect went unnoticed on every
+ * other control sharing `PRESS_SHAPE_MORPH`.
+ *
+ * The replacement ratio is transcribed, not invented, from
+ * `PressedContainerShape` in the same three androidx token files cited
+ * above, cross-referenced against `ShapeTokens.kt`'s own corner values in
+ * the same directory: `ButtonSmallTokens` (40dp) presses to `CornerSmall`
+ * (8dp), `ButtonMediumTokens` (56dp) to `CornerMedium` (12dp),
+ * `ButtonLargeTokens` (96dp) to `CornerLarge` (16dp) — 8/40 = 0.200,
+ * 12/56 = 0.214, 16/96 = 0.167. `0.2` is used below rather than a
+ * per-bucket lookup: it is exact for the Small bucket (the one every
+ * compact-register control in this package actually sits in today, so
+ * compact stays byte-identical — 40px * 0.2 = 8px, the same number the
+ * flat constant already produced there) and within a pixel of Medium
+ * (56px comfortable * 0.2 = 11.2px against the real 12px token), which is
+ * the working approximation the three data points above describe as
+ * "about a fifth" rather than a strict per-bucket table this package has
+ * no clean way to key off of (a control's Button `size` prop, not its
+ * resolved pixel height, is what would have to drive a lookup, and nothing
+ * here reads that far up).
+ *
+ * `.btn-circle` gets its own, deliberately gentler ratio rather than
+ * reusing 0.2: going from an unbounded radius (a true circle) to *any*
+ * finite corner is a much larger perceptual jump than a rounded rectangle
+ * softening further, which is exactly what the 25%-of-box measurement
+ * above was reporting. `0.1` — half of the rectangular ratio — is the
+ * same halving relationship `--radius-xs` (4px) already establishes
+ * against `--radius-selector` (8px) two sections up, for the identical
+ * "a small glyph-scale control reads as square at a quarter of its own
+ * box" risk, reapplied here as a ratio instead of a fixed px so it now
+ * scales with both size *and* density instead of needing a new constant
+ * every time either changes.
+ */
+.btn {
+  --btn-press-radius: calc(var(--size) * 0.2);
+}
+.btn-circle {
+  --btn-press-radius: calc(var(--size) * 0.1);
 }
 
 /*
@@ -502,7 +699,16 @@
   --radius-field: 12px;
   --radius-box: 20px;
   --size-selector: 0.25rem;
-  --size-field: 0.25rem;
+  /* Density axis (D10) — see the standalone "Density register" block below
+     this theme's closing brace for the full derivation. `--size-field` is
+     daisyUI's own per-theme scale unit: every `.btn`/`.input`/`.select`
+     multiplies it (`--size: calc(var(--size-field) * N)`, `N` = 10 for the
+     default/`md` size) to get its rendered height, so this one line is
+     what makes `Button`'s default size, `Input` and `Select` all track
+     `--density` for free, with zero component-level changes. `--density`
+     is 0 (compact) unless an ancestor sets `[data-density="comfortable"]`,
+     so a consumer who sets nothing gets exactly 0.25rem, unchanged. */
+  --size-field: calc(0.25rem + var(--density, 0) * 0.1rem);
   --border: 1px;
   --depth: 0;
   --noise: 0;

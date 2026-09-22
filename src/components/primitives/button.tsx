@@ -23,18 +23,20 @@ import { cn } from "../../lib/cn";
 // D8 register explicit at the call site, matching §6.3's own sketch
 // verbatim.
 //
-// M3 Expressive: the press shape morph. `active:rounded-selector` steps
-// the radius down one tier (12px field → 8px selector; `icon`'s
-// `rounded-full` circle → the same 8px, a visible square-with-soft-corners
-// on its ~32px box) for as long as the pointer or Space/Enter key holds
-// the button down, and springs back on release via `--ease-spatial-fast`/
-// `--dur-spatial-fast` — `theme.css`'s "signature bounce" spring. Both
-// `active:rounded-selector` and the icon variant's own unconditional
-// `rounded-full` below are plain Tailwind utilities (no shared merge
-// group across the `active:` modifier — see `cn.ts`'s own note on
-// modifier-scoped groups), so they coexist rather than one deleting the
-// other: `rounded-full` paints at rest, `active:rounded-selector` only
-// while held.
+// M3 Expressive: the press shape morph. `active:[border-radius:var(--btn-
+// press-radius)]` steps the radius down to a size-proportional target
+// (`theme.css`'s D10 "Density register" section derives `--btn-press-
+// radius` per control — `calc(var(--size) * 0.2)` on `.btn`, `* 0.1` on
+// `.btn-circle`, both transcribed from androidx's `PressedContainerShape`
+// tokens rather than the flat 8px constant this used to be) for as long
+// as the pointer or Space/Enter key holds the button down, and springs
+// back on release via `--ease-spatial-fast`/`--dur-spatial-fast` —
+// `theme.css`'s "signature bounce" spring. Both the `active:` rule and the
+// icon variant's own unconditional `rounded-full` below are plain
+// Tailwind utilities (no shared merge group across the `active:` modifier
+// — see `cn.ts`'s own note on modifier-scoped groups), so they coexist
+// rather than one deleting the other: `rounded-full` paints at rest, the
+// `active:` rule only while held.
 //
 // The transition itself has to be spelled out as one raw CSS property/
 // duration/timing-function triad rather than a `transition-colors` +
@@ -61,7 +63,8 @@ import { cn } from "../../lib/cn";
 // already declares elsewhere is a deliberate small unification, not an
 // unrelated change riding along.
 export const buttonVariants = cva(
-  "btn font-sans font-semibold rounded-field active:rounded-selector " +
+  "btn font-sans font-semibold rounded-field " +
+    "active:[border-radius:var(--btn-press-radius)] " +
     "[transition-property:color,background-color,border-color,border-radius] " +
     "[transition-duration:var(--dur-fast),var(--dur-fast),var(--dur-fast),var(--dur-spatial-fast)] " +
     "[transition-timing-function:var(--ease-out),var(--ease-out),var(--ease-out),var(--ease-spatial-fast)]",
