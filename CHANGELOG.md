@@ -13,6 +13,13 @@ decision the way the prose below does. The tradeoff is recorded in the
 pull request that made this change.
 -->
 
+## [0.2.3](https://github.com/vaam-apps/ui/compare/v0.2.2...v0.2.3) (2026-09-22)
+
+
+### Chores
+
+* **ci:** bump the vaam-apps/.github workflow pin to pick up the lint fix ([#22](https://github.com/vaam-apps/ui/issues/22)) ([694314f](https://github.com/vaam-apps/ui/commit/694314f5cf4c4eb93efdbd900dc5382d02344af3))
+
 ## [0.2.2](https://github.com/vaam-apps/ui/compare/v0.2.1...v0.2.2) (2026-09-19)
 
 
