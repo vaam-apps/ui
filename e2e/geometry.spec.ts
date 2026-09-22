@@ -144,7 +144,7 @@ test("the dialog's close button is a real target, not just an icon", async ({ pa
  * real browser proves the radius actually changes and actually reverts.
  */
 test.describe("the press-shape morph steps the radius down while held", () => {
-  test("a text button steps from --radius-field to --radius-selector", async ({ page }) => {
+  test("a text button steps from --radius-field to a fifth of its own height", async ({ page }) => {
     await openStory(page, STORY.buttonVariants);
     const button = storyRoot(page).getByRole("button", { name: "Primary" });
 
@@ -182,7 +182,9 @@ test.describe("the press-shape morph steps the radius down while held", () => {
     }
   });
 
-  test("a circular icon button steps from a true circle to --radius-selector", async ({ page }) => {
+  test("a circular icon button eases off the circle by a tenth of its height, not to a square", async ({
+    page,
+  }) => {
     await openStory(page, STORY.buttonSizes);
     const icon = storyRoot(page).getByRole("button", { name: "Icon button" });
     const rect = await box(icon);
