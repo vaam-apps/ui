@@ -8,9 +8,15 @@ import { expect, type Locator, type Page } from "@playwright/test";
  */
 
 export type Theme = "dark" | "light";
+export type Density = "compact" | "comfortable";
 
 export interface StoryOptions {
   theme?: Theme;
+  /** D10: the same `globals=…` channel as `theme`, defaulting to
+   * `"compact"` — `.storybook/preview.ts`'s own `initialGlobals` default,
+   * so a test that never passes this measures exactly what a consumer who
+   * sets nothing gets. */
+  density?: Density;
   width?: number;
   height?: number;
   /** `ThemeSwitcher`'s stories own `data-theme` themselves and opt out of
@@ -32,11 +38,11 @@ export interface StoryOptions {
  * the ones used here so a renamed story fails loudly in one place.
  */
 export async function openStory(page: Page, id: string, options: StoryOptions = {}): Promise<void> {
-  const { theme = "dark", width, height, expectThemeStamp = true } = options;
+  const { theme = "dark", density = "compact", width, height, expectThemeStamp = true } = options;
   if (width !== undefined) {
     await page.setViewportSize({ width, height: height ?? 800 });
   }
-  await page.goto(`/iframe.html?id=${id}&viewMode=story&globals=theme:${theme}`);
+  await page.goto(`/iframe.html?id=${id}&viewMode=story&globals=theme:${theme};density:${density}`);
   // The story is mounted, not merely fetched. `#storybook-root` exists in
   // `iframe.html` before React runs, so its emptiness is the only honest
   // "not yet" signal available.
@@ -48,6 +54,7 @@ export async function openStory(page: Page, id: string, options: StoryOptions = 
   if (expectThemeStamp) {
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
   }
+  await expect(page.locator("html")).toHaveAttribute("data-density", density);
 }
 
 /**
@@ -481,4 +488,68 @@ export async function clampToViewport(page: Page, rect: Box): Promise<Box> {
     width: Math.max(1, Math.min(rect.x + rect.width, viewport.width) - x),
     height: Math.max(1, Math.min(rect.y + rect.height, viewport.height) - y),
   };
+}
+
+/**
+ * Samples one or more elements' `getBoundingClientRect().x` together, on
+ * every animation frame, for `durationMs` — inside the page rather than
+ * round-tripped over CDP once per sample, which would add its own latency
+ * on top of whatever it is trying to measure, exactly backwards for
+ * catching a transition's *peak*.
+ *
+ * Plural rather than one selector at a time so two elements triggered by
+ * the *same* event (e.g. one "Replay" click starting two chips at once)
+ * are read from the *same* rAF loop, on the *same* frames — the only way
+ * to compare their peaks without also asking whether two separate runs
+ * happened to sample at the same point in their respective transitions.
+ * `e2e/motion.spec.ts` is the one caller today, and it uses this to
+ * compare two curves started by one click; a single-selector read is
+ * just this with a one-element array.
+ *
+ * This exists for one thing `motion-tokens.test.ts` cannot reach: that
+ * file integrates the spring's ODE and pins the `linear()` stops against
+ * it, entirely in Node, so it proves the curve is correct without ever
+ * asking a browser to run it. `linear()` easing functions are Baseline
+ * 2023 but not universal, and a CSS engine could in principle sample them
+ * differently than the spec's own linear interpolation between stops —
+ * this is what actually watches Chromium apply one to a real transition
+ * and measures what comes out, rather than trusting that a correct
+ * `linear()` string implies a correct render.
+ */
+export async function sampleBoundingClientXs(
+  page: Page,
+  selectors: string[],
+  durationMs: number,
+): Promise<number[][]> {
+  return await page.evaluate(
+    async ([sels, total]) => {
+      // Resolved and null-checked here, in the same scope as the throw —
+      // `nodes`'s declared type is `Element[]`, never `(Element | null)[]`,
+      // so the nested `tick` function below (a hoisted function
+      // declaration; TS does not carry a same-scope `const`'s narrowing
+      // across that boundary) never needs its own narrowing to begin with.
+      const nodes: Element[] = (sels as string[]).map((sel) => {
+        const found = document.querySelector(sel);
+        if (found === null) throw new Error(`no element for selector: ${sel}`);
+        return found;
+      });
+      const samples: number[][] = nodes.map(() => []);
+      const deadline = performance.now() + (total as number);
+      await new Promise<void>((resolve) => {
+        function tick() {
+          nodes.forEach((el, i) => {
+            samples[i]?.push(el.getBoundingClientRect().x);
+          });
+          if (performance.now() < deadline) {
+            requestAnimationFrame(tick);
+          } else {
+            resolve();
+          }
+        }
+        requestAnimationFrame(tick);
+      });
+      return samples;
+    },
+    [selectors, durationMs],
+  );
 }

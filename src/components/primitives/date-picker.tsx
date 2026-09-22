@@ -123,7 +123,18 @@ function PickerTrigger({
 const PANEL_CLASS = cn(
   "z-50 rounded-md border border-edge bg-surface-2 shadow-[var(--shadow-popover)]",
   "[--anchor-gap:6px] focus:outline-none",
-  "origin-top transition duration-100 ease-out data-closed:scale-95 data-closed:opacity-0",
+  // `scale-95 -> scale-100` is spatial (size), so it takes the M3
+  // Expressive spring rather than `--ease-out`: `--dur-spatial-fast` /
+  // `--ease-spatial-fast` (z 0.6, 9.5% overshoot) — the "fast" pair
+  // because this panel is small and local, the case `theme.css`'s own
+  // comment on the scheme calls out. `opacity` rides the same
+  // duration/easing rather than getting its own — splitting the two
+  // would need a comma-separated `transition-property` list with
+  // per-property duration/timing-function, and the fade here is
+  // secondary to the scale, not an independent signal worth the
+  // complexity. See `theme.css`'s "An easing and its duration are one
+  // unit" note: this is the matched pair, not a mix.
+  "origin-top transition duration-[var(--dur-spatial-fast)] ease-[var(--ease-spatial-fast)] data-closed:scale-95 data-closed:opacity-0",
 );
 
 export interface DatePickerProps {

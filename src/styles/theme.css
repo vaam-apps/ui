@@ -22,8 +22,12 @@
  * it is *legible*. So `contrast.test.ts` was written **first**, and the
  * light values below were searched for against it — maximum pairwise ΔE
  * among candidates that already cleared the bar. The result separates
- * better than the dark set it mirrors (minimum ΔE 19.3 against the dark
- * theme's own 9.6 between `neutral` and `expired`).
+ * better than the dark set it mirrors (minimum ΔE76 18.1 against the dark
+ * theme's own 9.6, both between `neutral` and `expired` — re-measured
+ * 2026-09-22 against plain CIE76 Euclidean-Lab distance, the metric this
+ * figure and `--state-expired-fg`'s own "ΔE 18" both use; a stale "19.3"
+ * here predated that expired-token correction and had drifted from it,
+ * caught while deriving `hct-neutrals.test.ts`'s CIEDE2000 gate below).
  *
  * `dark` keeps `default: true`, so a consumer who sets no `data-theme`
  * attribute gets exactly what they got before this change. Light is
@@ -75,6 +79,53 @@
  * build order, and no font files are checked into this repo yet. The
  * family stacks below are correct and will pick the right system fallback
  * (`ui-serif` / `system-ui` / `ui-monospace`) until self-hosting lands.
+ *
+ * **M3 Expressive colour (2026-09-22 investigation, see `hct-neutrals.test.ts`).**
+ * Motion, shape and type already took the M3 Expressive pass; colour was
+ * the last piece, and it landed as *documentation and a regression gate*,
+ * not new shipped hex values — a well-argued "this mostly already holds"
+ * is the honest result here, not a shortfall.
+ *
+ * §1.3 below is unchanged and is the reason: "one accent, never a hue"
+ * rules out the seed → tonal-palette pipeline M3's colour system is built
+ * around, so there is no principled way to *derive* a neutral from a seed
+ * in this library. What was checked instead is whether the surfaces this
+ * file already ships happen to sit inside M3 Expressive's own idea of a
+ * considered neutral, measured in HCT via
+ * `@material/material-color-utilities@0.4.0` (a devDependency, used only to
+ * derive and verify values here — never shipped to consumers). They do:
+ * `getNeutralPalette`/
+ * `getNeutralVariantPalette` in that package's `dynamic_scheme.js`
+ * (`case Variant.EXPRESSIVE`) fix chroma at 8 for neutral and 12 for
+ * neutral-variant, source-independent (checked against three unrelated
+ * seeds). `--color-base-100/200/300` and `--surface-3` measure
+ * chroma 3.1 → 7.2 in dark and 3.1 → 6.4 in light — under the budget with
+ * room to spare, on a palette nobody ever tuned against it. The `--edge`
+ * ladder sits a tier above (8.3–10.5 dark, 6.0–11.1 light), inside the
+ * neutral-*variant* budget the same way — the exact relationship M3 draws
+ * between the two palettes. Both are gated by `hct-neutrals.test.ts` now,
+ * so a future edit that saturates a surface or a border has somewhere to
+ * fail rather than just looking a little different.
+ *
+ * Two things that finding rules out. First, deriving the surfaces from an
+ * explicit seed anyway "to be principled": there is no measured gain over
+ * what is already shipped, and it would touch the single most pervasive
+ * colour in the library — the definition of a high-risk, low-payoff edit.
+ * Second, and the higher-risk item this investigation carried: putting the
+ * eight `--state-*-fg` hues on a uniform HCT tone step, so dark mirrors
+ * light's own tone band (35.7–39.1, an emergent property of the ΔE search
+ * above, not a target) "by construction". Tried and rejected: forcing dark
+ * theme's spread (currently 66.0–85.9, chosen per-hue for AA headroom) to
+ * a single tone (T80) leaves WCAG contrast essentially flat (7.6–13.7:1
+ * today vs. 11.5–11.6:1 forced — already comfortably over the 4.5:1 bar
+ * either way) and does **not** fix the palette's tightest collision:
+ * `neutral`/`expired` separate by only ΔE2000 8.7 today and 8.67 forced —
+ * unchanged, because that pair's closeness is a *chroma* problem
+ * (`expired` is deliberately near-achromatic, chroma 2.3 — see its own
+ * comment below) rather than a tone mismatch, so equalising tone cannot
+ * touch it. Eight shipped hex values changed for a measured improvement of
+ * nothing, on tokens every consumer and every pixel-level gate already
+ * depends on: not done.
  */
 
 @plugin "daisyui/theme" {
@@ -128,15 +179,259 @@
      explicit that it is "not fully pill-shaped either", and a data table's
      own row/cell chrome would look novelty-bubbly at pill radius — but
      within that ceiling this is the confident end of the range, not the
-     cautious one. */
+     cautious one.
+
+     **M3 Expressive shape-scale audit (verdict: keep the three-tier
+     register, no fourth step).** Google's own Expressive shape scale is
+     wider than this — roughly eleven named corner sizes (none through
+     extra-extra-large, several with an "increased" variant in between)
+     against this file's three plus the `--radius-xs` glyph-scale outlier
+     below. Checked against what this package actually renders, not
+     against the spec page in isolation, for three reasons the wider scale
+     does not survive here:
+
+     1. The extra Google steps above `--radius-box` (large-increased,
+        extra-large, extra-large-increased, extra-extra-large) exist for
+        surfaces this library doesn't have at all — phone-scale bottom
+        sheets and extended FABs at 28dp+ — and this file's own D8
+        reasoning already rejects that register for the surfaces it *does*
+        have: a data table's row/cell chrome "would look novelty-bubbly at
+        pill radius", the same objection at a smaller number. A desktop
+        operator console grounded in Polar's/Column's drawer and card
+        corners has no reference screen calling for a fourth, larger step,
+        and "one register, no fourth" (this comment's own opening line) is
+        a standing rule, not a rule that resets per redesign.
+     2. The "increased" variants (extra-small-increased,
+        large-increased, extra-large-increased) are Google's own
+        *interpolation waypoints* for their polygon-based shape-morph
+        system — named intermediate shapes a discrete state machine steps
+        through. CSS `border-radius` has no such need: a `transition` on
+        the property is continuously interpolated by the browser between
+        whatever two values a component names, so the "waypoint" problem
+        those extra tokens solve for Compose's shape-morph library doesn't
+        exist here. Confirmed empirically, not just argued: implementing
+        this file's own press-shape morph (`src/lib/press-shape.ts`)
+        needed exactly one additional value, and it didn't need to be a
+        new one — `--radius-selector` itself, already declared below,
+        covers it.
+     3. The 35-shape polygon library (cookies, clovers, arches, bursts —
+        Expressive's other shape axis, for avatars, FABs and loading
+        indicators) is explicitly out of scope for this pass; nothing in
+        this package's component set (form controls, tables, panels,
+        toasts) is a shape *outline* that would ever read as one of those
+        polygons rather than a rounded rectangle, so there is no register
+        gap to fill for it either.
+
+     So: three tiers plus the checkbox-only `--radius-xs` outlier already
+     say everything this component set needs said. Widening the register
+     "to match the spec" without a reference screen or a real interaction
+     calling for the extra step would be exactly the unargued change this
+     file's own conventions rule out. */
   --radius-selector: 8px;
   --radius-field: 12px;
   --radius-box: 20px;
   --size-selector: 0.25rem;
-  --size-field: 0.25rem;
+  /* Density axis (D10) — see the standalone "Density register" block below
+     this theme's closing brace for the full derivation. `--size-field` is
+     daisyUI's own per-theme scale unit: every `.btn`/`.input`/`.select`
+     multiplies it (`--size: calc(var(--size-field) * N)`, `N` = 10 for the
+     default/`md` size) to get its rendered height, so this one line is
+     what makes `Button`'s default size, `Input` and `Select` all track
+     `--density` for free, with zero component-level changes. `--density`
+     is 0 (compact) unless an ancestor sets `[data-density="comfortable"]`,
+     so a consumer who sets nothing gets exactly 0.25rem, unchanged. */
+  --size-field: calc(0.25rem + var(--density, 0) * 0.1rem);
   --border: 1px;
   --depth: 0;
   --noise: 0;
+}
+
+/*
+ * Density register (D10) — the fifth M3 Expressive pass. The first four
+ * (motion, shape, colour, type) changed this library's *vocabulary*
+ * without changing its *density*: measured in the built Storybook before
+ * this pass, `Button size="sm"`/`"md"` rendered 32px/40px and `Input`/
+ * `Select` rendered 40px, against M3's real Button tokens of 40dp/56dp —
+ * a deliberately dense operator-console register, correct for an admin
+ * console and wrong for a touch-first client app trying to reuse the same
+ * library. See the pull request description for the full before/after
+ * table; every number quoted below is re-derived from it, not invented.
+ *
+ * # The mechanism: a numeric `--density` custom property, `calc()`-driven
+ *
+ * `--density` is `0` (compact) or `1` (comfortable), read back everywhere
+ * a control's size needs to change as `calc(<compact value> + var(--density)
+ * * <delta>)` — one such formula per property, each with its own delta,
+ * which is what makes a *non-linear* register expressible at all: M3's
+ * own scale is not a fixed ratio (Button small→medium is 40dp→56dp, a
+ * +16dp step, while this library's compact register is 32px→40px, a
+ * +8px step — see the `.btn-sm` override below for the exact arithmetic
+ * this forces), so one global scalar multiplied through every control
+ * cannot hit both targets at once. A `calc()` expression scoped to one
+ * property can: the non-linearity lives in each formula's own delta
+ * constant, not in the axis itself, so `--density` stays one real,
+ * inheriting, genuinely-var-driven number the whole tree shares — not a
+ * design that needed to be linear to work.
+ *
+ * Two other mechanisms were weighed and rejected, on evidence rather than
+ * on taste:
+ *
+ * **`@container style(--density: …)` container style queries** — the
+ * candidate that reads best on paper, since it queries a custom property
+ * by name rather than leaning on an attribute selector. Rejected on two
+ * independent, both disqualifying, grounds:
+ *
+ * 1. Browser support, checked against caniuse directly rather than
+ *    recalled (`caniuse.com/css-container-queries-style`, read
+ *    2026-09-22): Chrome 111+ and Safari 18+ ship only *partial* support,
+ *    and Firefox's full support lands at version 151 — a browser with no
+ *    stable release at the time of writing. 91.7% global usage sounds
+ *    survivable until it is read as "excludes every Safari below 18",
+ *    i.e. every iOS/iPadOS release before March 2024 — a real floor for
+ *    a component library with no control over its consumers' users.
+ * 2. `container-type` is not free: establishing a query container sets
+ *    `contain: layout style` (or `size`) on that element, and `contain`
+ *    is exactly one of the five properties this file's own `AGENTS.md`
+ *    already names as breaking `position: fixed` for any descendant
+ *    (alongside `transform`/`filter`/`backdrop-filter`/
+ *    `will-change: transform`) — the reason `SideNav`'s floating rails
+ *    are portalled to `document.body` today. Scoping density at a root
+ *    element a consumer chooses is precisely the kind of ancestor this
+ *    trap already burned the library on once; reintroducing a
+ *    `contain`-bearing property at arbitrary root scopes is a second
+ *    chance for the same defect, for a feature that gains nothing a
+ *    `calc()` axis does not already provide.
+ *
+ * **A `[data-density="comfortable"]` selector setting literal values
+ * directly** (`.btn-sm[data-density="comfortable"] { --size: 40px }` and
+ * so on, no intermediate custom property) — robust and universally
+ * supported, but not honestly a CSS *variable*: nothing would actually
+ * cascade or interpolate, and every sized primitive would need its own
+ * per-density selector rather than reading one shared axis. Kept anyway,
+ * but only as the *toggle*: `[data-density="comfortable"]` below sets
+ * `--density: 1` and nothing else, so the ergonomic, zero-JS,
+ * set-once-at-a-root-scope API survives while every actual size still
+ * resolves through the one real variable.
+ *
+ * # Where it resolves — one place, not per screen
+ *
+ * `--density` is read in exactly three places, so a screen cannot end up
+ * half-dense by missing one: `--size-field` above (covers `Button`'s
+ * default/`md` size, `Input`, `Select` — everything daisyUI's own field
+ * scale drives), and the `.btn-sm` / `.btn` / `.btn-circle` rules below
+ * (the one daisyUI multiplier that cannot share `--size-field`, and the
+ * press-morph target, D10's other half). `src/lib/density.test.ts` pins
+ * this list and fails if a sized primitive's height stops resolving
+ * through one of the three.
+ *
+ * `--density: 0` is declared at bare `:root` — not `[data-theme="dark"]`
+ * — so it is reachable even outside a `data-theme`-stamped tree, the
+ * exact gap the surface-ladder comment two sections up already found
+ * Storybook's own documentation pages falling through (that comment's
+ * "Measured on a page with no attribute" applies verbatim here: a
+ * consumer relying on this file's own claim that density defaults to
+ * compact deserves that to be true with zero attributes set, not just
+ * with `data-theme` set). `var(--density, 0)` in every formula is the
+ * same guarantee restated at the point of use, for a browser or a
+ * fragment where even `:root` never loaded this stylesheet at all.
+ */
+:root {
+  --density: 0;
+}
+
+/* Comfortable is opt-in, set once at whatever root scope a consumer's
+   client app renders under (`<html data-density="comfortable">`, or a
+   wrapping element) — `--density` inherits from there to every control
+   beneath it, with no context to thread and no per-component prop.
+   `[data-density="compact"]` needs no rule of its own: `--density: 0` is
+   already `:root`'s default, so naming it explicitly is a documented
+   no-op, not a second code path. */
+[data-density="comfortable"] {
+  --density: 1;
+}
+
+/*
+ * The one daisyUI multiplier `--size-field` cannot cover, and the
+ * press-morph target — both driven by `--density` directly against each
+ * control's own resolved `--size`, so neither needs its own copy of the
+ * axis logic above.
+ *
+ * **`.btn-sm`'s `--size` is an explicit override, not `--size-field`.**
+ * daisyUI computes it as `--size-field * 8` (`node_modules/daisyui/
+ * components/button.css`, confirmed by reading the compiled output, not
+ * assumed) against `--size-field * 10` for the default/`md` size — two
+ * different multipliers sharing one scalar. Hitting `Button`'s own two
+ * comfortable targets (`ButtonSmallTokens.ContainerHeight` 40dp,
+ * `ButtonMediumTokens.ContainerHeight` 56dp — both transcribed from
+ * `androidx/androidx`'s `compose/material3/material3/src/commonMain/
+ * kotlin/androidx/compose/material3/tokens/`, tag `v0_11_0`) needs two
+ * different unit values at once: 40dp / 8 = 5px for `sm`, 56dp / 10 =
+ * 5.6px for `md` — and `--size-field` above is already committed to
+ * 5.6px (0.35rem) at density 1, the value every other field control
+ * shares. So `.btn-sm` gets its own literal formula instead, bypassing
+ * `--size-field` entirely for this one class; every other daisyUI size
+ * class this package does not expose (`.btn-lg`, `.btn-xs`, `.megamenu-*`,
+ * `.fileinput-*`) is deliberately left on the shared scalar, unreachable
+ * from any exported `size` variant, so drifting off M3's own numbers
+ * there costs nothing today. This rule is plain, unlayered CSS — the
+ * same "an unlayered Tailwind utility (or, here, an unlayered plain
+ * rule) outranks daisyUI's nested `@layer daisyui.l1.l2.l3`" mechanism
+ * this file's own `AGENTS.md` already documents twice — so it wins
+ * outright over daisyUI's own layered `.btn-sm{--size:…}` regardless of
+ * source order. `Button size="icon"` is `btn-circle btn-sm`, so it reads
+ * this same override for its diameter — comfortable icon buttons become
+ * 40×40, matching `ButtonSmallTokens` exactly, the same bucket their text
+ * counterpart already lived in at rest.
+ */
+.btn-sm {
+  --size: calc(32px + var(--density, 0) * 8px);
+}
+
+/*
+ * The press-shape morph's target radius (`src/lib/press-shape.ts`), made
+ * proportional to each control's own rendered size instead of the flat
+ * `--radius-selector` (8px) constant it used to be. Measured before this
+ * change: on `Button size="icon"` (32×32 at rest) the flat 8px target was
+ * 25% of the box — "obviously square" per the bug report this fixes — while
+ * on a 40px-tall text button the same 8px was already a fifth of the
+ * height and read fine, which is why the defect went unnoticed on every
+ * other control sharing `PRESS_SHAPE_MORPH`.
+ *
+ * The replacement ratio is transcribed, not invented, from
+ * `PressedContainerShape` in the same three androidx token files cited
+ * above, cross-referenced against `ShapeTokens.kt`'s own corner values in
+ * the same directory: `ButtonSmallTokens` (40dp) presses to `CornerSmall`
+ * (8dp), `ButtonMediumTokens` (56dp) to `CornerMedium` (12dp),
+ * `ButtonLargeTokens` (96dp) to `CornerLarge` (16dp) — 8/40 = 0.200,
+ * 12/56 = 0.214, 16/96 = 0.167. `0.2` is used below rather than a
+ * per-bucket lookup: it is exact for the Small bucket (the one every
+ * compact-register control in this package actually sits in today, so
+ * compact stays byte-identical — 40px * 0.2 = 8px, the same number the
+ * flat constant already produced there) and within a pixel of Medium
+ * (56px comfortable * 0.2 = 11.2px against the real 12px token), which is
+ * the working approximation the three data points above describe as
+ * "about a fifth" rather than a strict per-bucket table this package has
+ * no clean way to key off of (a control's Button `size` prop, not its
+ * resolved pixel height, is what would have to drive a lookup, and nothing
+ * here reads that far up).
+ *
+ * `.btn-circle` gets its own, deliberately gentler ratio rather than
+ * reusing 0.2: going from an unbounded radius (a true circle) to *any*
+ * finite corner is a much larger perceptual jump than a rounded rectangle
+ * softening further, which is exactly what the 25%-of-box measurement
+ * above was reporting. `0.1` — half of the rectangular ratio — is the
+ * same halving relationship `--radius-xs` (4px) already establishes
+ * against `--radius-selector` (8px) two sections up, for the identical
+ * "a small glyph-scale control reads as square at a quarter of its own
+ * box" risk, reapplied here as a ratio instead of a fixed px so it now
+ * scales with both size *and* density instead of needing a new constant
+ * every time either changes.
+ */
+.btn {
+  --btn-press-radius: calc(var(--size) * 0.2);
+}
+.btn-circle {
+  --btn-press-radius: calc(var(--size) * 0.1);
 }
 
 /*
@@ -147,7 +442,13 @@
  *
  * This block's light counterpart lives ~150 lines below. D9 had deleted it
  * outright; the header explains why it is back and what had to be true
- * first.
+ * first. Light's own comment there calls itself "slightly blue-biased,
+ * so the greys read as chosen rather than as stock neutrals" — measured in
+ * HCT (this file's header, "M3 Expressive colour"), the same is true here:
+ * `#0a0b0d` → `#1c1f25` sit at hue 258–265° (blue-violet) and chroma
+ * 3.1 → 7.2, not zero. Neither ladder was ever built from a seed; both
+ * turn out to already read as a considered cool grey rather than a stock
+ * one, which is the finding that header records.
  *
  * # Why `:root` is in this selector list
  *
@@ -217,6 +518,16 @@
   --skeleton-aurora-2: color-mix(in oklab, var(--aurora-2) 26%, transparent);
   --skeleton-aurora-3: color-mix(in oklab, var(--aurora-3) 22%, transparent);
   --skeleton-aurora-4: color-mix(in oklab, var(--aurora-4) 14%, transparent);
+
+  /* The default drift's paint (§3.8, "the skeleton's chaotic gradient"
+     below). `--color-base-content` carries no hue at all, so the same
+     four-tier falloff the aurora ramp uses — unchanged, on purpose, so
+     this is a hue swap and not a second set of tuned numbers — reads as
+     a brightness texture instead of a tint. */
+  --skeleton-tonal-1: color-mix(in oklab, var(--color-base-content) 30%, transparent);
+  --skeleton-tonal-2: color-mix(in oklab, var(--color-base-content) 26%, transparent);
+  --skeleton-tonal-3: color-mix(in oklab, var(--color-base-content) 22%, transparent);
+  --skeleton-tonal-4: color-mix(in oklab, var(--color-base-content) 14%, transparent);
 
   /* Overlay scrim. The only literal colour left in a component after the
      light theme landed was `bg-black/50`, hardcoded in three places —
@@ -398,7 +709,16 @@
   --radius-field: 12px;
   --radius-box: 20px;
   --size-selector: 0.25rem;
-  --size-field: 0.25rem;
+  /* Density axis (D10) — see the standalone "Density register" block below
+     this theme's closing brace for the full derivation. `--size-field` is
+     daisyUI's own per-theme scale unit: every `.btn`/`.input`/`.select`
+     multiplies it (`--size: calc(var(--size-field) * N)`, `N` = 10 for the
+     default/`md` size) to get its rendered height, so this one line is
+     what makes `Button`'s default size, `Input` and `Select` all track
+     `--density` for free, with zero component-level changes. `--density`
+     is 0 (compact) unless an ancestor sets `[data-density="comfortable"]`,
+     so a consumer who sets nothing gets exactly 0.25rem, unchanged. */
+  --size-field: calc(0.25rem + var(--density, 0) * 0.1rem);
   --border: 1px;
   --depth: 0;
   --noise: 0;
@@ -505,6 +825,13 @@
   --skeleton-aurora-2: color-mix(in oklab, var(--aurora-2) 17%, transparent);
   --skeleton-aurora-3: color-mix(in oklab, var(--aurora-3) 15%, transparent);
   --skeleton-aurora-4: color-mix(in oklab, var(--aurora-4) 10%, transparent);
+
+  /* Same falloff as dark's, reused unchanged — see the dark block's
+     comment on `--skeleton-tonal-1`. */
+  --skeleton-tonal-1: color-mix(in oklab, var(--color-base-content) 20%, transparent);
+  --skeleton-tonal-2: color-mix(in oklab, var(--color-base-content) 17%, transparent);
+  --skeleton-tonal-3: color-mix(in oklab, var(--color-base-content) 15%, transparent);
+  --skeleton-tonal-4: color-mix(in oklab, var(--color-base-content) 10%, transparent);
 
   --scrim: rgb(20 23 28 / 0.32);
 }
@@ -695,6 +1022,106 @@
   --text-metric-lg--line-height: 44px;
 }
 
+/*
+ * M3 Expressive's "emphasised" type register — investigated for this
+ * redesign, and deliberately not built as a new size scale or a new
+ * custom-property family. What follows is the finding and the reasoning,
+ * transcribed the same way the motion tokens above were: from androidx
+ * source rather than m3.material.io, which publishes no numbers in a
+ * fetchable form.
+ *
+ * `compose/material3/material3/src/commonMain/kotlin/androidx/compose/
+ * material3/tokens/TypefaceTokens.kt` (`v0_103`) carries fifteen
+ * `*Emphasized*` entries — one per baseline role (Display/Headline/
+ * Title/Body/Label × Large/Medium/Small) — each pairing 1:1 with its
+ * baseline in `TypeScaleTokens.kt`. Comparing the two files role by
+ * role: **size and line-height are byte-identical between a role and its
+ * emphasised counterpart, every single time.** The only thing that
+ * changes is `FontWeight`, and it moves exactly one named step up the
+ * same Regular → Medium → Bold axis this system already uses:
+ * Display/Headline/BodyLarge/BodyMedium/BodySmall/TitleLarge go
+ * Regular → Medium; TitleMedium/TitleSmall/Label(L/M/S) go
+ * Medium → Bold. (A handful of roles also nudge `letter-spacing` by
+ * ±0.05–0.1sp, e.g. BodyLarge 0.5sp → 0.15sp — too small and
+ * inconsistent in direction to be a rule worth porting into a system
+ * that already overrides tracking with a single `-0.011em` on `html`.)
+ * `Typography.kt`'s own doc comment confirms this is an emphasis
+ * *toggle*, not a heavier theme: "used to further stylize select pieces
+ * of text... pragmatic uses, such as creating clearer division of
+ * content and drawing users' eyes to relevant material" — i.e. opt-in,
+ * per instance, among structurally identical peers.
+ *
+ * **One caveat on how much those values are worth, which the motion
+ * tokens above do not carry.** The line immediately before the first
+ * `*Emphasized*` declaration in `TypeScaleTokens.kt` reads `// TODO
+ * update with the generated tokens once available` — so the whole
+ * emphasised block is hand-written placeholder, flagged as provisional by
+ * androidx itself, unlike the generated baseline roles above it and
+ * unlike `ExpressiveMotionTokens.kt`'s real constants. Weight-only is the
+ * best reading available today and everything below follows from it, but
+ * it is a claim about a file Google has marked not-final. If a later
+ * androidx drop generates these for real and the sizes diverge, this
+ * paragraph is where to start — and the fact that nothing here declares a
+ * new `--text-*` step is exactly what makes that cheap to revisit.
+ *
+ * Two things that finding rules out, both worth saying explicitly
+ * because they were the two ways this could have gone wrong:
+ *
+ * 1. **No new `--text-*` step.** "Emphasised" is not a fourteenth size —
+ *    it is an existing size at a different weight. Adding
+ *    `--text-metric-emphasized` or similar would be a second, redundant
+ *    way to say a size this scale already has a name for, which is the
+ *    exact drift `--radius-xs`'s own comment above warns about for the
+ *    radius ladder.
+ * 2. **No new custom property for the weight step either.** The
+ *    emphasised weight is always one of Tailwind's own stock
+ *    `font-medium` (500) or `font-bold` (700) — both already in use
+ *    elsewhere in this package (`side-nav.tsx`'s active rail item is
+ *    `font-medium` over an unweighted sibling; `calendar.tsx`'s `today`
+ *    is `font-semibold`). There is nothing to register: `font-weight`
+ *    is not a custom scale the way `--text-*` is, so `tailwind-merge`
+ *    already resolves conflicting weight utilities with no entry in
+ *    `cn.ts`'s `ExtraClassGroupId` list.
+ *
+ * **The variable-font axis Compose leans on is for animating smoothly
+ * *between* the two weights** (`MaterialExpressiveTheme` can tween a
+ * `FontVariation.Settings('wght', …)` as a value changes) — it is not
+ * needed to render either endpoint. Both endpoints here are ordinary
+ * named weights (400/500/700), which every stack above already renders
+ * correctly with zero font files shipped: a static, non-variable
+ * fallback (`system-ui`, `ui-serif`, `ui-monospace`, …) matches or
+ * synthesises those weights the same way it already does for the
+ * `font-medium`/`font-semibold` this package ships today. So the
+ * self-hosting gap noted in the four-voices comment above is not a
+ * blocker for the register itself — only for the motion half (animating
+ * *through* the weight axis), which is out of scope on this branch
+ * regardless (`--ease-*`/`--dur-*` above belong to a sibling branch) and
+ * was never going to be attempted here.
+ *
+ * **Where it actually lands: `StatTile`'s `emphasized` prop**
+ * (`src/components/data/stat-tile.tsx`), and nowhere else, on purpose.
+ * `StatTile`'s own doc comment for `tone` already names the exact
+ * scenario M3 Expressive's emphasis toggle exists for — "leave unset
+ * unless the number's own colour carries meaning; a wall of coloured
+ * tiles makes the one that matters harder to find" — and then offers no
+ * other way to do it, because colour is reserved for status
+ * (`--state-*`) and a tile singled out for *importance* is not carrying
+ * status. That was a genuine, load-bearing gap: `InstrumentPanel`'s own
+ * dashboard story (`instrument-panel.stories.tsx`) renders three tiles
+ * of equal weight — Delivered, Unresolved, Spend — with no way to say
+ * which one a reader should find first without reaching for colour and
+ * lying about what it means. `font-medium` on the value only (never the
+ * label or caption, which stay the reference the reader compares the
+ * emphasised figure against) is the Regular → Medium step this system's
+ * own headline-scale roles (`--text-metric`/`--text-metric-lg`) take in
+ * M3 Expressive, applied the same way `side-nav.tsx` already applies it
+ * to a selected rail item — completing a pattern this library had
+ * already arrived at independently, not inventing one. It does not
+ * touch `font-variant-numeric: tabular-nums slashed-zero` (§3.3 above):
+ * that is a glyph-substitution feature, orthogonal to weight, and the
+ * slash survives at 500 exactly as it does at 400.
+ */
+
 @layer base {
   :root {
     /* §3.8 motion tokens. Not Tailwind-registered (no `duration-*` utility
@@ -707,6 +1134,162 @@
     --ease-out: cubic-bezier(0.2, 0, 0, 1);
     --ease-in: cubic-bezier(0.4, 0, 1, 1);
     --ease-linear: linear;
+
+    /* ── M3 Expressive motion ────────────────────────────────────────────
+       The spring scheme `MaterialExpressiveTheme` installs, transcribed
+       from androidx rather than from the design site, which publishes no
+       numbers: `compose/material3/material3/src/commonMain/kotlin/
+       androidx/compose/material3/tokens/ExpressiveMotionTokens.kt`, with
+       `StandardMotionTokens.kt` beside it for the comparison below.
+       Compose's `SpringSpec` has mass = 1, so omega-n = sqrt(stiffness).
+
+                        standard (z/k)   expressive (z/k)
+         spatial default   0.9 / 700        0.8 / 380
+         spatial fast      0.9 / 1400       0.6 / 800
+         spatial slow      0.9 / 300        0.8 / 200
+         effects (all 3)   1.0 / ...        1.0 / ...   <- identical
+
+       **Expressive changes spatial motion and nothing else.** All three
+       effects springs carry the same constants in both schemes, so colour
+       and opacity animation is not part of this: reach for `--ease-out`
+       there and you are still on spec.
+
+       Three curves, not six, and that is derived rather than a shortcut.
+       A spring's *normalised* step response depends on z alone; stiffness
+       only scales time. Integrating the ODE at 0.5ms and sampling 25
+       stops, the z=0.8 default and z=0.8 slow agree to 4dp at every stop
+       (peak 1.0151 for both), and the three z=1.0 effects curves agree to
+       3dp. So one curve per damping ratio, and stiffness lives in the
+       duration.
+
+       Measured peak overshoot, same integration:
+         --ease-spatial        1.5%   (z 0.8)
+         --ease-spatial-fast   9.5%   (z 0.6)  <- the signature bounce
+         --ease-effects        0%     (z 1.0, critically damped)
+       Standard's spatial springs peak at 0.2%, i.e. nothing a reader can
+       see. That gap is the whole difference between the two schemes.
+
+       **An easing and its duration are one unit.** These are `linear()`
+       samples of a spring across its own settling time; pairing
+       `--ease-spatial-fast` with `--dur-fast` does not give a quicker
+       bounce, it gives a curve that is no longer that spring. Change one,
+       change both. */
+    --dur-spatial: 435ms;
+    --dur-spatial-fast: 360ms;
+    --dur-spatial-slow: 599ms;
+    --dur-effects: 231ms;
+    --dur-effects-fast: 150ms;
+    --dur-effects-slow: 327ms;
+
+    /* `linear()` is the only CSS easing that can hold a multi-oscillation
+       spring — a cubic-bezier overshoots at most once, and z=0.6 crosses 1
+       twice. It is Baseline 2023 (Chrome 113, Safari 17.2, Firefox 112),
+       so the `@supports` block below upgrades these. The default is
+       `--ease-out`, which drops the bounce rather than approximating it
+       badly: a wrong bounce reads as a broken animation, no bounce reads
+       as a restrained one.
+
+       The fallback has to be two rules and not two declarations of the
+       same property. A custom property accepts *any* token stream, so a
+       browser with no `linear()` still stores it happily and fails only
+       where it is used — the usual "declare the fallback first and let
+       the cascade drop the invalid one" trick silently does nothing for
+       custom properties. */
+    --ease-spatial: var(--ease-out);
+    --ease-spatial-fast: var(--ease-out);
+    --ease-effects: var(--ease-out);
+  }
+
+  @supports (animation-timing-function: linear(0, 1)) {
+    :root {
+      /* z 0.8, k 380 — 25 stops across 435ms. Peak 1.0151. */
+      --ease-spatial: linear(
+        0,
+        0.0516,
+        0.1705,
+        0.3163,
+        0.4636,
+        0.598,
+        0.7123,
+        0.8044,
+        0.8751,
+        0.9271,
+        0.9636,
+        0.9877,
+        1.0026,
+        1.0108,
+        1.0144,
+        1.0151,
+        1.0141,
+        1.0122,
+        1.01,
+        1.0077,
+        1.0058,
+        1.0041,
+        1.0027,
+        1.0017,
+        1.001
+      );
+      /* z 0.6, k 800 — 25 stops across 360ms. Peaks at 1.0941, then dips
+         to 0.9912 before settling: two crossings of 1, which is exactly
+         why this one cannot be a bezier. */
+      --ease-spatial-fast: linear(
+        0,
+        0.0752,
+        0.2486,
+        0.4571,
+        0.6578,
+        0.8259,
+        0.9511,
+        1.0332,
+        1.078,
+        1.0941,
+        1.0908,
+        1.0762,
+        1.0568,
+        1.0373,
+        1.0204,
+        1.0074,
+        0.9986,
+        0.9934,
+        0.9913,
+        0.9912,
+        0.9923,
+        0.9941,
+        0.996,
+        0.9977,
+        0.999
+      );
+      /* z 1.0 — critically damped, monotonic, never exceeds 1. Serves all
+         three effects speeds; only `--dur-effects-*` differs. */
+      --ease-effects: linear(
+        0,
+        0.0576,
+        0.1805,
+        0.3211,
+        0.4555,
+        0.5733,
+        0.6714,
+        0.7504,
+        0.8125,
+        0.8604,
+        0.8968,
+        0.9242,
+        0.9446,
+        0.9597,
+        0.9708,
+        0.979,
+        0.9849,
+        0.9892,
+        0.9922,
+        0.9945,
+        0.9961,
+        0.9972,
+        0.998,
+        0.9986,
+        0.999
+      );
+    }
   }
 
   html {
@@ -755,22 +1338,87 @@
  * cannot know, and a grid of them beats in unison like a metronome.
  *
  * What replaces it is a *drift*: two soft, oversized gradient fields
- * translating and scaling past each other on coprime periods (23s and
- * 31s, so the pair only returns to its starting arrangement every 713s).
- * There is no sweep, no direction, no edge, and no shared phase between
- * two skeletons mounted a moment apart — which is what "chaotic" is
- * buying. It says "alive, still waiting" without saying anything about
- * how much longer.
+ * translating and scaling past each other on coprime periods (9s and 13s,
+ * so the pair only returns to its starting arrangement every 117s — this
+ * comment used to say 23s/31s/713s, the periods this drift shipped with
+ * before `a87a4c2` widened the amplitude and shortened both to 9s/13s
+ * without updating the prose beside them; measured against the
+ * `animation:` declarations below rather than trusted). There is no
+ * sweep, no direction, no edge, and no shared phase between two skeletons
+ * mounted a moment apart — which is what "chaotic" is buying. It says
+ * "alive, still waiting" without saying anything about how much longer.
+ *
+ * # Why this doesn't use the M3 Expressive spring tokens
+ *
+ * `--ease-spatial`/`--ease-spatial-fast`/`--ease-effects` and their
+ * `--dur-*` pairs (§3.8 above) are integrated springs — see
+ * `motion-tokens.test.ts`. Every one of them describes a *step response*:
+ * a value displaced once and settling, over 231–599ms, to a single target
+ * it then holds. `skeleton-drift-a`/`-b` are the opposite shape: an
+ * unbroken loop with no displacement and no target, restated over 9–13s
+ * per cycle for as long as the placeholder is mounted. Two consequences
+ * follow from that mismatch rather than from taste:
+ *
+ * - **Wrong order of magnitude.** The slowest spring (`--dur-spatial-slow`,
+ *   599ms) is 15–22× shorter than either drift period. Playing a loop
+ *   this long at spring speed would collapse "ambient" into "twitchy" —
+ *   the drift exists precisely to be slow enough that no single glance
+ *   catches it moving.
+ * - **A spring bounces toward rest; a `@keyframes` loop has no rest to
+ *   bounce toward.** `--ease-spatial-fast` overshoots by 9.5% *because*
+ *   it is approaching a value it then holds — that overshoot is legible
+ *   as "arrived, slightly too fast" precisely because motion stops
+ *   after it. Applied between two of `skeleton-drift-a`'s eight irregular
+ *   stops, the same curve would read as a stutter at each segment
+ *   boundary, once per stop, forever — the loop never holds still long
+ *   enough for a bounce to resolve into anything.
+ *
+ * So the bespoke `cubic-bezier()` curves below are the right tool for an
+ * ambient loop and the spring scheme is not, and that is a considered
+ * answer rather than an oversight: M3 Expressive itself changes only
+ * *spatial* (state-to-state) and *effects* (opacity/colour) motion — its
+ * own token set has no ambient-loop category to reach for here either.
+ *
+ * # Colour: tonal by default, aurora by explicit opt-in
+ *
+ * The drift used to paint with the `--aurora-*` ramp unconditionally —
+ * decorative chrome bound to the system's status hues, everywhere a
+ * `Skeleton` rendered, including inside a `Table` (`skeleton.stories.tsx`'s
+ * own `MatchesTheRealRowHeight` story puts one in a table cell). That
+ * contradicts the three-register split `instrument-panel.tsx` documents:
+ * a hairline-on-a-surface-step *diagnostic* register for tables, drawers
+ * and detail panes — the places a reader reads row by row — with hued
+ * chrome reserved for the *instrument* register alone, the dashboard
+ * surfaces a reader scans rather than reads. A skeleton standing in for a
+ * table cell is diagnostic-register content; the coloured wash it shipped
+ * with is instrument-register chrome, and most skeletons on screen at any
+ * moment are the former.
+ *
+ * So the default paint is now `--skeleton-tonal-*`: the same four-tier
+ * alpha falloff the aurora ramp already used, unchanged, mixed with
+ * `--color-base-content` instead of a hue — a brightness texture with no
+ * colour in it, which is what "a tonal step, not a coloured wash" means
+ * for a surface this stylesheet cannot express as an actual extra surface
+ * level (`--surface-3` is already the ladder's top step; see the surface
+ * ladder comment above). `Skeleton`'s `instrument` prop switches the same
+ * geometry back onto `--skeleton-aurora-*`, for the one case the register
+ * doctrine actually calls for it: a placeholder standing in for content
+ * inside `InstrumentPanel`/`StatTile`, the scanned dashboard surfaces the
+ * aurora ramp was drawn for in the first place.
  *
  * Three properties are deliberate and worth not undoing:
  *
  * - **Transform only.** Both layers animate `transform`, never
  *   `background-position` or `background-image`, so the whole effect is
  *   composited and a table of 200 skeleton cells costs no layout and no
- *   repaint.
- * - **Low amplitude, low contrast.** Four fields drawn from the aurora
- *   ramp at 7–20%, over `--surface-3`. At a glance it should read as a
- *   texture, not as a moving object — "silent".
+ *   repaint. Swapping the paint between tonal and aurora is a static
+ *   `background-image` chosen by class at render time, not an animated
+ *   property — it does not touch this.
+ * - **Low amplitude, low contrast.** Four fields at 14–30% in dark and
+ *   10–20% in light (both variants share the same falloff — see
+ *   `--skeleton-tonal-1`'s comment above), over `--surface-3`. At a
+ *   glance it should read as a texture, not as a moving object —
+ *   "silent".
  * - **Off under `prefers-reduced-motion`, and still correct.** Pausing
  *   leaves the gradients painted where they stand, so a reduced-motion
  *   reader gets a static mottled surface rather than a flat one: the
@@ -844,19 +1492,43 @@
    * ruinous on two hundred table cells, and it would force the whole
    * skeleton onto its own composited layer for no visual gain — the
    * softness here comes from wide gradient stops, which cost nothing.
+   *
+   * Tonal by default (`--skeleton-tonal-*`); `Skeleton`'s `instrument`
+   * prop adds `.skeleton-instrument`, which repaints the identical
+   * geometry onto `--skeleton-aurora-*` below. Same specificity trick as
+   * `.aurora-glow`'s light override: `.skeleton-chaos.skeleton-instrument`
+   * is (0,2,1) against this rule's (0,1,1), so it wins on specificity and
+   * does not depend on source order.
    */
   .skeleton-chaos::before {
     background-image:
-      radial-gradient(58% 120% at 18% 30%, var(--skeleton-aurora-1), transparent 68%),
-      radial-gradient(46% 110% at 72% 78%, var(--skeleton-aurora-2), transparent 70%);
+      radial-gradient(58% 120% at 18% 30%, var(--skeleton-tonal-1), transparent 68%),
+      radial-gradient(46% 110% at 72% 78%, var(--skeleton-tonal-2), transparent 70%);
     animation: skeleton-drift-a 9s cubic-bezier(0.4, 0.1, 0.35, 1) infinite;
   }
 
   .skeleton-chaos::after {
     background-image:
+      radial-gradient(70% 130% at 58% 12%, var(--skeleton-tonal-3), transparent 66%),
+      radial-gradient(40% 90% at 8% 88%, var(--skeleton-tonal-4), transparent 72%);
+    animation: skeleton-drift-b 13s cubic-bezier(0.32, 0, 0.5, 0.9) infinite;
+  }
+
+  /* The instrument-register opt-in: the same two layers, repainted with
+     the hued aurora ramp instead of the neutral one. For a placeholder
+     standing in for content inside `InstrumentPanel`/`StatTile` — the
+     scanned dashboard surfaces `--aurora-*` exists for — not for general
+     use; see the header comment above. */
+  .skeleton-chaos.skeleton-instrument::before {
+    background-image:
+      radial-gradient(58% 120% at 18% 30%, var(--skeleton-aurora-1), transparent 68%),
+      radial-gradient(46% 110% at 72% 78%, var(--skeleton-aurora-2), transparent 70%);
+  }
+
+  .skeleton-chaos.skeleton-instrument::after {
+    background-image:
       radial-gradient(70% 130% at 58% 12%, var(--skeleton-aurora-3), transparent 66%),
       radial-gradient(40% 90% at 8% 88%, var(--skeleton-aurora-4), transparent 72%);
-    animation: skeleton-drift-b 13s cubic-bezier(0.32, 0, 0.5, 0.9) infinite;
   }
 
   /*

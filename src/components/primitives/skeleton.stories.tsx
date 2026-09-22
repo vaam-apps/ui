@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
+import { InstrumentPanel } from "../data/instrument-panel";
 import { RouteSkeleton } from "../patterns/route-skeleton";
 import { Card, CardBody, CardHeader } from "./card";
 import { CheckboxField } from "./checkbox";
@@ -21,7 +22,10 @@ const meta = {
           "shared phase between neighbours. A shimmer implies progress a placeholder cannot " +
           "know about, and a column of them beats in unison; a drift says only “still " +
           "waiting, not stuck”. Turn your OS reduced-motion setting on and reload: the " +
-          "gradients stay, frozen where they stand.",
+          "gradients stay, frozen where they stand. The drift itself paints tonal by " +
+          "default — a brightness texture, no hue — and only turns to the `--aurora-*` " +
+          "chrome when `instrument` is set, for a placeholder standing in for content that " +
+          "will itself render inside `InstrumentPanel`/`StatTile`.",
       },
     },
   },
@@ -145,6 +149,33 @@ export const InsideACardAndStill: Story = {
           <SkeletonText lines={3} animated={false} />
         </CardBody>
       </Card>
+    </div>
+  ),
+};
+
+/**
+ * The register split. Left: the default, tonal drift — a brightness
+ * texture with no hue in it, the right paint for the table cells and
+ * form fields most skeletons stand in for. Right: `instrument`, the same
+ * geometry repainted onto the `--aurora-*` ramp, for a placeholder that
+ * will itself render inside an `InstrumentPanel` — the one register that
+ * chrome belongs to. `InstrumentPanel`'s own mesh matches the tone of
+ * the `instrument` skeleton it stands in for.
+ */
+export const TonalVsInstrument: Story = {
+  render: () => (
+    <div className="flex w-full max-w-[48rem] flex-col gap-4 sm:flex-row">
+      <Card className="flex-1">
+        <CardHeader title="Delivered" meta="default" />
+        <CardBody>
+          <Skeleton className="h-9 w-24" />
+          <SkeletonText lines={2} className="mt-3" />
+        </CardBody>
+      </Card>
+      <InstrumentPanel title="Delivered" caption="instrument" className="flex-1">
+        <Skeleton className="h-9 w-24" instrument />
+        <SkeletonText lines={2} className="mt-3" instrument />
+      </InstrumentPanel>
     </div>
   ),
 };

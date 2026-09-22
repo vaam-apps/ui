@@ -50,7 +50,11 @@ export function DropdownMenuContent({
         // (see `DropdownMenuItem`'s own comment for why "on the item"
         // itself — this component's row — does not work).
         "z-50 min-w-[180px] max-w-[min(20rem,calc(100vw-2rem))] rounded-md border border-edge bg-surface-2 p-1 shadow-[var(--shadow-popover)] [--anchor-gap:4px] focus:outline-none",
-        "origin-top transition duration-100 ease-out data-closed:scale-95 data-closed:opacity-0",
+        // Spatial (scale), M3 Expressive `--dur-spatial-fast` /
+        // `--ease-spatial-fast` — see `date-picker.tsx`'s `PANEL_CLASS`
+        // for the full reasoning (small/local panel, opacity riding the
+        // same pair rather than splitting the transition).
+        "origin-top transition duration-[var(--dur-spatial-fast)] ease-[var(--ease-spatial-fast)] data-closed:scale-95 data-closed:opacity-0",
         className,
       )}
       {...props}

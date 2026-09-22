@@ -12,6 +12,27 @@ export interface SkeletonProps extends HTMLAttributes<HTMLDivElement> {
    * `theme.css`, and does not need each call site to decide for them.
    */
   animated?: boolean;
+  /**
+   * Paints the drift with the `--aurora-*` hue ramp instead of the
+   * neutral default.
+   *
+   * `false` (the default) is the *tonal* drift: the same geometry, mixed
+   * with `--color-base-content` instead of a hue, so it reads as a
+   * brightness texture rather than a tint. That is the diagnostic-
+   * register colour language — see `instrument-panel.tsx`'s three-
+   * register doctrine — and it is what most `Skeleton`s are: table
+   * cells, form fields, detail panes, all content a reader reads rather
+   * than scans.
+   *
+   * Set it `true` only for a placeholder standing in for content that
+   * will itself render inside `InstrumentPanel`/`StatTile` — a scanned
+   * dashboard metric, not read prose. The hued chrome that surface is
+   * built for is decorative there for the same reason `Card`'s `glow`
+   * prop is opt-in rather than default: coloured chrome on every
+   * placeholder makes the one inside a real instrument panel no longer
+   * distinctive, and it is chrome a table cell has no business wearing.
+   */
+  instrument?: boolean;
 }
 
 /**
@@ -34,12 +55,19 @@ export interface SkeletonProps extends HTMLAttributes<HTMLDivElement> {
  * low-contrast gradient fields drifting past each other on coprime
  * periods, with no edge, no direction and no shared phase — see
  * `theme.css`'s own `.skeleton-chaos` block for the mechanics and the
- * numbers. It conveys "still waiting, not stuck" and deliberately
- * conveys nothing about how much longer.
+ * numbers, including why this loop is *not* built from the M3 Expressive
+ * spring tokens (`--ease-spatial`/`--ease-effects`): those describe a
+ * value settling once, this is an unbroken ambient loop, and neither the
+ * duration nor the shape of a spring transfers to that.
  *
  * Deliberately still a hand-rolled `<div>`, not daisyUI's `.skeleton`:
  * read `daisyui/components/skeleton.css` before reaching for it — what it
  * ships is precisely the `background-position` sweep described above.
+ *
+ * # Colour: tonal by default, `instrument` for the one case that isn't
+ *
+ * The drift is a brightness texture, not a tint — see the `instrument`
+ * prop above for when the hued alternative is actually the right call.
  *
  * # Not announced
  *
@@ -53,11 +81,21 @@ export interface SkeletonProps extends HTMLAttributes<HTMLDivElement> {
  * `--radius-box` — this component stands in for table cells and text
  * lines across every screen, all field-scale content.
  */
-export function Skeleton({ className, animated = true, ...props }: SkeletonProps) {
+export function Skeleton({
+  className,
+  animated = true,
+  instrument = false,
+  ...props
+}: SkeletonProps) {
   return (
     <div
       aria-hidden="true"
-      className={cn("rounded-sm bg-surface-3", animated && "skeleton-chaos", className)}
+      className={cn(
+        "rounded-sm bg-surface-3",
+        animated && "skeleton-chaos",
+        animated && instrument && "skeleton-instrument",
+        className,
+      )}
       {...props}
     />
   );
@@ -91,6 +129,7 @@ export function SkeletonText({
   className,
   lineClassName,
   animated = true,
+  instrument = false,
   ...props
 }: SkeletonTextProps) {
   return (
@@ -102,6 +141,7 @@ export function SkeletonText({
             // biome-ignore lint/suspicious/noArrayIndexKey: a fixed count of interchangeable placeholder bars, never reordered
             key={i}
             animated={animated}
+            instrument={instrument}
             className={cn(
               "h-4",
               last && lines > 1 ? "w-[58%]" : LINE_WIDTHS[i % LINE_WIDTHS.length],

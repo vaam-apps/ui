@@ -1,6 +1,31 @@
+import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { box, openStory, paintedFillRatio, settleTransitions, storyRoot } from "./helpers";
 import { STORY } from "./story-ids";
+
+/** The four corner radii of `target`, in px, via `getComputedStyle` —
+ * never the class string (see this file's own header). */
+async function cornerRadii(target: Locator): Promise<number[]> {
+  return await target.evaluate((el) => {
+    const style = getComputedStyle(el);
+    return [
+      style.borderTopLeftRadius,
+      style.borderTopRightRadius,
+      style.borderBottomLeftRadius,
+      style.borderBottomRightRadius,
+    ].map((value) => Number.parseFloat(value));
+  });
+}
+
+/** Holds the pointer down on `target` — real `:active`, not a class toggle
+ * — waits out the radius transition, and hands back the settled shape.
+ * The caller is responsible for `page.mouse.up()` afterwards. */
+async function pressAndSettle(page: Page, target: Locator): Promise<number[]> {
+  await target.hover();
+  await page.mouse.down();
+  await settleTransitions(page);
+  return await cornerRadii(target);
+}
 
 /**
  * Shapes and sizes, measured off the render.
@@ -108,4 +133,114 @@ test("the dialog's close button is a real target, not just an icon", async ({ pa
   // bigger than the glyph. 24 is WCAG 2.2 §2.5.8's floor.
   expect(rect.width, "close button width").toBeGreaterThanOrEqual(24);
   expect(rect.height, "close button height").toBeGreaterThanOrEqual(24);
+});
+
+/**
+ * The M3 Expressive press-shape morph (`src/lib/press-shape.ts`), on a
+ * real `:active` state — a class-string assertion cannot see this at all
+ * (this file's own header explains why nothing here reads `className`),
+ * and neither can `a11y.test.tsx`'s jsdom render, which has no
+ * `getComputedStyle` cascade to answer with. Only a held pointer in a
+ * real browser proves the radius actually changes and actually reverts.
+ */
+test.describe("the press-shape morph steps the radius down while held", () => {
+  test("a text button steps from --radius-field to a fifth of its own height", async ({ page }) => {
+    await openStory(page, STORY.buttonVariants);
+    const button = storyRoot(page).getByRole("button", { name: "Primary" });
+
+    const resting = await cornerRadii(button);
+    for (const radius of resting) {
+      // `rounded-field` — see `theme.css`'s D8 comment.
+      expect(radius, "resting corner radius").toBeCloseTo(12, 0);
+    }
+
+    const pressed = await pressAndSettle(page, button);
+    try {
+      for (const radius of pressed) {
+        // D10: no longer `--radius-selector` by name — `--btn-press-radius`
+        // now computes `calc(var(--size) * 0.2)` per `theme.css`'s
+        // "Density register" section, and this button's compact/`md`
+        // `--size` is 40px, so 40 * 0.2 = 8, the exact same number the
+        // flat constant produced here before. Compact stays
+        // byte-identical; `density.spec.ts` covers the comfortable
+        // register, where this button is 56px and the target is ~11.2.
+        expect(radius, "pressed corner radius").toBeCloseTo(8, 0);
+      }
+    } finally {
+      await page.mouse.up();
+    }
+    // The release is itself a transition (the spring bouncing back to
+    // `--radius-field`), so the first paint after `mouse.up()` is still
+    // mid-flight — reading immediately reads whatever frame happened to
+    // land, not the settled shape. Same reasoning as this file's own
+    // `settleTransitions` calls elsewhere.
+    await settleTransitions(page);
+
+    const released = await cornerRadii(button);
+    for (const radius of released) {
+      expect(radius, "corner radius after release").toBeCloseTo(12, 0);
+    }
+  });
+
+  test("a circular icon button eases off the circle by a tenth of its height, not to a square", async ({
+    page,
+  }) => {
+    await openStory(page, STORY.buttonSizes);
+    const icon = storyRoot(page).getByRole("button", { name: "Icon button" });
+    const rect = await box(icon);
+
+    const resting = await cornerRadii(icon);
+    for (const radius of resting) {
+      expect(radius, "resting corner radius, against a circle").toBeGreaterThanOrEqual(
+        rect.width / 2,
+      );
+    }
+
+    const pressed = await pressAndSettle(page, icon);
+    try {
+      for (const radius of pressed) {
+        // D10: this used to be 8px — a flat quarter of the 32px box, the
+        // exact "becoming a square on long-press" bug report `theme.css`'s
+        // "Density register" section quotes. `.btn-circle`'s own
+        // `--btn-press-radius: calc(var(--size) * 0.1)` now drives it:
+        // 32 * 0.1 = 3.2, a gentler proportional nudge instead of a flat
+        // quarter-box step.
+        expect(radius, "pressed corner radius").toBeCloseTo(3.2, 1);
+        expect(radius, "pressed corner radius is no longer a circle").toBeLessThan(rect.width / 2);
+      }
+    } finally {
+      await page.mouse.up();
+    }
+  });
+
+  test("the dialog close button — PRESS_SHAPE_MORPH's shared family — morphs the same way", async ({
+    page,
+  }) => {
+    await openStory(page, STORY.dialogScrollingBody);
+    await storyRoot(page).getByRole("button", { name: "Open tall dialog" }).click();
+    const close = page.locator('button[aria-label="Close"]');
+    await expect(close).toBeVisible();
+    await settleTransitions(page);
+    const rect = await box(close);
+
+    const resting = await cornerRadii(close);
+    for (const radius of resting) {
+      expect(radius, "resting corner radius, against a circle").toBeGreaterThanOrEqual(
+        rect.width / 2,
+      );
+    }
+
+    const pressed = await pressAndSettle(page, close);
+    try {
+      for (const radius of pressed) {
+        // D10: `DialogClose` is a fixed 24×24 box (16px icon, `-m-1 p-1`),
+        // not a `.btn-circle`, so it supplies its own
+        // `--btn-press-radius: calc(24px * 0.1)` — see `dialog.tsx`'s own
+        // comment on the close button. 24 * 0.1 = 2.4.
+        expect(radius, "pressed corner radius").toBeCloseTo(2.4, 1);
+      }
+    } finally {
+      await page.mouse.up();
+    }
+  });
 });

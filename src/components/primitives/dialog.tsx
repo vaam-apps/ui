@@ -18,6 +18,7 @@ import {
   useState,
 } from "react";
 import { cn } from "../../lib/cn";
+import { PRESS_SHAPE_MORPH } from "../../lib/press-shape";
 
 interface DialogContextValue {
   open: boolean;
@@ -213,7 +214,16 @@ export function DialogContent({ className, children, ...props }: ComponentPropsW
           transition
           className={cn(
             "relative flex max-h-[85vh] w-full max-w-[480px] flex-col overflow-hidden rounded-md border border-edge bg-surface-2 shadow-[var(--shadow-dialog)]",
-            "duration-150 ease-out data-closed:scale-95 data-closed:opacity-0",
+            // Spatial (scale), M3 Expressive — but the *default* pair
+            // (`--dur-spatial` / `--ease-spatial`, z 0.8, 1.5% overshoot),
+            // not `-fast`: this panel is a full modal surface, not a
+            // small local one, and the fast spring's 9.5% bounce reads
+            // right on a menu but gets increasingly odd the bigger the
+            // thing bouncing is. See `date-picker.tsx`'s `PANEL_CLASS` for
+            // why opacity rides the same duration/easing rather than
+            // getting its own. The backdrop above stays on `--ease-out` —
+            // it only fades, nothing about it is spatial.
+            "duration-[var(--dur-spatial)] ease-[var(--ease-spatial)] data-closed:scale-95 data-closed:opacity-0",
             className,
           )}
           {...props}
@@ -245,12 +255,31 @@ export function DialogContent({ className, children, ...props }: ComponentPropsW
               DOM order, which already puts it on top, but the explicit
               `z-20` keeps that true even if `DialogHeader`'s own `z-10`
               (needed so its sticky background occludes scrolled content)
-              ever changes. */}
+              ever changes.
+
+              `PRESS_SHAPE_MORPH` (see `press-shape.ts`) replaces the
+              plain `transition-colors` this used to carry — it already
+              covers `color`/`background-color`, and folds in the M3
+              Expressive press morph: this circle steps to a
+              size-proportional radius while held and springs back on
+              release, in lockstep with `Button size="icon"` per that
+              file's own comment. `[--btn-press-radius:calc(24px*0.1)]`:
+              `PRESS_SHAPE_MORPH` reads that custom property rather than
+              naming a value itself (see its own header, "D10"), and this
+              is a fixed 24×24 box (16px icon, `-m-1 p-1` above) rather
+              than a `--size`-driven `.btn`/`.btn-circle`, so this call
+              site supplies it directly — the same 0.1 circular ratio
+              `.btn-circle` uses in `theme.css`, applied to its own known
+              box. */}
           <button
             type="button"
             aria-label="Close"
             onClick={() => setOpen(false)}
-            className="-m-1 absolute top-4 right-4 z-20 rounded-full p-1 text-subtle-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
+            className={cn(
+              "-m-1 absolute top-4 right-4 z-20 rounded-full p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
+              "[--btn-press-radius:calc(24px*0.1)]",
+              PRESS_SHAPE_MORPH,
+            )}
           >
             <X size={16} strokeWidth={1.5} />
           </button>
