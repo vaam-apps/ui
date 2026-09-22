@@ -14,3 +14,17 @@ allowBuilds:
 # exactly the moment it is doing its job. If an install wants to add
 # entries here, widen the range in package.json instead and let the
 # resolver pick the newest version that clears the quarantine.
+
+# `@material/material-color-utilities@0.4.0` ships `type: module` with ten
+# relative imports missing their `.js` extension (nine `scheme_*.js` files
+# importing `../dynamiccolor/dynamic_scheme`, plus `color_spec_2025.js`
+# importing `./dynamic_color`) — invalid under strict Node/Vite ESM
+# resolution, so `import { Hct } from "@material/material-color-utilities"`
+# throws `ERR_MODULE_NOT_FOUND` under both plain `node` and vitest's SSR
+# resolution the moment anything pulls in `color_spec_2025.js` or a
+# `scheme_*` module (which the package's own `index.js` does unconditionally
+# for every export). The patch below adds the missing extensions; nothing
+# else changes. Not yet filed upstream (material-foundation/
+# material-color-utilities) — worth doing before the next bump of this pin.
+patchedDependencies:
+  '@material/material-color-utilities@0.4.0': patches/@material__material-color-utilities@0.4.0.patch

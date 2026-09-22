@@ -22,8 +22,12 @@
  * it is *legible*. So `contrast.test.ts` was written **first**, and the
  * light values below were searched for against it — maximum pairwise ΔE
  * among candidates that already cleared the bar. The result separates
- * better than the dark set it mirrors (minimum ΔE 19.3 against the dark
- * theme's own 9.6 between `neutral` and `expired`).
+ * better than the dark set it mirrors (minimum ΔE76 18.1 against the dark
+ * theme's own 9.6, both between `neutral` and `expired` — re-measured
+ * 2026-09-22 against plain CIE76 Euclidean-Lab distance, the metric this
+ * figure and `--state-expired-fg`'s own "ΔE 18" both use; a stale "19.3"
+ * here predated that expired-token correction and had drifted from it,
+ * caught while deriving `hct-neutrals.test.ts`'s CIEDE2000 gate below).
  *
  * `dark` keeps `default: true`, so a consumer who sets no `data-theme`
  * attribute gets exactly what they got before this change. Light is
@@ -75,6 +79,53 @@
  * build order, and no font files are checked into this repo yet. The
  * family stacks below are correct and will pick the right system fallback
  * (`ui-serif` / `system-ui` / `ui-monospace`) until self-hosting lands.
+ *
+ * **M3 Expressive colour (2026-09-22 investigation, see `hct-neutrals.test.ts`).**
+ * Motion, shape and type already took the M3 Expressive pass; colour was
+ * the last piece, and it landed as *documentation and a regression gate*,
+ * not new shipped hex values — a well-argued "this mostly already holds"
+ * is the honest result here, not a shortfall.
+ *
+ * §1.3 below is unchanged and is the reason: "one accent, never a hue"
+ * rules out the seed → tonal-palette pipeline M3's colour system is built
+ * around, so there is no principled way to *derive* a neutral from a seed
+ * in this library. What was checked instead is whether the surfaces this
+ * file already ships happen to sit inside M3 Expressive's own idea of a
+ * considered neutral, measured in HCT via
+ * `@material/material-color-utilities@0.4.0` (a devDependency, used only to
+ * derive and verify values here — never shipped to consumers). They do:
+ * `getNeutralPalette`/
+ * `getNeutralVariantPalette` in that package's `dynamic_scheme.js`
+ * (`case Variant.EXPRESSIVE`) fix chroma at 8 for neutral and 12 for
+ * neutral-variant, source-independent (checked against three unrelated
+ * seeds). `--color-base-100/200/300` and `--surface-3` measure
+ * chroma 3.1 → 7.2 in dark and 3.1 → 6.4 in light — under the budget with
+ * room to spare, on a palette nobody ever tuned against it. The `--edge`
+ * ladder sits a tier above (8.3–10.5 dark, 6.0–11.1 light), inside the
+ * neutral-*variant* budget the same way — the exact relationship M3 draws
+ * between the two palettes. Both are gated by `hct-neutrals.test.ts` now,
+ * so a future edit that saturates a surface or a border has somewhere to
+ * fail rather than just looking a little different.
+ *
+ * Two things that finding rules out. First, deriving the surfaces from an
+ * explicit seed anyway "to be principled": there is no measured gain over
+ * what is already shipped, and it would touch the single most pervasive
+ * colour in the library — the definition of a high-risk, low-payoff edit.
+ * Second, and the higher-risk item this investigation carried: putting the
+ * eight `--state-*-fg` hues on a uniform HCT tone step, so dark mirrors
+ * light's own tone band (35.7–39.1, an emergent property of the ΔE search
+ * above, not a target) "by construction". Tried and rejected: forcing dark
+ * theme's spread (currently 66.0–85.9, chosen per-hue for AA headroom) to
+ * a single tone (T80) leaves WCAG contrast essentially flat (7.6–13.7:1
+ * today vs. 11.5–11.6:1 forced — already comfortably over the 4.5:1 bar
+ * either way) and does **not** fix the palette's tightest collision:
+ * `neutral`/`expired` separate by only ΔE2000 8.7 today and 8.67 forced —
+ * unchanged, because that pair's closeness is a *chroma* problem
+ * (`expired` is deliberately near-achromatic, chroma 2.3 — see its own
+ * comment below) rather than a tone mismatch, so equalising tone cannot
+ * touch it. Eight shipped hex values changed for a measured improvement of
+ * nothing, on tokens every consumer and every pixel-level gate already
+ * depends on: not done.
  */
 
 @plugin "daisyui/theme" {
@@ -194,7 +245,13 @@
  *
  * This block's light counterpart lives ~150 lines below. D9 had deleted it
  * outright; the header explains why it is back and what had to be true
- * first.
+ * first. Light's own comment there calls itself "slightly blue-biased,
+ * so the greys read as chosen rather than as stock neutrals" — measured in
+ * HCT (this file's header, "M3 Expressive colour"), the same is true here:
+ * `#0a0b0d` → `#1c1f25` sit at hue 258–265° (blue-violet) and chroma
+ * 3.1 → 7.2, not zero. Neither ladder was ever built from a seed; both
+ * turn out to already read as a considered cool grey rather than a stock
+ * one, which is the finding that header records.
  *
  * # Why `:root` is in this selector list
  *
