@@ -707,6 +707,162 @@
     --ease-out: cubic-bezier(0.2, 0, 0, 1);
     --ease-in: cubic-bezier(0.4, 0, 1, 1);
     --ease-linear: linear;
+
+    /* ── M3 Expressive motion ────────────────────────────────────────────
+       The spring scheme `MaterialExpressiveTheme` installs, transcribed
+       from androidx rather than from the design site, which publishes no
+       numbers: `compose/material3/material3/src/commonMain/kotlin/
+       androidx/compose/material3/tokens/ExpressiveMotionTokens.kt`, with
+       `StandardMotionTokens.kt` beside it for the comparison below.
+       Compose's `SpringSpec` has mass = 1, so omega-n = sqrt(stiffness).
+
+                        standard (z/k)   expressive (z/k)
+         spatial default   0.9 / 700        0.8 / 380
+         spatial fast      0.9 / 1400       0.6 / 800
+         spatial slow      0.9 / 300        0.8 / 200
+         effects (all 3)   1.0 / ...        1.0 / ...   <- identical
+
+       **Expressive changes spatial motion and nothing else.** All three
+       effects springs carry the same constants in both schemes, so colour
+       and opacity animation is not part of this: reach for `--ease-out`
+       there and you are still on spec.
+
+       Three curves, not six, and that is derived rather than a shortcut.
+       A spring's *normalised* step response depends on z alone; stiffness
+       only scales time. Integrating the ODE at 0.5ms and sampling 25
+       stops, the z=0.8 default and z=0.8 slow agree to 4dp at every stop
+       (peak 1.0151 for both), and the three z=1.0 effects curves agree to
+       3dp. So one curve per damping ratio, and stiffness lives in the
+       duration.
+
+       Measured peak overshoot, same integration:
+         --ease-spatial        1.5%   (z 0.8)
+         --ease-spatial-fast   9.5%   (z 0.6)  <- the signature bounce
+         --ease-effects        0%     (z 1.0, critically damped)
+       Standard's spatial springs peak at 0.2%, i.e. nothing a reader can
+       see. That gap is the whole difference between the two schemes.
+
+       **An easing and its duration are one unit.** These are `linear()`
+       samples of a spring across its own settling time; pairing
+       `--ease-spatial-fast` with `--dur-fast` does not give a quicker
+       bounce, it gives a curve that is no longer that spring. Change one,
+       change both. */
+    --dur-spatial: 435ms;
+    --dur-spatial-fast: 360ms;
+    --dur-spatial-slow: 599ms;
+    --dur-effects: 231ms;
+    --dur-effects-fast: 150ms;
+    --dur-effects-slow: 327ms;
+
+    /* `linear()` is the only CSS easing that can hold a multi-oscillation
+       spring — a cubic-bezier overshoots at most once, and z=0.6 crosses 1
+       twice. It is Baseline 2023 (Chrome 113, Safari 17.2, Firefox 112),
+       so the `@supports` block below upgrades these. The default is
+       `--ease-out`, which drops the bounce rather than approximating it
+       badly: a wrong bounce reads as a broken animation, no bounce reads
+       as a restrained one.
+
+       The fallback has to be two rules and not two declarations of the
+       same property. A custom property accepts *any* token stream, so a
+       browser with no `linear()` still stores it happily and fails only
+       where it is used — the usual "declare the fallback first and let
+       the cascade drop the invalid one" trick silently does nothing for
+       custom properties. */
+    --ease-spatial: var(--ease-out);
+    --ease-spatial-fast: var(--ease-out);
+    --ease-effects: var(--ease-out);
+  }
+
+  @supports (animation-timing-function: linear(0, 1)) {
+    :root {
+      /* z 0.8, k 380 — 25 stops across 435ms. Peak 1.0151. */
+      --ease-spatial: linear(
+        0,
+        0.0516,
+        0.1705,
+        0.3163,
+        0.4636,
+        0.598,
+        0.7123,
+        0.8044,
+        0.8751,
+        0.9271,
+        0.9636,
+        0.9877,
+        1.0026,
+        1.0108,
+        1.0144,
+        1.0151,
+        1.0141,
+        1.0122,
+        1.01,
+        1.0077,
+        1.0058,
+        1.0041,
+        1.0027,
+        1.0017,
+        1.001
+      );
+      /* z 0.6, k 800 — 25 stops across 360ms. Peaks at 1.0941, then dips
+         to 0.9912 before settling: two crossings of 1, which is exactly
+         why this one cannot be a bezier. */
+      --ease-spatial-fast: linear(
+        0,
+        0.0752,
+        0.2486,
+        0.4571,
+        0.6578,
+        0.8259,
+        0.9511,
+        1.0332,
+        1.078,
+        1.0941,
+        1.0908,
+        1.0762,
+        1.0568,
+        1.0373,
+        1.0204,
+        1.0074,
+        0.9986,
+        0.9934,
+        0.9913,
+        0.9912,
+        0.9923,
+        0.9941,
+        0.996,
+        0.9977,
+        0.999
+      );
+      /* z 1.0 — critically damped, monotonic, never exceeds 1. Serves all
+         three effects speeds; only `--dur-effects-*` differs. */
+      --ease-effects: linear(
+        0,
+        0.0576,
+        0.1805,
+        0.3211,
+        0.4555,
+        0.5733,
+        0.6714,
+        0.7504,
+        0.8125,
+        0.8604,
+        0.8968,
+        0.9242,
+        0.9446,
+        0.9597,
+        0.9708,
+        0.979,
+        0.9849,
+        0.9892,
+        0.9922,
+        0.9945,
+        0.9961,
+        0.9972,
+        0.998,
+        0.9986,
+        0.999
+      );
+    }
   }
 
   html {
