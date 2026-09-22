@@ -300,6 +300,23 @@ export const DisabledAndScrolling: Story = {
  * mid-transition at `opacity: 0` and never became usable — every select
  * inside a drawer was silently dead. Rendering inline keeps the options
  * in the drawer's own subtree. Open the drawer and use the select.
+ *
+ * Also the reproduction for "drawer + select on small screens: it's
+ * cramped" (`e2e/density.spec.ts`'s "a phone-width sheet forces
+ * comfortable" suite drives this exact story at 375px). The footer
+ * button stays `size="sm"` deliberately — every other drawer/dialog
+ * footer action in this package's own stories is `size="sm"` too
+ * (`overlays.stories.tsx`'s `Drawers`/`PlainDrawer`/`Rotate` examples),
+ * and there is no reason for this one story to invent a different
+ * desktop convention just because its phone rendering was cramped.
+ * `drawer.tsx`'s forced comfortable density already lifts it from 32px
+ * to 40px (`ButtonSmallTokens.ContainerHeight`) below `md:`, on its own
+ * formula, with no change needed here; only the footer row's own
+ * full-width stretch (`drawer.tsx`, same section) needed adding, which
+ * this story gets for free without touching the button at all. Desktop
+ * — where this story's own convention actually lives — is therefore
+ * untouched: still 32px, still right-aligned, byte-identical to before
+ * this fix.
  */
 export const InsideADrawer: Story = {
   render: function Render() {
