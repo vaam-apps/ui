@@ -13,9 +13,15 @@ export const STORY = {
   buttonSizes: "primitives-button--sizes",
   buttonVariants: "primitives-button--variants",
   dialogScrollingBody: "primitives-overlays--dialog-with-scrolling-body",
+  drawers: "primitives-overlays--drawers",
+  toasts: "primitives-overlays--toasts",
   formControls: "primitives-form-controls--fields-and-errors",
+  checkboxAndSwitch: "primitives-form-controls--checkbox-and-switch",
   instrumentPanelDashboard: "data-instrumentpanel--as-a-dashboard",
   instrumentPanelSubtle: "data-instrumentpanel--why-subtle-is-banned",
+  maskedValueDefault: "data-maskedvalue--default",
+  datePickerSingle: "primitives-date-pickers--single",
+  bareCalendar: "primitives-date-pickers--bare-calendar",
   sideNavInAShell: "primitives-sidenav--in-a-shell",
   tableAsAScreenUsesIt: "primitives-table--as-a-screen-uses-it",
   tableDefault: "primitives-table--default",
@@ -28,6 +34,7 @@ export const STORY = {
   // `#sb-long` lives here, not on `LongValues` — that story's own
   // `SelectTrigger` carries no `id` at all (a bare, unlabelled `Select`).
   selectDisabledAndScrolling: "primitives-select--disabled-and-scrolling",
+  selectInsideADrawer: "primitives-select--inside-a-drawer",
   statusPillQuietVersusLoud: "status-statuspill--quiet-versus-loud",
   tokensSprings: "foundations-tokens--springs",
 } as const;

@@ -98,6 +98,22 @@ export function MaskedValue({
           // resolves to whichever button paints on top; not worth widening
           // the row's gap to chase.
           //
+          // D11 (comfortable-only, see `theme.css`'s `.tap-target` header):
+          // the same overlap, much bigger. Each control's *invisible*
+          // `::before` reaches for 48px, so at density 1 this button's
+          // overlay extends ~14px past its own 20px box on every side —
+          // more than the entire 6px gap — and genuinely overlaps
+          // `CopyButton`'s own 48px overlay, not just by a 2px sliver.
+          // Accepted for the same reason the 2px case already was: DOM
+          // order resolves the tie (this button paints first, `CopyButton`
+          // second, so a point inside both hits `CopyButton`), and neither
+          // control's own accessible name nor its keyboard reachability
+          // depends on the pointer landing precisely — widening the row
+          // just to give two adjacent icon affordances disjoint invisible
+          // hit areas at a density most consumers don't use would be
+          // solving a problem nobody has reported, in a file this package's
+          // own rules say not to invent numbers for.
+          //
           // `PRESS_SHAPE_MORPH` (`press-shape.ts`) replaces the plain
           // `transition-colors` this used to carry with the M3 Expressive
           // press morph, in the same lockstep as `Button size="icon"`,
@@ -108,8 +124,15 @@ export function MaskedValue({
           // `PRESS_SHAPE_MORPH` reads `--btn-press-radius` rather than
           // naming a value itself, per its own header.
           className={cn(
-            "-m-1 shrink-0 rounded-full p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
+            "relative -m-1 shrink-0 rounded-full p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
             "[--btn-press-radius:calc(20px*0.1)]",
+            // D11 (`theme.css`'s own header on `.tap-target`): this
+            // control's own fixed 20×20 box (12px icon, `-m-1 p-1`
+            // above), the same number `[--btn-press-radius]` already
+            // needs — `--tap-size` feeds the invisible comfortable-only
+            // overlay instead of growing this real box, for the same
+            // "two `-m-1` controls 6px apart" reason that header explains.
+            "[--tap-size:20px] tap-target",
             PRESS_SHAPE_MORPH,
           )}
         >

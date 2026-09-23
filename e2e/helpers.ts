@@ -36,6 +36,33 @@ export interface StoryOptions {
  *
  * Story ids come from `storybook-static/index.json`; `story-ids.ts` holds
  * the ones used here so a renamed story fails loudly in one place.
+ *
+ * # Why it also waits for the webfonts
+ *
+ * `.storybook/preview.css` `@import`s IBM Plex Sans from Google Fonts with
+ * `display=swap`. Swap means the first paint is laid out in whatever
+ * fallback face the *operating system* supplies, and every box in the
+ * story moves sideways the instant the real face arrives — so a
+ * measurement taken before that is a measurement of a layout no reader
+ * ever sees, and it is a *different* wrong layout on every platform.
+ * Measured on the run this was found in (CI, Linux; `primitives-button--
+ * sizes`): `Button size="icon"` sat at x = 198.34 in the fallback layout
+ * and at x = 182.34 once IBM Plex landed — 16px, because the two labelled
+ * buttons ahead of it in the row each shed width. On macOS the same shift
+ * is 2.8px, which is why every assertion in this suite passed on a laptop
+ * and exactly the two that cannot absorb 16px failed in CI:
+ * `paintedFillRatio`'s clip missed the disc it was aimed at (and its
+ * top-left pixel landed on the disc's own antialiased edge, so "the
+ * ground behind it" became the button's fill and the ratio inverted into
+ * a plausible-looking 0.654), and `pressAndSettle`'s pointer landed
+ * exactly 16.0px from the shifted centre of a 16px-radius circle — one
+ * hair outside it, so nothing entered `:active` at all.
+ *
+ * The layout is forced before the wait rather than after: `fonts.ready`
+ * answers "is any load *in flight*", so asking it before anything has
+ * measured the story's text resolves against an empty set and proves
+ * nothing. A failed fetch resolves it too, so an offline machine gets the
+ * fallback layout deterministically instead of hanging.
  */
 export async function openStory(page: Page, id: string, options: StoryOptions = {}): Promise<void> {
   const { theme = "dark", density = "compact", width, height, expectThemeStamp = true } = options;
@@ -51,6 +78,12 @@ export async function openStory(page: Page, id: string, options: StoryOptions = 
       message: `story ${id} never mounted`,
     })
     .toBeGreaterThan(0);
+  await page.evaluate(async () => {
+    // Discarded on purpose: reading a rect is what forces the layout that
+    // schedules the font load, which is what `fonts.ready` then answers for.
+    document.documentElement.getBoundingClientRect();
+    await document.fonts.ready;
+  });
   if (expectThemeStamp) {
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
   }
@@ -472,6 +505,32 @@ export async function pseudoRect(target: Locator, pseudo: "::before" | "::after"
     width: measured.width,
     height: measured.height,
   };
+}
+
+/**
+ * The size of `target`'s D11 `.tap-target::before` overlay
+ * (`theme.css`'s own header on that class) — the invisible,
+ * comfortable-register-only expansion of an icon-only control's click
+ * area, distinct from its own visual box (`box()` above).
+ *
+ * Only the *size* is read, not the full `pseudoRect()` reconstruction:
+ * every assertion this backs is "did the hit area reach 48px", which
+ * `getComputedStyle(el, "::before").width/height` answers directly, and
+ * computing the pseudo's viewport *position* on top would be measuring
+ * something no test here needs — `theme.css`'s own comment on
+ * `--tap-border` already covers the one place the raw computed value
+ * would otherwise mislead (a bordered host's `::before` resolves against
+ * its padding edge, not its border edge, which is a *position* fact, not
+ * a *size* one — `width`/`height` are unaffected by it).
+ */
+export async function tapTargetSize(target: Locator): Promise<{ width: number; height: number }> {
+  return await target.evaluate((el) => {
+    const style = getComputedStyle(el, "::before");
+    return {
+      width: Number.parseFloat(style.width),
+      height: Number.parseFloat(style.height),
+    };
+  });
 }
 
 /** Clamps a box to the viewport, because `page.screenshot({ clip })`

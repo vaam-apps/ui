@@ -278,6 +278,12 @@ export function DialogContent({ className, children, ...props }: ComponentPropsW
             className={cn(
               "-m-1 absolute top-4 right-4 z-20 rounded-full p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
               "[--btn-press-radius:calc(24px*0.1)]",
+              // D11 (`theme.css`'s own header on `.tap-target`): this
+              // button is already `absolute`, which is what an invisible
+              // `::before` overlay needs to anchor to — no extra
+              // `relative` required, unlike the in-flow drawer/toast
+              // siblings this same fix applies to.
+              "[--tap-size:24px] tap-target",
               PRESS_SHAPE_MORPH,
             )}
           >

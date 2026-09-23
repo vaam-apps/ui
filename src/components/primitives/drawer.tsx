@@ -184,6 +184,103 @@ DrawerDescription.displayName = "DrawerDescription";
 // reader as "more details" is; that's a real, verified limitation of
 // `vaul@1.1.2`, not a gap left open on purpose) and `contentClassName`
 // (width/inset/radius/border, per D14's own two size ranges).
+//
+// # Below `md:`, this panel forces comfortable density — deliberately,
+// regardless of the app's own `--density` setting
+//
+// Reported live: "drawer + select on small screens: it's cramped", on
+// `Select`'s own "Inside a drawer" story at 375×812. Measured before any
+// fix, at this package's `compact` default: the `SelectTrigger` 40px
+// tall (14px font, 12px horizontal padding — daisyUI's own `.select`
+// font-size is a flat `.875rem` regardless of `--size`, so only the
+// height was ever going to move), and the footer's primary action 32px
+// tall, 12px font, ~71px wide, pinned to the right edge of a 375px sheet.
+// Nothing in that is a bug in the D10 density axis itself — every one of
+// those numbers is `compact` doing exactly what `compact` promises
+// (`theme.css`'s own "Density register": a consumer who sets nothing
+// gets the pre-D10 numbers, byte-identical). The defect is that this
+// *specific* panel, below `md:`, is never the thing `compact` was
+// designed for.
+//
+// **The decision:** below `md:` (the same breakpoint this file already
+// uses, two paragraphs up, to fix `direction="bottom"` unconditionally
+// and to decide sheet-vs-panel with a plain CSS class rather than a
+// JS viewport read), `DetailDrawerContent` sets `--density: 1` on its
+// own root — `max-md:[--density:1]` below, the same custom-property
+// mechanism `theme.css`'s `[data-density="comfortable"]` rule uses, just
+// scoped to this element and this breakpoint instead of to a consumer's
+// root. At `md:`+, the declaration is absent and `--density` resolves
+// however the app's own ancestor already set it (`0`/compact by
+// default) — the desktop right-hand panel is completely unaffected,
+// because it is a real console surface and the app's density choice is
+// exactly the one that should govern it.
+//
+// **Why forced rather than left to the app, or left to a breakpoint the
+// app opts into:** the case against forcing it is real — a component
+// silently overriding a setting the app deliberately chose is exactly
+// the kind of surprise this library otherwise avoids, and `compact` is
+// the *default* precisely so vpay/vsms render unchanged
+// (`density.spec.ts`'s own "compact is the default" suite is the
+// contract). But `direction="bottom"` above already establishes the
+// precedent this leans on: below `md:`, this component is *never* the
+// console panel — it is unconditionally the phone bottom sheet
+// (`inset-x-0 bottom-0 rounded-t-box`, no border-radius/border/position
+// left ambiguous, all reset explicitly per D12's own correction note).
+// A bottom sheet on a ≤767px viewport is a touch surface by
+// construction, not by the app's density choice — the thumb reaching
+// this exact panel does not know or care that the surrounding console
+// runs `compact` for its tables and toolbars. And the override is
+// genuinely narrow: a consumer who already sets `data-density=
+// "comfortable"` app-wide is unaffected (redundant, not overridden); the
+// same consumer viewing this same panel at `md:`+ — its real, intended,
+// desk-bound use — is unaffected (the rule never fires there). The only
+// configuration this actually changes is "compact app, this panel,
+// under 768px" — which per D14 is the one configuration where the panel
+// has already stopped being a console drawer and started being a phone
+// sheet, by the same line the rest of this file draws that distinction
+// on.
+//
+// The middle ground the task brief itself named — "sheet opts into
+// comfortable only below a breakpoint" — is what this is; the other
+// middle ground, "the sheet stays neutral and the consuming app sets
+// density on it," was rejected because it puts the fix in the wrong
+// place: every one of this package's ~11 console call sites for
+// `Select` alone would need updating to remember it, for a component
+// this package already knows, from its own `md:` split, is a phone
+// surface at that width. `no-dropdowns_test.dart`'s house rule in the
+// sibling Flutter app — "a bottom sheet is a touch surface by
+// definition" — is the same reasoning restated for a different
+// component family; it is not cited as an authority over this package,
+// only as the same conclusion reached independently on the other side
+// of the same product.
+//
+// Numbers below are re-derived, not invented: `SelectTrigger` (which
+// shares daisyUI's `.select`/`--size-field` scale with `Button`'s
+// default/`md` size) reaches 56px — `ButtonMediumTokens.ContainerHeight`
+// (`theme.css`'s own D10 citation, androidx `v0_11_0`) — the exact
+// number `density.spec.ts` already pins for `density: "comfortable"`
+// everywhere else in this package. The footer's own primary action is
+// left as whatever size the *caller* already chose — this package's own
+// convention, unanimous across every drawer/dialog footer in its
+// stories, is `size="sm"` — and D10's existing `.btn-sm` formula
+// (`theme.css`, reads `--density` directly, not through `--size-field`)
+// already lifts it from 32px to 40px, `ButtonSmallTokens.ContainerHeight`,
+// with no new mechanism needed here. `max-md:flex-col
+// max-md:items-stretch` below is what actually answers the "71px
+// right-aligned" half of the report: the footer row stretches whatever
+// it's given edge-to-edge below `md:`, so a `size="sm"` button reaches
+// the sheet's full content width instead of a target pinned to one
+// corner. 44px is this package's own already-established phone
+// tap-target convention (`e2e/geometry.spec.ts`, "tap targets on the
+// phone-width nav": "every control in the bottom rail is at least
+// 44×44") — 40px does not quite clear it, which is named rather than
+// hidden: closing that last 4px would mean this component overriding a
+// size the *caller* chose, the same overreach the "sheet stays neutral"
+// middle ground above was weighed against, for a gap this small. The
+// pre-existing 32px cleared neither 40 nor 44; a caller who wants the
+// full 44px+ ideal already can, by choosing the default/`md` size for a
+// footer action that matters enough to warrant it — nothing here stops
+// that, it just isn't forced.
 interface DetailDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -249,6 +346,39 @@ function DetailDrawerContent({
             // own D12-correction note above.
             "md:inset-x-auto md:inset-y-0 md:right-0 md:h-full md:max-h-none",
             "md:w-full md:rounded-t-none md:rounded-l-box md:border-t-0 md:border-l",
+            // D10, forced: see this file's own header comment, directly
+            // above `DetailDrawerProps`, for the full density decision
+            // and its reasoning. `max-md:` — absent at `md:`+, so the
+            // desktop right-hand panel keeps reading whatever density the
+            // app itself set.
+            //
+            // **`--density` alone is enough now.** It used to not be:
+            // `--density: 1` here always reached `.btn-sm`'s and `.btn`/
+            // `.btn-circle`'s own formulas (`theme.css`'s D10 section),
+            // because those are declared *on the sized element itself*
+            // and re-resolve `var(--density, 0)` against whatever
+            // inherits to that exact element — but `--size-field` used to
+            // be declared exactly once, at the theme root
+            // (`:root`/`[data-theme]`), and a CSS custom property's
+            // `calc()` only ever re-evaluates where it is *declared*,
+            // never per descendant just because `var(--density)` resolves
+            // differently further down. That forced a second, literal
+            // `max-md:[--size-field:0.35rem]` line here — measured before
+            // it was added: `--density` read back as `1` on this very
+            // element, and `SelectTrigger` still rendered 40px, not 56px,
+            // because `.select`'s `--size: calc(var(--size-field,.25rem)
+            // * 10)` was still inheriting `--size-field`'s value frozen at
+            // the theme root's own `--density: 0`. `theme.css`'s own
+            // "`--size-field`, corrected" comment fixed this at the
+            // source — `--size-field` is now declared directly on
+            // `.input`/`.select`/`.btn`, the same "declare it on the
+            // sized element itself" mechanism `.btn-sm` already used — so
+            // this line's own workaround is dead weight now rather than a
+            // fix, and has been removed: `--density: 1` alone reaches
+            // `SelectTrigger` correctly through the corrected
+            // `--size-field`, verified by re-running this exact
+            // measurement after the fix (56px, not 40px).
+            "max-md:[--density:1]",
             contentClassName,
             className,
           )}
@@ -290,7 +420,12 @@ function DetailDrawerContent({
                 focus already gets a ring for free from `theme.css`). */}
             <DrawerPrimitive.Close
               aria-label="Close"
-              className="-m-1 shrink-0 rounded-full p-1 text-subtle-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
+              // D11 (`theme.css`'s own header on `.tap-target`): unlike
+              // `dialog.tsx`'s close button, this one is in normal flow
+              // (`justify-between` row above), not `absolute` — `relative`
+              // is added here so the invisible comfortable-only overlay
+              // has a positioning context of its own.
+              className="relative -m-1 shrink-0 rounded-full p-1 text-subtle-foreground transition-colors hover:bg-surface-3 hover:text-foreground [--tap-size:24px] tap-target"
             >
               <X size={16} strokeWidth={1.5} />
             </DrawerPrimitive.Close>
@@ -299,7 +434,20 @@ function DetailDrawerContent({
           <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
 
           {footer != null && (
-            <div className="flex shrink-0 items-center justify-end gap-2 border-edge border-t px-5 py-4">
+            // `max-md:flex-col max-md:items-stretch`: below `md:` this
+            // row is a phone bottom sheet's action area, not a console
+            // toolbar — a `justify-end`-packed row leaves a primary
+            // action pinned to one corner (measured live: ~71px wide, on
+            // a 375px sheet, the exact "cramped" report this file's own
+            // density comment above addresses the *sizing* half of).
+            // `items-stretch` in a column flexes every direct child —
+            // typically one primary `Button`, as `select.stories.tsx`'s
+            // "Inside a drawer" story now shows — to the row's own full
+            // width with no assumption about how many children `footer`
+            // holds or what they are. `md:justify-end` restores the
+            // packed, right-aligned console row unchanged once this is
+            // genuinely the desktop panel.
+            <div className="flex shrink-0 items-center gap-2 border-edge border-t px-5 py-4 max-md:flex-col max-md:items-stretch md:justify-end">
               {footer}
             </div>
           )}
