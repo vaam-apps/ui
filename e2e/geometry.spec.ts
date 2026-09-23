@@ -26,10 +26,25 @@ async function cornerRadii(target: Locator): Promise<number[]> {
 
 /** Holds the pointer down on `target` — real `:active`, not a class toggle
  * — waits out the radius transition, and hands back the settled shape.
- * The caller is responsible for `page.mouse.up()` afterwards. */
+ * The caller is responsible for `page.mouse.up()` afterwards.
+ *
+ * The `:active` check is the premise, not an extra assertion. `hover()`
+ * aims at the box it measured; `mouse.down()` fires at wherever the
+ * pointer already is, so anything that re-lays the page out in between
+ * presses the background instead — and then nothing is transitioning,
+ * `settleTransitions` returns in 0ms, and the radius read below is the
+ * *resting* one. On a circle that resting value is `rounded-full`'s
+ * 33554400px, which reads as "the morph never fired" rather than as "the
+ * press never landed": exactly how a 16px webfont reflow was
+ * mis-diagnosed once (`helpers.ts`'s own `openStory` header has the
+ * measurements). A missed press now says so. */
 async function pressAndSettle(page: Page, target: Locator): Promise<number[]> {
   await target.hover();
   await page.mouse.down();
+  expect(
+    await target.evaluate((el) => el.matches(":active")),
+    "the pointer press landed on the control",
+  ).toBe(true);
   await settleTransitions(page);
   return await cornerRadii(target);
 }
