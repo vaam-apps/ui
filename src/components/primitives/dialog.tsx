@@ -279,11 +279,23 @@ export function DialogContent({ className, children, ...props }: ComponentPropsW
               "-m-1 absolute top-4 right-4 z-20 rounded-full p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
               "[--btn-press-radius:calc(24px*0.1)]",
               // D11 (`theme.css`'s own header on `.tap-target`): this
-              // button is already `absolute`, which is what an invisible
-              // `::before` overlay needs to anchor to — no extra
-              // `relative` required, unlike the in-flow drawer/toast
-              // siblings this same fix applies to.
-              "[--tap-size:24px] tap-target",
+              // button is `absolute`, pinned to the panel's top-right
+              // corner, so it takes the `-anchored` variant — margin on
+              // an absolutely positioned box with an inset set *moves*
+              // the box, so the in-flow reservation would drag this glyph
+              // 12px off its corner. `top-4 right-4` with `-m-1` puts
+              // this box's border edges 12px from `DialogPanel`'s padding
+              // edge on both axes, which is exactly the 12px each side a
+              // 24px box needs to reach 48 — so no `--tap-room-*` clamp
+              // is needed, and none is declared: a clamp that clamps
+              // nothing is dormant code, and `e2e/tap-targets.spec.ts`
+              // asserts this cover stays inside the panel, which catches
+              // a changed offset whether or not anyone remembered a
+              // declaration. `DialogHeader`'s `pr` below is the other
+              // half — the container reserving the room this variant
+              // cannot reserve for itself, and it has its own gate in
+              // that file too.
+              "[--tap-size:24px] tap-target-anchored",
               PRESS_SHAPE_MORPH,
             )}
           >
@@ -304,8 +316,20 @@ export function DialogContent({ className, children, ...props }: ComponentPropsW
  * 16px to 32px inset — 8px *inside* that column with no gutter here.
  * Every existing story uses a short title, so the overlap has never
  * rendered; `ConfirmDialog`'s `max-w-sm` panel makes it more likely once a
- * title is long enough to wrap. `pr-8` (32px) puts the header's own right
- * edge safely past the button's 32px-inset extent, with room to spare.
+ * title is long enough to wrap. 32px puts the header's own right edge
+ * safely past the button's 32px-inset extent, with room to spare.
+ *
+ * D11: the gutter grows with `--density`, to 48px at comfortable, because
+ * that is where the close button's *tap target* ends rather than its box.
+ * `theme.css`'s `.tap-target-anchored` header has the reasoning — an
+ * anchored control cannot reserve its own 48dp in flow, so the container
+ * beside it has to, and this is that reservation. 32 + 16 rather than a
+ * second literal: the compact value stays byte-identical, which is what
+ * `e2e/geometry.spec.ts` asserts, and the comfortable one lands exactly
+ * on the 48px the cover reaches (12px of `top-4 right-4` inset, plus 36px
+ * of cover). Written as one `calc` rather than as a `max-md:`-style
+ * variant because `--density` is a subtree axis, not a breakpoint:
+ * `DetailDrawerContent` sets it on a phone-width sheet at any viewport.
  *
  * `sticky -top-6`, not `top-0` — and the `-6` is load-bearing. A sticky
  * offset is measured from the scrollport's **content** edge, and the
@@ -336,7 +360,8 @@ export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLD
   return (
     <div
       className={cn(
-        "-mx-6 -mt-6 sticky -top-6 z-10 mb-4 flex flex-col gap-1 bg-surface-2 px-6 pt-6 pr-8",
+        "-mx-6 -mt-6 sticky -top-6 z-10 mb-4 flex flex-col gap-1 bg-surface-2 px-6 pt-6",
+        "pr-[calc(2rem+var(--density,0)*1rem)]",
         className,
       )}
       {...props}

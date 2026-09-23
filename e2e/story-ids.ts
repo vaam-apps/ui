@@ -20,6 +20,27 @@ export const STORY = {
   instrumentPanelDashboard: "data-instrumentpanel--as-a-dashboard",
   instrumentPanelSubtle: "data-instrumentpanel--why-subtle-is-banned",
   maskedValueDefault: "data-maskedvalue--default",
+  // Two more reveal/copy pairs than `Default` has, and the reason
+  // `e2e/tap-targets.spec.ts`'s compact-collision gate covers every story
+  // that renders one of these controls rather than one story: the claim
+  // was "exactly one known pair in the whole library" while this story
+  // sat next door with two more of it.
+  maskedValueVariants: "data-maskedvalue--variants",
+  // Every story where a `CopyButton` is the last thing in a row and sits
+  // flush to its container's right edge — the shape whose D11 overlay
+  // grew `document.scrollWidth` past the viewport at comfortable
+  // (`e2e/overflow.spec.ts`, `e2e/tap-targets.spec.ts`).
+  detailVariants: "data-detail-and-summary--variants",
+  detailMixedVariants: "data-detail-and-summary--mixed-variants-in-one-column",
+  detailCardsAndBadges: "data-detail-and-summary--cards-and-badges",
+  detailTiles: "data-detail-and-summary--tiles",
+  idsCodeAndCopy: "data-identifiers--code-and-copy",
+  idsPhones: "data-identifiers--phones",
+  idsTableAndFull: "data-identifiers--table-and-full",
+  // A long title on a narrow panel, which is how `DialogHeader`'s own
+  // density-aware gutter is measured: the title's layout box must stop
+  // before `DialogClose`'s 48px target begins.
+  dialogWithLongTitle: "primitives-overlays--dialog-with-long-title",
   datePickerSingle: "primitives-date-pickers--single",
   bareCalendar: "primitives-date-pickers--bare-calendar",
   sideNavInAShell: "primitives-sidenav--in-a-shell",

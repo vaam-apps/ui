@@ -74,8 +74,12 @@ export function Checkbox({
         // box has no click target to spare — `CheckboxField`'s label
         // widens it in practice, but a standalone `Checkbox` (the
         // `aria-label` case its own module doc calls out) has nothing
-        // else. `relative` above gives the invisible `::before` overlay a
-        // positioning context; `16px` is this box's own `size-4`.
+        // else. `relative` above gives the cover a positioning context;
+        // `16px` is this box's own `size-4`. In flow, so it reserves the
+        // target as margin and a row of checkboxes grows its own pitch
+        // at comfortable rather than four 48px targets overlapping each
+        // other by 8px — which is what they did, measured, while this
+        // was an overlay that reserved nothing.
         // `--tap-border:1px` matches the `border` utility three lines up
         // — see `.tap-target`'s own header for why a bordered host needs
         // it to actually reach 48px rather than landing 2px short.

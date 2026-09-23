@@ -53,7 +53,9 @@ export function Switch({ checked, onCheckedChange, disabled, className, ...aria 
         // track's own visual size is not what's undersized, only its
         // click target is). `relative` is already on the base string
         // above, so this only adds the two axis sizes the shared rule
-        // needs to size its invisible `::before` overlay against.
+        // needs to compute the per-axis reservation against — the
+        // narrower axis (20px) reserves 14px a side, the wider one
+        // (36px) only 6px.
         // `--tap-border:1px` matches this same base string's own `border`
         // utility — see `.tap-target`'s header for why a bordered host
         // needs it to actually reach 48px.

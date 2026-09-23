@@ -88,7 +88,15 @@ function PickerTrigger({
           "aria-invalid:border-state-danger-border aria-invalid:text-state-danger-fg",
           !hasValue && "text-subtle-foreground",
           "disabled:cursor-not-allowed disabled:opacity-50",
-          hasValue && onClear !== undefined && "pr-9",
+          // D11: the gutter the Clear button's *tap target* needs, not
+          // the one its 14px box needs. 36px compact (unchanged — `pr-9`,
+          // byte for byte, at `--density: 0`), 48px comfortable, which is
+          // exactly where that target's inner edge lands once it is
+          // clamped flush to this field's right edge. `theme.css`'s
+          // `.tap-target-anchored` header has the rule: an absolutely
+          // positioned control cannot reserve its own 48dp in flow, so
+          // the container beside it does it instead.
+          hasValue && onClear !== undefined && "pr-[calc(2.25rem+var(--density,0)*0.75rem)]",
         )}
       >
         <CalendarDays size={14} strokeWidth={1.5} className="shrink-0 text-subtle-foreground" />
@@ -114,15 +122,36 @@ function PickerTrigger({
           // D11 (`theme.css`'s own header on `.tap-target`): this button
           // carries no `-m-*`/`p-*` hit-area padding at all today — its
           // click target is the bare 14×14 icon, in both densities, which
-          // is below even WCAG 2.2 §2.5.8's 24px floor. Left unchanged at
-          // density 0 (compact must render byte-identically to before
-          // this pass); `[--tap-size:14px] tap-target` only adds an
-          // invisible comfortable-register overlay reaching 48px — it does
-          // not retroactively fix the pre-existing compact-register gap,
-          // which is outside this pass's scope. Already `absolute`, so no
-          // extra `relative` is needed for the overlay's positioning
-          // context.
-          className="-translate-y-1/2 absolute top-1/2 right-2 text-subtle-foreground hover:text-foreground [--tap-size:14px] tap-target"
+          // is below even WCAG 2.2 SC 2.5.8's 24px floor. Left unchanged
+          // at density 0 (compact must render byte-identically to before
+          // this pass); it does not retroactively fix the pre-existing
+          // compact-register gap, which is outside this pass's scope.
+          //
+          // This is the one control on this mechanism whose cover has to
+          // be **clamped**, and the reason is arithmetic rather than
+          // taste: 14px wide, 8px from the field's right edge, so a
+          // symmetric 48px cover ends 9px *outside* the field — it
+          // grew `document.scrollWidth` and, worse, took the field's own
+          // rightmost 39px, so tapping the right end of a date field
+          // cleared the value instead of opening the calendar
+          // (`elementFromPoint` returned this button from x≈236 to 272 of
+          // a trigger ending at 272; measured, not inferred).
+          // `--tap-room-right:8px` is the room that actually exists
+          // toward the edge it is anchored to, so the cover stops flush
+          // with the field's right edge and the 8px it gave up is added
+          // to its left side instead — the target is still 48px, it just
+          // grows inward, and the glyph does not move at all. Vertically
+          // it needs no clamp: the field is 56px tall at comfortable
+          // (`--size-field` × 10, D10's own formula), which already
+          // exceeds 48, and `e2e/tap-targets.spec.ts` asserts the
+          // containment rather than trusting that sentence.
+          //
+          // Already `absolute`, so no extra `relative` is needed for the
+          // cover's positioning context — and the `-anchored` variant is
+          // required precisely because it is: the in-flow variant
+          // reserves its target as margin, which on an inset-positioned
+          // box moves the box instead of making room around it.
+          className="-translate-y-1/2 absolute top-1/2 right-2 text-subtle-foreground hover:text-foreground [--tap-room-right:8px] [--tap-size:14px] tap-target-anchored"
         >
           <X size={14} strokeWidth={1.5} />
         </button>

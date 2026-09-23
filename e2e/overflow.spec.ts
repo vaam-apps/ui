@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openStory, storyRoot } from "./helpers";
+import { type Density, openStory, storyRoot } from "./helpers";
 import { STORY } from "./story-ids";
 
 /**
@@ -15,12 +15,35 @@ import { STORY } from "./story-ids";
  * The assertion is deliberately about the **document**: a component is
  * free to scroll its own box (`Tabs` does, `Table` does), but no
  * component may make the page itself wider than the viewport.
+ *
+ * # Both densities, since D11
+ *
+ * Every test here used to run at one density — `openStory`'s own
+ * `"compact"` default — which made this whole file blind to the register
+ * where the library's geometry actually changes. D11's out-of-flow tap
+ * overlay grew `document.scrollWidth` past the viewport on three stories
+ * at `comfortable` (377 > 375 twice, 1282 > 1280 once) and every test in
+ * this file stayed green, because none of them ever set the global. The
+ * culprit was an invisible pseudo-element on a `CopyButton` flush to its
+ * container's right edge, which is this file's own recurring defect —
+ * `side-nav.tsx`'s tooltip, one library revision later — so the density
+ * loop is not a precaution, it is the case that already happened. Two
+ * of the three stories were not in `PAGES` at all either; they are now.
  */
+
+const DENSITIES: readonly Density[] = ["compact", "comfortable"] as const;
 
 const PAGES = [
   { id: STORY.sideNavInAShell, widths: [375, 900, 1262, 1440] },
   { id: STORY.tableAsAScreenUsesIt, widths: [375, 768, 1280] },
   { id: STORY.tableDefault, widths: [375, 1280] },
+  // D11's own three. `Variants` and `MixedVariantsInOneColumn` each end a
+  // row with a `CopyButton` hard against the container's right edge,
+  // which is the one arrangement in which a tap target that is not
+  // reserved in flow has nowhere to go but outside the page.
+  { id: STORY.detailVariants, widths: [375, 1280] },
+  { id: STORY.detailMixedVariants, widths: [375, 1280] },
+  { id: STORY.maskedValueDefault, widths: [375, 1280] },
   // 1280 only: this story pins its own `w-[380px]` box, so at a 375px
   // viewport the *story* is wider than the page by construction — a fact
   // about the fixture, not about `Tabs`. Its scrolling behaviour gets its
@@ -35,32 +58,43 @@ const PAGES = [
 
 for (const { id, widths } of PAGES) {
   for (const width of widths) {
-    test(`${id} does not scroll the page sideways at ${width}px`, async ({ page }) => {
-      await openStory(page, id, { width, height: 760 });
-      const overflow = await page.evaluate(() => ({
-        scrollWidth: document.documentElement.scrollWidth,
-        clientWidth: document.documentElement.clientWidth,
-        widest: (() => {
-          // Name the culprit in the failure message rather than leaving
-          // "1283 > 1280" for someone to bisect by hand.
-          let worst = { selector: "", right: 0 };
-          for (const el of document.querySelectorAll<HTMLElement>("#storybook-root *, body > *")) {
-            const right = el.getBoundingClientRect().right;
-            if (right > worst.right) {
-              worst = {
-                selector: `${el.tagName.toLowerCase()}.${el.className.toString().split(" ").slice(0, 3).join(".")}`,
-                right,
-              };
+    for (const density of DENSITIES) {
+      test(`${id} does not scroll the page sideways at ${width}px / ${density}`, async ({
+        page,
+      }) => {
+        await openStory(page, id, { width, height: 760, density });
+        const overflow = await page.evaluate(() => ({
+          scrollWidth: document.documentElement.scrollWidth,
+          clientWidth: document.documentElement.clientWidth,
+          widest: (() => {
+            // Name the culprit in the failure message rather than leaving
+            // "1283 > 1280" for someone to bisect by hand. Elements only:
+            // the overflow D11 produced came from a pseudo-element, which
+            // has no node to find here — `e2e/tap-targets.spec.ts`'s
+            // `targetsOutsideViewport` is the one that names a cover, and
+            // this message pointing at an innocent parent is why that
+            // exists rather than this being extended.
+            let worst = { selector: "", right: 0 };
+            for (const el of document.querySelectorAll<HTMLElement>(
+              "#storybook-root *, body > *",
+            )) {
+              const right = el.getBoundingClientRect().right;
+              if (right > worst.right) {
+                worst = {
+                  selector: `${el.tagName.toLowerCase()}.${el.className.toString().split(" ").slice(0, 3).join(".")}`,
+                  right,
+                };
+              }
             }
-          }
-          return worst;
-        })(),
-      }));
-      expect(
-        overflow.scrollWidth,
-        `widest element: ${overflow.widest.selector} ending at ${overflow.widest.right}px`,
-      ).toBeLessThanOrEqual(overflow.clientWidth);
-    });
+            return worst;
+          })(),
+        }));
+        expect(
+          overflow.scrollWidth,
+          `widest element: ${overflow.widest.selector} ending at ${overflow.widest.right}px`,
+        ).toBeLessThanOrEqual(overflow.clientWidth);
+      });
+    }
   }
 }
 

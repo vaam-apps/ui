@@ -67,20 +67,35 @@ export function Calendar({
         // not an icon-only control, so the convention doesn't apply to it.
         // D11 (`theme.css`'s own header on `.tap-target`): both nav
         // buttons are a fixed `size-7` (28px) icon-only circle in both
-        // densities — RDP positions them `absolute` itself, which already
-        // gives the invisible comfortable-only overlay a positioning
-        // context, so only `[--tap-size:28px] tap-target` needs adding.
+        // densities, absolutely positioned against the top corners, so
+        // they take the `-anchored` variant — the in-flow one reserves
+        // its target as margin, and margin on a box with an inset set
+        // moves it rather than growing the room around it.
+        //
+        // A 28px box needs 10px a side to reach 48, and `top-3 left-3`
+        // leaves 12px toward each anchored edge, so no `--tap-room-*`
+        // clamp is needed and the cover lands 2px inside the panel's own
+        // `p-3`. No clamp is *declared* either: one that clamps nothing
+        // is dormant code, and what actually keeps this target inside the
+        // panel if the offsets ever change is a gate rather than a
+        // defensive declaration — `e2e/tap-targets.spec.ts` asserts both
+        // nav covers stay within the popover panel they are anchored to.
+        // What the cover *does* overlap is `month_caption`'s full-width
+        // flex row, which is not a target and has no click action of its
+        // own — the caption label sits centred, 41px clear of it — and
+        // that same file asserts no control claims the caption's pixels
+        // rather than leaving it as a claim.
         button_previous: cn(
           "absolute top-3 left-3 inline-flex size-7 items-center justify-center rounded-full",
           "text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground",
           "disabled:pointer-events-none disabled:opacity-40",
-          "[--tap-size:28px] tap-target",
+          "[--tap-size:28px] tap-target-anchored",
         ),
         button_next: cn(
           "absolute top-3 right-3 inline-flex size-7 items-center justify-center rounded-full",
           "text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground",
           "disabled:pointer-events-none disabled:opacity-40",
-          "[--tap-size:28px] tap-target",
+          "[--tap-size:28px] tap-target-anchored",
         ),
         month_grid: "w-full border-collapse",
         weekdays: "flex",

@@ -362,8 +362,13 @@ function DetailDrawerContent({
             // (`:root`/`[data-theme]`), and a CSS custom property's
             // `calc()` only ever re-evaluates where it is *declared*,
             // never per descendant just because `var(--density)` resolves
-            // differently further down. That forced a second, literal
-            // `max-md:[--size-field:0.35rem]` line here — measured before
+            // differently further down. That forced a second
+            // `max-md:` arbitrary-property line here, pinning
+            // `--size-field` to `0.35rem` — written as prose rather than
+            // as the class itself because Tailwind's `@source "../src"`
+            // scanner reads a comment as eagerly as it reads JSX, so the
+            // deleted class went on being emitted into the built CSS for
+            // as long as this comment spelled it out. Measured before
             // it was added: `--density` read back as `1` on this very
             // element, and `SelectTrigger` still rendered 40px, not 56px,
             // because `.select`'s `--size: calc(var(--size-field,.25rem)
@@ -408,7 +413,10 @@ function DetailDrawerContent({
                 {description ?? "Details panel."}
               </DrawerDescription>
             </div>
-            {/* `-m-1 p-1`: same hit-area fix as `dialog.tsx`'s close button
+            {/* A -4px resting margin (`[--tap-rest:-4px]`, a property
+                rather than a `-m-1` utility because `.tap-target` writes
+                `margin` itself — D11) against `p-1`: same hit-area fix as
+                `dialog.tsx`'s close button
                 (§ that file's own `DialogContent` comment) — grows the
                 clickable box to **24×24px** — 16px icon plus 4px each side,
                 not the 32×32 this said before it was measured, and
@@ -422,10 +430,14 @@ function DetailDrawerContent({
               aria-label="Close"
               // D11 (`theme.css`'s own header on `.tap-target`): unlike
               // `dialog.tsx`'s close button, this one is in normal flow
-              // (`justify-between` row above), not `absolute` — `relative`
-              // is added here so the invisible comfortable-only overlay
-              // has a positioning context of its own.
-              className="relative -m-1 shrink-0 rounded-full p-1 text-subtle-foreground transition-colors hover:bg-surface-3 hover:text-foreground [--tap-size:24px] tap-target"
+              // (`justify-between` row above), not `absolute` — so it
+              // takes the in-flow `tap-target`, which reserves its
+              // comfortable-register target as margin, and `relative`
+              // added here gives the cover a positioning context of its
+              // own. `[--tap-rest:-4px]` replaces a `-m-1` utility for
+              // the reason that rule's header gives: `margin` gets one
+              // writer.
+              className="relative shrink-0 rounded-full p-1 text-subtle-foreground transition-colors hover:bg-surface-3 hover:text-foreground [--tap-rest:-4px] [--tap-size:24px] tap-target"
             >
               <X size={16} strokeWidth={1.5} />
             </DrawerPrimitive.Close>

@@ -377,8 +377,14 @@
  * exactly the split `drawer.tsx`'s own "Both custom properties are
  * needed — `--density` alone is not enough" comment already found live,
  * for this same reason, before this fix existed (it worked around it
- * with a literal `max-md:[--size-field:0.35rem]`, which is redundant
- * now and has been removed there).
+ * with a `max-md:` arbitrary-property override pinning `--size-field` to
+ * `0.35rem` on that one element, which is redundant now and has been
+ * removed there). Spelled out in prose rather than written as the class
+ * it was: Tailwind's `@source "../src"` scanner reads this file too, and
+ * a class name quoted in a comment is a class name it emits — the
+ * literal above survived its own deletion as a live
+ * `--size-field: .35rem` rule in `dist/styles/theme.css` until this
+ * sentence replaced it.
  *
  * Measured before this fix, in a real browser (Chromium, via the built
  * Storybook): opening `primitives-form-controls--fields-and-errors` at
@@ -522,126 +528,312 @@
 }
 
 /*
- * D11 — comfortable tap-target floor (48dp), for the icon-only affordances
- * whose own glyph the M3 Expressive register keeps small in BOTH
- * densities: `Checkbox`, `Switch`, `CopyButton`, `MaskedValue`'s reveal
- * toggle, `DialogClose`/the drawer and toast dismiss buttons,
- * `DatePicker`'s inline Clear button, and `Calendar`'s prev/next nav. None
- * of these read `--size-field` or `.btn-sm` (D10's own two hooks) — each
- * is either a fixed-utility box (`size-4`, `h-5 w-9`, `size-7`) or a
- * padding-grown one (`-m-1 p-1` around a 12–16px icon) with no `--density`
- * term at all, so every one of them measured identically at both
- * densities before this rule (`e2e/density.spec.ts`'s new assertions
+ * D11 — the comfortable-register 48dp tap target, for the icon-only
+ * affordances whose own glyph the M3 Expressive register keeps small in
+ * BOTH densities: `Checkbox`, `Switch`, `CopyButton`, `MaskedValue`'s
+ * reveal toggle, `DialogClose`, the drawer and toast dismiss buttons,
+ * `DatePicker`'s inline Clear button, and `Calendar`'s prev/next nav.
+ * None of these read `--size-field` or `.btn-sm` (D10's own two hooks) —
+ * each is either a fixed-utility box (`size-4`, `h-5 w-9`, `size-7`) or a
+ * padding-grown one (`-m-1 p-1` around a 12–16px icon) with no
+ * `--density` term at all, so every one of them measured identically at
+ * both densities before this rule (`e2e/density.spec.ts`'s assertions
  * record the "before" numbers this fixes).
  *
- * # Why 48dp, and why these controls specifically
+ * # 48dp is a *reservation*. That is the whole rule, and getting it wrong
+ * # is how an earlier revision of this file shipped four real defects.
  *
  * Transcribed, not invented, from `androidx/androidx`'s own
  * `compose/material3/material3/src/commonMain/kotlin/androidx/compose/
  * material3/InteractiveComponentSize.kt` (`androidx-main`, commit
  * `080d2b3e5326ba80392d93442c4a51a02dc22650`, read via `gh api
- * repos/androidx/androidx/contents/...` on 2026-09-22 — `v0_11_0`, the tag
- * this file's D10 section cites for the button tokens, does not resolve
- * through the GitHub API for this file's own history; `androidx-main` at a
- * pinned commit is the citable equivalent this rule is actually checked
- * against). `LocalMinimumInteractiveComponentSize` defaults to `48.dp`,
- * and its own doc comment calls that "the Material recommended minimum
- * size of 48.dp x 48.dp" for target sizes, distinct from a component's
- * visual size.
+ * repos/androidx/androidx/contents/...` — `v0_11_0`, the tag this file's
+ * D10 section cites for the button tokens, does not resolve through the
+ * GitHub API for this file's own history; `androidx-main` at a pinned
+ * commit is the citable equivalent this rule is actually checked
+ * against). Three facts from that one file, in the order they matter:
  *
- * Which components actually apply it is what draws this rule's list.
- * `Checkbox.kt`, `RadioButton.kt`, `Switch.kt` and `IconButton.kt` each
- * call `Modifier.minimumInteractiveComponentSize()` — confirmed by
- * grepping their own source, not assumed from the name — and `Button.kt`
- * does not, anywhere in the file. So a small glyph control gets an
- * invisible touch target grown around it while its visual size stays put,
- * and a text button's own already-sized container (D10's
- * `--size-field`/`.btn-sm`, reaching 40dp/56dp at density 1) IS the touch
- * target with no further padding — exactly the split this rule and D10's
- * mechanism now draw between them.
+ * 1. `minimumInteractiveComponentSize()`'s own first sentence is
+ *    "Reserves at least 48.dp in size to disambiguate touch interactions
+ *    if the element would measure smaller", and the node behind it is a
+ *    `LayoutModifierNode`: it measures the child, reports
+ *    `maxOf(placeable.width, sizePx)` / `maxOf(placeable.height, sizePx)`
+ *    as its own size, and places the child centred inside that. Its doc
+ *    says what that means outright — "This modifier is not needed for
+ *    touch target expansion to happen. It only affects layout, to make
+ *    sure there is adequate space for touch target expansion." The 48dp
+ *    is **layout space the control reserves**, not a region it paints
+ *    over its neighbours.
+ * 2. `LocalMinimumInteractiveComponentSize`'s own doc, in the same file,
+ *    names both failure modes of *not* reserving it: "If set to 0.dp,
+ *    there will be no extra space, and so it is possible that if the
+ *    component is placed near the edge of a layout / near to another
+ *    component without any padding, there will not be enough space for
+ *    an accessible touch target." Near the edge of a layout, and near to
+ *    another component. An earlier revision of this rule grew an
+ *    out-of-flow `::before` overlay and reserved nothing, and shipped
+ *    exactly those two failures: `MaskedValue`'s reveal toggle became
+ *    unreachable by pointer because its `CopyButton` sibling — 18px away,
+ *    centre to centre — covered 16 of its 20 visible pixels and won
+ *    hit-testing by DOM order (a real click at the eye glyph put the
+ *    secret on the clipboard instead of revealing it), and a `CopyButton`
+ *    flush to its container's right edge pushed `document.scrollWidth`
+ *    14px past the viewport. Two 20px controls whose centres are 18px
+ *    apart cannot both own a 48px target, whatever the insets say.
+ * 3. `IconButton.kt`'s modifier chain at that same commit is
+ *    `.minimumInteractiveComponentSize().size(IconButtonDefaults
+ *    .smallContainerSize()).clip(shape).background(…).clickable(…)` —
+ *    the reservation comes **before** the sized, clipped, painted
+ *    container. So the reserved space grows *around* the state layer and
+ *    the state layer does not grow with it, which is why the mechanism
+ *    below moves margins and never touches a control's own box.
  *
- * # The mechanism — an invisible `::before`, not a bigger padding box
+ * The complementary accessibility rule is intersection, not size, and it
+ * is normative: WCAG 2.2 SC 2.5.8's Spacing exception reads "Undersized
+ * targets (those less than 24 by 24 CSS pixels) are positioned so that
+ * if a 24 CSS pixel diameter circle is centered on the bounding box of
+ * each, the circles do not intersect another target or the circle for
+ * another undersized target". A target that overlaps its neighbour is
+ * not a bigger target; it is two broken ones.
  *
- * Growing the real padding/margin box to 48px (the same `-m-*`/`p-*`
- * idiom these controls already use for their compact-register 20–24px hit
- * area, just with a bigger number) was tried first, and has a real cost:
- * `MaskedValue`'s reveal toggle and its `CopyButton` sibling sit 6px apart
- * in a `gap-1.5` row, and 48px boxes there would roughly quadruple that
- * row's rendered width and shift every value beside it — a layout change
- * nobody asked for, on every row in the console that renders a masked
- * secret, just to satisfy a density most consumers never turn on.
+ * # The mechanism: reserve, then cover
  *
- * `position: absolute` content on an already-positioned host solves it: a
- * pseudo-element participates in hit-testing as part of its host (a click
- * landing on it is a click on the button, not on a second, separate
- * target), but taking it out of flow means growing it costs the
- * surrounding layout nothing. This is the same "grow the hit area, not
- * the glyph" idiom `copy-button.tsx`'s and `masked-value.tsx`'s own doc
- * comments already describe for their fixed compact-register box —
- * generalized across `--density` and moved off the real box so it stops
- * competing with neighbouring controls for layout space. Each call site
- * must already be (or become) `position`-anything-but-`static` itself —
- * `.tap-target` deliberately does not set `position` on the host: several
- * call sites are already `absolute` (`DialogClose`, `DatePicker`'s Clear
- * button, `Calendar`'s nav buttons, via their own anchor offsets), and an
- * unlayered `position: relative` here would win over that layered
- * `absolute` utility outright (this file's own standing daisyUI-layer
- * trap) and silently break their anchoring. The handful that were
- * `position: static` (`CopyButton`, `MaskedValue`'s toggle, the drawer and
- * toast dismiss buttons) pick up a plain `relative` utility at the call
- * site instead, same as `Switch` already had for an unrelated reason.
+ * `.tap-target` — for a control in **normal flow**. Two halves, and it is
+ * the pair that makes the geometry true:
  *
- * `--tap-w`/`--tap-h` name the control's own resting box, in px, so one
- * rule computes the right expansion for a 16px checkbox, a 36×20 switch
- * track, a 12–16px icon-in-padding circle or a 28px calendar nav button
- * without each writing its own arithmetic. `--tap-size` is the square
- * shorthand for a control whose two axes agree (every caller here except
- * `Switch`). `min(0px, …)` is the guard: a control already at or past
- * 48px in a given axis (none here are, today) would otherwise compute a
- * *positive* inset and shrink itself.
+ * - it grows its own **margin** box to 48px at density 1, so the row it
+ *   sits in grows its pitch with the density and two adjacent controls
+ *   end up 48px apart centre to centre rather than 18px. This is the
+ *   `maxOf(placeable.width, sizePx)` of fact 1, expressed the only way
+ *   CSS can express "reserve space without resizing the box".
+ * - it then **covers** that reservation with an invisible, absolutely
+ *   positioned `::before`, because CSS has no equivalent of the platform
+ *   input-layer expansion fact 1 describes: reserved margin is not
+ *   hit-testable on its own, and a pseudo-element *is* part of its host
+ *   for hit-testing (a click landing on it is a click on the button).
  *
- * `--tap-border` (default `0px`) corrects for a real, measured discrepancy
- * rather than an assumed one: CSS resolves an absolutely-positioned
- * pseudo-element's `top`/`left`/`right`/`bottom` against its containing
- * block's *padding* edge, not its border edge (CSS Position §4's own
- * definition), so on a bordered host — `Checkbox`/`Switch`, both
+ * The cover is sized to the reservation exactly — never more. So the
+ * sibling that used to be swallowed is now 6px clear of the cover's
+ * edge, and the container that used to be overflowed now sizes to the
+ * margin box like any other in-flow content.
+ *
+ * The resting negative margin is **cancelled** at density 1 rather than
+ * added to. `-m-1 p-1` exists so that a compact control's 4px of
+ * hit-area padding costs the row no width; at comfortable the whole point
+ * is that the reservation *does* cost layout, so `--tap-rest` is spent
+ * only while `--density` is 0. That is also why these call sites write
+ * `[--tap-rest:-4px]` instead of Tailwind's own `-m-1`: `margin` has to
+ * have exactly one writer, and a `-m-1` utility beside a rule that also
+ * sets `margin` is a cascade coin-flip rather than a formula.
+ *
+ * `.tap-target-anchored` — for a control that is **absolutely positioned
+ * against its container's edge** (`DialogClose`, `DatePicker`'s Clear
+ * button, `Calendar`'s prev/next nav). Margin cannot reserve anything
+ * here: on an absolutely positioned box with an `inset` set, margin
+ * *moves* the box, so the reserve half of the pair would drag the glyph
+ * off its anchor. So this variant covers without reserving, and the
+ * containment that flow was providing has to come from two other places
+ * instead:
+ *
+ * - the **container reserves the room**, at the call site, with a
+ *   density-aware padding on whatever sits beside the control
+ *   (`dialog.tsx`'s own `pr-8` gutter and `date-picker.tsx`'s `pr-9` are
+ *   both that reservation; both grow with `--density` now). This is the
+ *   "without any padding" clause of fact 2, taken literally.
+ * - the cover is **clamped** to the room actually available toward each
+ *   edge the control is anchored to, via `--tap-room-top/right/bottom/
+ *   left`. A clamped side does not shrink the target: the opposite side
+ *   absorbs what the clamp gave up, so the target stays 48px and simply
+ *   grows inward instead of symmetrically. `DatePicker`'s Clear button is
+ *   the case that needs it — 14px wide, 8px from its field's right edge,
+ *   so a symmetric cover ended 9px *outside* the field and stole the
+ *   field's own rightmost 39px; clamped, the same 48px target sits flush
+ *   inside the field's right edge with the glyph not moved at all.
+ *
+ * Each `.tap-target-anchored` call site is already `position:
+ * absolute` and needs nothing added; each `.tap-target` call site is (or
+ * becomes) `position: relative`. Neither class sets `position` on its
+ * host, deliberately: an unlayered `position: relative` here would win
+ * over a layered `absolute` utility outright (this file's own standing
+ * daisyUI-layer trap) and silently break the anchored call sites'
+ * anchoring.
+ *
+ * `--tap-w`/`--tap-h` name the control's own resting **border** box, in
+ * px, so one rule computes the right reservation for a 16px checkbox, a
+ * 36×20 switch track, a 12–16px icon-in-padding circle or a 28px calendar
+ * nav button without each writing its own arithmetic. `--tap-size` is the
+ * square shorthand for a control whose two axes agree (every caller here
+ * except `Switch`). `max(0px, …)` is the guard: a control already at or
+ * past 48px in an axis (none here are, today) reserves nothing in it
+ * rather than computing a negative reservation and shrinking itself.
+ *
+ * `--tap-border` (default `0px`) corrects the cover, and only the cover,
+ * for a real measured discrepancy rather than an assumed one: CSS
+ * resolves an absolutely-positioned pseudo-element's inset against its
+ * containing block's *padding* edge, not its border edge (CSS Position
+ * §4's own definition), so on a bordered host — `Checkbox`/`Switch`, both
  * `border border-edge-strong` — the same formula that lands exactly on
- * 48px for a borderless icon button (`CopyButton`, `DialogClose`, …,
- * confirmed live) landed at 46px for a 1px-bordered one, measured before
- * this term was added. Subtracting the border width once per side is
- * what makes the *visual*, on-screen overlay reach the full 48px this
- * rule claims regardless of whether the host happens to draw a border.
+ * 48px for a borderless icon button landed at 46px for a 1px-bordered
+ * one. It is not in the reservation, because `--tap-w`/`--tap-h` are
+ * already the border box and the margin box grows from there.
+ *
+ * What this rule deliberately does **not** do is fix the compact
+ * register. At density 0 every term below is multiplied by zero, so a
+ * compact `CopyButton` is still a 20×20 target and `DatePicker`'s Clear
+ * is still 14×14 — both under WCAG 2.2 SC 2.5.8's own 24px floor, and
+ * both by ruling: compact is what `vsms` and `vpay` render today and this
+ * pass changes not one pixel of it (`e2e/geometry.spec.ts`'s D11 block
+ * asserts that half per control, and `e2e/tap-targets.spec.ts` records
+ * the compact intersections rather than pretending they are absent).
  */
-.tap-target::before {
+.tap-target,
+.tap-target-anchored {
+  /* Half the 48px deficit per side, zero at compact, never negative. */
+  --tap-reserve-x: calc(
+    var(--density, 0) *
+    max(0px, (48px - var(--tap-w, var(--tap-size, 48px))) / 2)
+  );
+  --tap-reserve-y: calc(
+    var(--density, 0) *
+    max(0px, (48px - var(--tap-h, var(--tap-size, 48px))) / 2)
+  );
+  /* The cover's own per-side reach: the reservation, plus the
+     padding-edge-vs-border-edge correction `--tap-border` documents
+     above. Both terms carry the `--density` factor, so compact stays a
+     literal `0px` on every side rather than a 1px bordered offset. */
+  --tap-cover-x: calc(var(--tap-reserve-x) + var(--density, 0) * var(--tap-border, 0px));
+  --tap-cover-y: calc(var(--tap-reserve-y) + var(--density, 0) * var(--tap-border, 0px));
+}
+
+/*
+ * In flow, the cover IS the reservation: symmetric, on all four sides, and
+ * deliberately deaf to `--tap-room-*`.
+ *
+ * Declared on the element rather than left to fall through to the
+ * anchored variant's formula, because these are inherited custom
+ * properties and "the in-flow variant does not support `--tap-room-*`"
+ * has to be enforced rather than documented. Measured before this split
+ * existed: `--tap-room-left: 0px` on `MaskedValue`'s reveal toggle — a
+ * knob the docs said applied only to the anchored variant — desynced its
+ * cover from its own margin reservation, moving it from 191.64…239.64 to
+ * 205.64…253.64 and producing a 384px² collision with the `CopyButton`
+ * beside it. That is the exact defect class this whole rule exists to
+ * remove, reachable through a property that was never meant to reach
+ * here. A clamp makes no sense in flow anyway: the reservation is the
+ * containment, so a cover narrower than its own margin box would leave
+ * reserved space that routes a pointer nowhere.
+ */
+.tap-target {
+  --tap-cover-top: var(--tap-cover-y);
+  --tap-cover-bottom: var(--tap-cover-y);
+  --tap-cover-left: var(--tap-cover-x);
+  --tap-cover-right: var(--tap-cover-x);
+}
+
+/*
+ * Clamped per side, for the anchored variant only. `9999px` is "no
+ * clamp" — larger than any container this library can be rendered in, and
+ * a plain length rather than a viewport unit so a clamp cannot start
+ * depending on the window size.
+ *
+ * Each side is its own room, capped at the total the axis owes
+ * (`2 x cover`) minus whatever the opposite side is *able* to take. So an
+ * unclamped side absorbs what a clamped one gave up — which is what keeps
+ * a clamped target a full 48px instead of quietly shrinking it — while an
+ * axis clamped on both sides honestly ends up smaller than 48 rather than
+ * reaching outside its container anyway.
+ *
+ * Written symmetrically, with the *opposite* room inside each expression,
+ * because the obvious shorter form is wrong in a way nothing here would
+ * have noticed: deriving `left` from the already computed `right`
+ * (`2 x cover - right`) never reads `--tap-room-left` at all, so two of
+ * these four properties were declared at call sites and silently ignored.
+ * Every one of those call sites still measured correctly, because none of
+ * them needs the clamp it declared — which is exactly how a dead knob
+ * survives. `e2e/tap-targets.spec.ts`'s "the mechanism itself" block now
+ * drives all four against a live element rather than trusting a call site
+ * to exercise them.
+ *
+ * Only `DatePicker`'s Clear button declares one today (`--tap-room-right`,
+ * 8px, which genuinely binds). The non-binding declarations `dialog.tsx`
+ * and `calendar.tsx` used to carry "in case the offsets change" are gone:
+ * a declaration that clamps nothing is dormant code, and what actually
+ * protects those two is a gate — `e2e/tap-targets.spec.ts` asserts each
+ * one's cover stays inside the panel it is anchored to, which catches a
+ * changed offset whether or not anybody remembered to declare a room.
+ */
+.tap-target-anchored {
+  --tap-cover-right: min(
+    var(--tap-room-right, 9999px),
+    2 *
+    var(--tap-cover-x) -
+    min(var(--tap-cover-x), var(--tap-room-left, 9999px))
+  );
+  --tap-cover-left: min(
+    var(--tap-room-left, 9999px),
+    2 *
+    var(--tap-cover-x) -
+    min(var(--tap-cover-x), var(--tap-room-right, 9999px))
+  );
+  --tap-cover-bottom: min(
+    var(--tap-room-bottom, 9999px),
+    2 *
+    var(--tap-cover-y) -
+    min(var(--tap-cover-y), var(--tap-room-top, 9999px))
+  );
+  --tap-cover-top: min(
+    var(--tap-room-top, 9999px),
+    2 *
+    var(--tap-cover-y) -
+    min(var(--tap-cover-y), var(--tap-room-bottom, 9999px))
+  );
+}
+
+/*
+ * `@layer components`, not unlayered, for the reason the `SideNav` band
+ * rules ~1000 lines below carry the same wrapper: a caller's own margin
+ * utility on one of these controls has to be able to win. Unlayered, this
+ * one declaration would outrank every `m-*` in the utilities layer,
+ * including a consumer's deliberate override, and there would be no way
+ * to opt a control out of the reservation from outside this package.
+ * `[--tap-rest:…]` and `[--tap-size:…]` are arbitrary-property utilities
+ * and so already outrank this block, which is the direction that has to
+ * work.
+ *
+ * **The wrapper is load-bearing and is gated.** Removing only the
+ * `@layer components` lines, leaving the declaration byte-identical, left
+ * all 151 e2e tests and all 945 unit tests green while silently deleting
+ * the escape hatch this comment and `Docs/Theming and tokens` both
+ * promise: unlayered, `.tap-target` outranks a consumer's `m-0` and the
+ * margin stays at its reserved 14px instead of collapsing to 0.
+ * `e2e/tap-targets.spec.ts`'s "the mechanism itself" block asserts the
+ * precedence directly — a real `m-0` utility applied to one of these
+ * controls has to win — so that edit is now red rather than invisible.
+ */
+@layer components {
+  .tap-target {
+    margin: calc(var(--tap-rest, 0px) * (1 - var(--density, 0)) + var(--tap-reserve-y))
+      calc(var(--tap-rest, 0px) * (1 - var(--density, 0)) + var(--tap-reserve-x));
+  }
+}
+
+.tap-target::before,
+.tap-target-anchored::before {
   content: "";
   position: absolute;
-  /* An inset has to be *negative* to grow the box outward, so this is
-     `(tap-size - 48) / 2`, not `(48 - tap-size) / 2` — the deficit with
-     its sign already flipped, not the raw gap. Read the other way around
-     the first time this was written, `min(0px, (48px - tap)/2)` picks the
-     *larger* (less negative, i.e. more positive) of the two operands
-     whenever tap < 48, which is 0px every time — `min()` degenerates to
-     "never expand", the exact silent no-op `density.spec.ts`'s new
-     assertions caught before this was corrected. `--tap-border` is
-     subtracted after the guard, not folded into it: it corrects for the
-     padding-edge-vs-border-edge gap above, which is unrelated to whether
-     this axis needed to expand at all. */
-  top: calc(
-    var(--density, 0) *
-    (min(0px, (var(--tap-h, var(--tap-size, 48px)) - 48px) / 2) - var(--tap-border, 0px))
-  );
-  bottom: calc(
-    var(--density, 0) *
-    (min(0px, (var(--tap-h, var(--tap-size, 48px)) - 48px) / 2) - var(--tap-border, 0px))
-  );
-  left: calc(
-    var(--density, 0) *
-    (min(0px, (var(--tap-w, var(--tap-size, 48px)) - 48px) / 2) - var(--tap-border, 0px))
-  );
-  right: calc(
-    var(--density, 0) *
-    (min(0px, (var(--tap-w, var(--tap-size, 48px)) - 48px) / 2) - var(--tap-border, 0px))
-  );
+  /* An inset has to be *negative* to grow the box outward. The sign lives
+     here, once, rather than inside the formulas: `--tap-cover-*` are all
+     positive "how far past the host does this reach" lengths, which is
+     what makes them readable at a call site and comparable against a
+     `--tap-room-*` clamp. Read the other way around the first time this
+     was written, a `min(0px, (48px - tap)/2)` picks the *larger* (less
+     negative) of the two operands whenever tap < 48, which is 0px every
+     time — `min()` degenerates to "never expand", the exact silent no-op
+     `density.spec.ts`'s assertions caught before it was corrected. */
+  top: calc(-1 * var(--tap-cover-top));
+  bottom: calc(-1 * var(--tap-cover-bottom));
+  left: calc(-1 * var(--tap-cover-left));
+  right: calc(-1 * var(--tap-cover-right));
 }
 
 /*
