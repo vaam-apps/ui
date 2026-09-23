@@ -1,6 +1,6 @@
 {
   "name": "@vaam-apps/ui",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "A dark-first React component library for operator consoles — daisyUI styling, Headless UI behaviour, and a parameterised status-glyph system.",
   "license": "MIT",
   "author": "Vaam Apps",
