@@ -13,6 +13,14 @@ decision the way the prose below does. The tradeoff is recorded in the
 pull request that made this change.
 -->
 
+## [0.2.4](https://github.com/vaam-apps/ui/compare/v0.2.3...v0.2.4) (2026-09-23)
+
+
+### Bug Fixes
+
+* **density:** replay the three commits the [#24](https://github.com/vaam-apps/ui/issues/24) squash left behind ([#25](https://github.com/vaam-apps/ui/issues/25)) ([7539d3c](https://github.com/vaam-apps/ui/commit/7539d3c34dd9d98fcaa00d0469d1e03b59075b28))
+* **density:** reserve the 48dp tap target in layout instead of overlaying it ([#27](https://github.com/vaam-apps/ui/issues/27)) ([83efd32](https://github.com/vaam-apps/ui/commit/83efd32ae0b8d5d1c9517fa8e7912e5e15c655fc))
+
 ## [0.2.3](https://github.com/vaam-apps/ui/compare/v0.2.2...v0.2.3) (2026-09-22)
 
 
