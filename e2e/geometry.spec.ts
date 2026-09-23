@@ -282,8 +282,16 @@ test.describe("the press-shape morph steps the radius down while held", () => {
  * trigger click), and its own visual-box pair — folding that into a
  * shared loop body would hide more than it would save. A *new* icon-only
  * affordance joins this list the same way an existing one is checked
- * here: open its story, locate it, assert `tapTargetSize` reaches 48 at
+ * here: open its story, locate it, assert `tapTargetSize` lands on 48 at
  * `comfortable` and still matches its own resting box at `compact`.
+ *
+ * **And then it joins `e2e/tap-targets.spec.ts` too, which is the
+ * complement this block cannot be.** Everything here is a size, and a
+ * size is necessary rather than sufficient: every assertion below passed
+ * while `MaskedValue`'s reveal toggle was unreachable by pointer, because
+ * its `CopyButton` sibling's own perfectly-sized 48px covered 16 of the
+ * toggle's 20 visible pixels and won hit-testing by DOM order. Size here,
+ * ownership and exclusivity there; a control needs both.
  */
 /** `toMatchObject` failed on a real, sub-pixel `getBoundingClientRect()`
  * value (`24.00000762939453`) the first time this suite ran — Chromium's
@@ -299,14 +307,31 @@ function expectSize(
   expect(actual.height, `${label} height`).toBeCloseTo(expected.height, 0);
 }
 
-/** `tapTargetSize` reaching 48 on both axes — the one assertion every
+/**
+ * `tapTargetSize` landing **on** 48 on both axes — the one assertion every
  * control below needs at `comfortable`, regardless of its own compact
- * shape. `toBeGreaterThanOrEqual` rather than `expectSize`: the floor is
- * a minimum, not a target to hit exactly, and `Switch`'s two axes reach
- * it by different per-side amounts (see that test's own comment). */
-function expectFloor(actual: { width: number; height: number }): void {
-  expect(actual.width, "comfortable tap target width").toBeGreaterThanOrEqual(48);
-  expect(actual.height, "comfortable tap target height").toBeGreaterThanOrEqual(48);
+ * shape.
+ *
+ * A floor and a ceiling, not just a floor, and the ceiling is the half
+ * that was missing. This function used to be `expectFloor` and asserted
+ * only `toBeGreaterThanOrEqual(48)`: raising the target from 48px to
+ * **480px** left all 48 e2e tests and all 945 unit tests green, because
+ * nothing anywhere objected to a target being too big. Too big is not
+ * generous — a target larger than it was reserved room for is a target
+ * sitting on its neighbour, which is precisely the defect
+ * `tap-targets.spec.ts` exists to catch. 48 is a minimum *and* the
+ * number the formula computes, so both bounds are assertable here and
+ * both are asserted; `Switch`'s two axes reach it by different per-side
+ * amounts (see that test's own comment) and still land on 48.
+ *
+ * ±0.5px for the same reason `expectSize` above carries it: Chromium's
+ * layout is not required to land on an integer.
+ */
+function expectTapTarget(actual: { width: number; height: number }): void {
+  expect(actual.width, "comfortable tap target width, floor").toBeGreaterThanOrEqual(48);
+  expect(actual.height, "comfortable tap target height, floor").toBeGreaterThanOrEqual(48);
+  expect(actual.width, "comfortable tap target width, ceiling").toBeLessThanOrEqual(48.5);
+  expect(actual.height, "comfortable tap target height, ceiling").toBeLessThanOrEqual(48.5);
 }
 
 test.describe("D11 — comfortable tap-target floor (48dp) on icon-only affordances", () => {
@@ -336,7 +361,7 @@ test.describe("D11 — comfortable tap-target floor (48dp) on icon-only affordan
       { width: 16, height: 16 },
       "comfortable visual box, unchanged",
     );
-    expectFloor(await tapTargetSize(checkedComfortable));
+    expectTapTarget(await tapTargetSize(checkedComfortable));
   });
 
   test("Switch: 36×20 visual track, unchanged; tap target reaches 48×48 on both axes", async ({
@@ -360,7 +385,7 @@ test.describe("D11 — comfortable tap-target floor (48dp) on icon-only affordan
     // than the wider one (width, 36px) to reach the same 48px floor —
     // exactly the case `--tap-w`/`--tap-h` (rather than one `--tap-size`)
     // exists for. `expectFloor` checks both axes independently.
-    expectFloor(await tapTargetSize(toggleComfortable));
+    expectTapTarget(await tapTargetSize(toggleComfortable));
   });
 
   test("CopyButton: 20×20 visual box (default size=12), unchanged; tap target reaches 48×48", async ({
@@ -380,7 +405,7 @@ test.describe("D11 — comfortable tap-target floor (48dp) on icon-only affordan
       { width: 20, height: 20 },
       "comfortable visual box, unchanged",
     );
-    expectFloor(await tapTargetSize(copyComfortable));
+    expectTapTarget(await tapTargetSize(copyComfortable));
   });
 
   test("MaskedValue's reveal toggle: 20×20 visual box, unchanged; tap target reaches 48×48", async ({
@@ -398,7 +423,7 @@ test.describe("D11 — comfortable tap-target floor (48dp) on icon-only affordan
       { width: 20, height: 20 },
       "comfortable visual box, unchanged",
     );
-    expectFloor(await tapTargetSize(revealComfortable));
+    expectTapTarget(await tapTargetSize(revealComfortable));
   });
 
   test("DialogClose: 24×24 visual box, unchanged; tap target reaches 48×48", async ({ page }) => {
@@ -420,7 +445,7 @@ test.describe("D11 — comfortable tap-target floor (48dp) on icon-only affordan
       { width: 24, height: 24 },
       "comfortable visual box, unchanged",
     );
-    expectFloor(await tapTargetSize(closeComfortable));
+    expectTapTarget(await tapTargetSize(closeComfortable));
   });
 
   test("Drawer's close button: 24×24 visual box, unchanged; tap target reaches 48×48", async ({
@@ -445,7 +470,7 @@ test.describe("D11 — comfortable tap-target floor (48dp) on icon-only affordan
       { width: 24, height: 24 },
       "comfortable visual box, unchanged",
     );
-    expectFloor(await tapTargetSize(closeComfortable));
+    expectTapTarget(await tapTargetSize(closeComfortable));
   });
 
   test("Toast's dismiss button: 24×24 visual box, unchanged; tap target reaches 48×48", async ({
@@ -469,7 +494,7 @@ test.describe("D11 — comfortable tap-target floor (48dp) on icon-only affordan
       { width: 24, height: 24 },
       "comfortable visual box, unchanged",
     );
-    expectFloor(await tapTargetSize(dismissComfortable));
+    expectTapTarget(await tapTargetSize(dismissComfortable));
   });
 
   test("DatePicker's Clear button: 14×14 visual box, unchanged; tap target reaches 48×48", async ({
@@ -492,7 +517,7 @@ test.describe("D11 — comfortable tap-target floor (48dp) on icon-only affordan
       { width: 14, height: 14 },
       "comfortable visual box, unchanged",
     );
-    expectFloor(await tapTargetSize(clearComfortable));
+    expectTapTarget(await tapTargetSize(clearComfortable));
   });
 
   test("Calendar's prev/next nav: 28×28 visual box, unchanged; tap target reaches 48×48", async ({
@@ -512,6 +537,6 @@ test.describe("D11 — comfortable tap-target floor (48dp) on icon-only affordan
       { width: 28, height: 28 },
       "comfortable visual box, unchanged",
     );
-    expectFloor(await tapTargetSize(prevComfortable));
+    expectTapTarget(await tapTargetSize(prevComfortable));
   });
 });

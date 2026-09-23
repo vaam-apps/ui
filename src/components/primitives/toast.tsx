@@ -174,7 +174,10 @@ export function Toaster() {
             {/* Lucide `X` at the same 16px/1.5 stroke every other close in
                 the library uses (`dialog.tsx`, `drawer.tsx`) — the literal
                 `×` glyph this replaced rendered a different weight and a
-                roughly 8×18px box. `-m-1 p-1`: the same hit-area idiom
+                roughly 8×18px box. A -4px resting margin
+                (`[--tap-rest:-4px]`, not a `-m-1` utility — `.tap-target`
+                writes `margin` itself, D11) against `p-1`: the same
+                hit-area idiom
                 used there, growing the click target without moving the
                 icon. `rounded-full` and `hover:bg-surface-3` match those
                 two as well — icon-only controls are circular in this
@@ -192,13 +195,15 @@ export function Toaster() {
               onClick={() => dismissToast(item.id)}
               aria-label="Dismiss"
               className={cn(
-                "relative -m-1 shrink-0 rounded-full p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
+                "relative shrink-0 rounded-full p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
                 "[--btn-press-radius:calc(24px*0.1)]",
                 // D11 (`theme.css`'s own header on `.tap-target`): in
                 // normal flow like the drawer close button, so `relative`
-                // (added above) gives its invisible comfortable-only
-                // overlay a positioning context.
-                "[--tap-size:24px] tap-target",
+                // (added above) gives its cover a positioning context and
+                // the target is reserved as margin. `[--tap-rest:-4px]`
+                // is the `-m-1` this string used to carry — see that
+                // rule's header for why `margin` has exactly one writer.
+                "[--tap-rest:-4px] [--tap-size:24px] tap-target",
                 PRESS_SHAPE_MORPH,
               )}
             >

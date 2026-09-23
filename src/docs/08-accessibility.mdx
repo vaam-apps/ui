@@ -255,3 +255,40 @@ test fails and says the limitation is gone.
 so a tooltip label must be a string. That is an accepted constraint of
 not taking a second behaviour library, and nothing in the library
 currently needs otherwise.
+
+### Compact tap targets are under SC 2.5.8, and comfortable is the fix
+
+Nine icon-only affordances — `Checkbox`, `Switch`, `CopyButton`,
+`MaskedValue`'s reveal toggle, the `Dialog`/`Drawer`/`Toast` close buttons,
+`DatePicker`'s Clear button and `Calendar`'s prev/next nav — keep a small
+glyph in both density registers. At `comfortable` each one reserves a real
+48 × 48 target, the way M3's own `minimumInteractiveComponentSize()` reserves
+it; `Docs/Theming and tokens` has the mechanism and the citations.
+
+At `compact` they do not, and that is a ruling rather than an oversight:
+compact is byte-for-byte what `vsms` and `vpay` render today, and changing it
+changes rendered widths in two shipped applications. So a compact
+`CopyButton` is a 20 × 20 target and `DatePicker`'s Clear button is 14 × 14,
+both under WCAG 2.2 SC 2.5.8's 24 × 24 CSS pixel floor, and `MaskedValue`'s
+reveal toggle sits 18px from its `CopyButton` sibling — two sub-24px targets
+whose 24px circles intersect, so that criterion's Spacing exception does not
+rescue them either.
+
+Named here rather than left implicit, and **gated** rather than merely named:
+`e2e/tap-targets.spec.ts` asserts that the set of colliding tap regions at
+compact is *exactly* that one known pair, so a tenth control arriving with the
+same problem fails the build instead of joining a list nobody is counting. A
+consumer who needs the criterion met today can set `--density: 1` on any
+subtree; `DetailDrawerContent` already does it for a phone-width sheet.
+
+This is also the one gap on this page that a browser found and jsdom could
+not, which is why it belongs beside "What these gates cannot see" above:
+**hit-target size** was already on that list, and hit-target *ownership* was
+the half nobody had written down. An earlier revision of the comfortable
+register gave every one of those nine controls a correct 48px target and left
+`MaskedValue`'s reveal toggle unreachable by pointer, because `CopyButton`'s
+equally correct 48px covered 16 of its 20 visible pixels and won hit-testing
+by DOM order — a click on the eye glyph put the secret on the clipboard. No
+unit test in this library could see it and no size assertion would have
+either; `document.elementFromPoint` in a real browser is the only thing that
+can.

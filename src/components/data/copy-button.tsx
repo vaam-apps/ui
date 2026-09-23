@@ -81,7 +81,8 @@ export function CopyButton({
   // `PRESS_SHAPE_MORPH` (`press-shape.ts`) reads `--btn-press-radius`
   // rather than naming a value itself (see that file's "D10" header) —
   // every call site supplies its own box. This control's `size` prop
-  // makes the box itself a runtime value (`size + 8`px, `-m-1 p-1` above),
+  // makes the box itself a runtime value (`size + 8`px, `p-1` against a
+  // -4px resting margin, above),
   // so unlike the fixed-size call sites in `dialog.tsx`/`toast.tsx`/
   // `masked-value.tsx` — which can write a literal Tailwind arbitrary
   // property — this one has to compute it and set it as an inline style.
@@ -92,8 +93,8 @@ export function CopyButton({
   // `--tap-size` rides the same object for the same reason (D11,
   // `theme.css`'s own header on `.tap-target`): this control's compact box
   // is already `size + 8`, which the `.tap-target` rule needs to know to
-  // compute how far its invisible comfortable-register overlay has to
-  // reach past it.
+  // compute how much layout space its comfortable-register target has to
+  // reserve around it.
   const pressRadiusStyle = {
     "--btn-press-radius": `calc(${size + 8}px * 0.1)`,
     "--tap-size": `${size + 8}px`,
@@ -106,9 +107,12 @@ export function CopyButton({
       aria-label={label ?? `Copy ${value}`}
       style={pressRadiusStyle}
       className={cn(
-        // `-m-1 p-1 rounded-full`: same hit-area idiom as the close
-        // buttons in `dialog.tsx`/`drawer.tsx`/`toast.tsx` — negative
-        // margin and padding are equal, so this grows the clickable box to
+        // `[--tap-rest:-4px] p-1 rounded-full`: same hit-area idiom as
+        // the close buttons in `dialog.tsx`/`drawer.tsx`/`toast.tsx` —
+        // the resting negative margin (spelled as a property rather than
+        // a `-m-1` utility, because `.tap-target` writes `margin` itself;
+        // it still computes to exactly -4px at compact) and the padding
+        // are equal, so this grows the clickable box to
         // `size + 8`px (20/22/24px across this control's own 12/14/16px
         // `size` prop) without moving the icon or changing this element's
         // footprint in the flex row it sits in (`IdDisplay`'s and
@@ -139,11 +143,17 @@ export function CopyButton({
         // site. Doesn't collide with the `opacity-*` utilities below for
         // the same reason `transition` didn't: those set `opacity`'s
         // *value*, this sets which properties transition and how fast.
-        "relative -m-1 shrink-0 rounded-full p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
+        "relative shrink-0 rounded-full p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
         // D11: see `pressRadiusStyle` above for `--tap-size`, and
-        // `theme.css`'s own header on `.tap-target` for why this is an
-        // invisible overlay rather than a bigger `-m-1 p-1`.
-        "tap-target",
+        // `theme.css`'s own header on `.tap-target` for the whole rule.
+        // `[--tap-rest:-4px]` is the `-m-1` this class string used to
+        // carry, handed to `.tap-target` instead of written as a utility:
+        // that rule sets `margin` itself (it has to — the 48dp target is
+        // reserved layout space, not an overlay), so a `-m-1` beside it
+        // would be a second writer of the same property. Compact is
+        // unchanged by the swap, byte for byte: at `--density: 0` the
+        // rule's own formula resolves to exactly `-4px`.
+        "tap-target [--tap-rest:-4px]",
         PRESS_SHAPE_MORPH,
         revealOnGroupHover && "opacity-0 focus-visible:opacity-100 group-hover:opacity-100",
         className,

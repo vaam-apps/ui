@@ -1,4 +1,6 @@
-import { expect, type Locator, type Page } from "@playwright/test";
+import { expect, type Locator, type Page, test as testBase } from "@playwright/test";
+
+const testInfo = (): ReturnType<typeof testBase.info> => testBase.info();
 
 /**
  * Shared machinery for the real-browser gate. Nothing here asserts on its
@@ -9,6 +11,21 @@ import { expect, type Locator, type Page } from "@playwright/test";
 
 export type Theme = "dark" | "light";
 export type Density = "compact" | "comfortable";
+
+/**
+ * How long `openStory` waits for the webfont swap before measuring the
+ * fallback layout instead. See that function's "Why the wait is bounded"
+ * note for the two measurements this number sits between.
+ *
+ * The healthy case is **75–183ms**, median 95, measured over 15 cold
+ * browser contexts rather than the single 34ms reading this constant was
+ * first sized against — so the real headroom here is **16x**, not the two
+ * orders of magnitude an earlier revision of this comment claimed. 16x
+ * still comfortably clears a slow-but-working load while staying an order
+ * of magnitude below the 15s/30s test timeout, so the number does not
+ * change; the claim about it does.
+ */
+const FONT_SWAP_BUDGET_MS = 3_000;
 
 export interface StoryOptions {
   theme?: Theme;
@@ -37,6 +54,21 @@ export interface StoryOptions {
  * Story ids come from `storybook-static/index.json`; `story-ids.ts` holds
  * the ones used here so a renamed story fails loudly in one place.
  *
+ * # One shape of story this cannot open at all
+ *
+ * The mount signal below is "`#storybook-root` has children", so a
+ * **portal-only** story — one whose entire render goes to
+ * `document.body` — never satisfies it and the poll runs to its timeout
+ * rather than failing with anything informative.
+ * `primitives-feedback--confirming-busy-with-error` is one today: it
+ * renders an overlay straight into `document.body`, so `#storybook-root`
+ * stays empty forever. Byte-identical on `main`, so this is pre-existing
+ * rather than something D11 introduced, and it is why the full-Storybook
+ * compact sweep that backs "compact is unchanged" covered 115 of 116
+ * stories. It is a standing hole for any future story of that shape: a
+ * test that needs one will have to wait on its own portalled selector
+ * instead, and this helper would need a way to be told which.
+ *
  * # Why it also waits for the webfonts
  *
  * `.storybook/preview.css` `@import`s IBM Plex Sans from Google Fonts with
@@ -58,32 +90,255 @@ export interface StoryOptions {
  * exactly 16.0px from the shifted centre of a 16px-radius circle — one
  * hair outside it, so nothing entered `:active` at all.
  *
- * The layout is forced before the wait rather than after: `fonts.ready`
+ * # Why the wait is bounded
+ *
+ * `document.fonts.ready` resolves when nothing is in flight — including
+ * when a load *fails*, but only if it fails **fast**. Probed on this
+ * laptop rather than assumed: a refused connection and a 404 both resolve
+ * it in 0–1ms, while `fonts.gstatic.com` **dropped** (a firewall DROP, not
+ * a refusal) left the promise pending after 90 seconds with
+ * `document.fonts.status === "loading"`. `page.evaluate` carries no
+ * timeout of its own and `playwright.config.ts` sets `retries: 0`, so one
+ * egress rule on a runner turns all 82 tests in this suite into
+ * 30-second timeouts whose code frame points at this line. An earlier
+ * revision of this comment claimed "a failed fetch resolves it too, so an
+ * offline machine gets the fallback layout deterministically instead of
+ * hanging", which is true of a fast failure and false of a dropped
+ * packet — the case a locked-down network actually produces.
+ *
+ * So the wait races a timer. `FONT_SWAP_BUDGET_MS` sits 16x above the
+ * measured healthy case and an order of magnitude below the 15s/30s test
+ * timeout (see that constant), so it cannot expire on a slow-but-working
+ * font load. On expiry the helper **proceeds** rather than failing: what
+ * it then measures is the fallback layout, which is exactly what `main`
+ * measured before the swap-wait existed and what every assertion in this
+ * suite passed against — deterministic per platform, and wrong only for
+ * the two assertions the swap shift was added for
+ * (`paintedFillRatio`'s clip and `pressAndSettle`'s pointer). A hard
+ * failure here would instead turn "this machine cannot reach Google
+ * Fonts" into 82 red tests about geometry, which is the diagnosis
+ * pointing at the wrong thing.
+ *
+ * **But expiry must not be silent, for exactly that reason.** On a cold
+ * runner a budget-induced pre-swap measurement would otherwise surface as
+ * a bare geometry failure with nothing pointing at the font host, which
+ * is the same mis-pointing this paragraph argues against — one level
+ * further down. So expiry attaches a `font-swap-budget` annotation to the
+ * running test (visible in the Playwright report, and in the `github`
+ * reporter's output) and writes a warning to stderr. It does not fail:
+ * the annotation is there so that *if* something else in the same test
+ * goes red, the reason is already on the page.
+ *
+ * The layout is forced before the wait rather than after — `fonts.ready`
  * answers "is any load *in flight*", so asking it before anything has
- * measured the story's text resolves against an empty set and proves
- * nothing. A failed fetch resolves it too, so an offline machine gets the
- * fallback layout deterministically instead of hanging.
+ * measured the story's text resolves against an empty set. That is the
+ * claim; what was measured is narrower, and the difference matters enough
+ * to record: `document.fonts.status` already reads `"loading"` before
+ * that line runs, because Storybook's own preview has laid out text long
+ * before this helper is reached, so the `getBoundingClientRect()` call is
+ * **inert here** rather than load-bearing. It is kept as the cheap,
+ * explicit guarantee for a future story that renders nothing measurable
+ * until this point, not because it was observed to do anything.
  */
+/**
+ * The measurement this suite is *about*, installed into the page so that
+ * exactly one definition of it exists.
+ *
+ * `openStory` has to wait for it to settle, and
+ * `tap-targets.spec.ts`'s reproducibility gate has to sample it every
+ * frame — both from inside the page, where a closure cannot reach. Two
+ * hand-written copies of "which controls are visible and where" is the
+ * duplication that let the two disagree in the first place: the wait
+ * stabilised `#storybook-root`'s element count while the suite read
+ * document-wide target geometry, so a story could satisfy the wait and
+ * still be moving under the thing being measured.
+ *
+ * Same population as `tapRegions`: the target roles, minus anything with
+ * a zero-size box (a built Storybook keeps `#storybook-docs` populated
+ * but `display: none`, which is otherwise seven invisible "controls" in
+ * every story). Geometry is rounded, so a sub-pixel reflow does not read
+ * as instability while a control appearing, vanishing or sliding does.
+ */
+async function installTargetSignature(page: Page): Promise<void> {
+  if (instrumentedPages.has(page)) return;
+  instrumentedPages.add(page);
+  await page.addInitScript((selector) => {
+    (window as unknown as { __vaamTargetSignature?: () => string }).__vaamTargetSignature = () =>
+      [...document.querySelectorAll(selector)]
+        .map((el) => ({ el, r: el.getBoundingClientRect() }))
+        .filter(({ r }) => r.width !== 0 || r.height !== 0)
+        .map(
+          ({ el, r }) =>
+            `${(el.getAttribute("aria-label") ?? el.textContent ?? "").trim().slice(0, 24)}@${Math.round(r.x)},${Math.round(r.y)},${Math.round(r.width)}x${Math.round(r.height)}`,
+        )
+        .join("|");
+  }, TARGET_SELECTOR);
+}
+
+const instrumentedPages = new WeakSet<Page>();
+
 export async function openStory(page: Page, id: string, options: StoryOptions = {}): Promise<void> {
   const { theme = "dark", density = "compact", width, height, expectThemeStamp = true } = options;
+  await installTargetSignature(page);
   if (width !== undefined) {
     await page.setViewportSize({ width, height: height ?? 800 });
   }
   await page.goto(`/iframe.html?id=${id}&viewMode=story&globals=theme:${theme};density:${density}`);
-  // The story is mounted, not merely fetched. `#storybook-root` exists in
-  // `iframe.html` before React runs, so its emptiness is the only honest
-  // "not yet" signal available.
-  await expect
-    .poll(() => page.locator("#storybook-root > *").count(), {
-      message: `story ${id} never mounted`,
-    })
-    .toBeGreaterThan(0);
-  await page.evaluate(async () => {
-    // Discarded on purpose: reading a rect is what forces the layout that
-    // schedules the font load, which is what `fonts.ready` then answers for.
+  // The story is mounted **and settled**, not merely fetched.
+  // `#storybook-root` exists in `iframe.html` before React runs, so its
+  // emptiness is the only honest "not yet" signal available — but "has any
+  // children" is satisfied by React's *first* commit, which is not the same
+  // as the story being finished. Caught by building a whole-Storybook
+  // geometry sweep on this same signal and finding it disagreed with
+  // **itself**: the same build swept twice differed on one story each run
+  // (25 elements against 12 for `primitives-select--default`), because a
+  // faster or slower run snapshotted a half-rendered subtree.
+  //
+  // For a locator-driven assertion that is mostly harmless — the locator
+  // just retries. For a whole-document snapshot it is a silent false
+  // green: `tapRegions` reads every target at one instant, so a tree that
+  // is still growing reports fewer targets and therefore fewer collisions
+  // than the story really has, which is the one direction
+  // `tap-targets.spec.ts` must never be wrong in.
+  //
+  // So: wait for the subtree to stop changing size. `polling: "raf"` keeps
+  // the whole loop in the page (no CDP round trip per sample), and three
+  // stable frames costs ~48ms rather than the ~100ms an `expect.poll`
+  // interval would — measured across the suite at under 4s total.
+  try {
+    await page.waitForFunction(
+      () => {
+        // `#storybook-root` for "did anything mount", and then the
+        // shared target signature for "has it settled" — the same
+        // measurement the suite goes on to take, which is the only
+        // signal worth stabilising. Two earlier attempts each stabilised
+        // something narrower and were each satisfied while the real
+        // measurement was still moving: `#storybook-root`'s element
+        // count leaves out every portalled control (
+        // `primitives-overlays--menu-with-toggles` holds the root at 2
+        // elements from its first frame while its portalled menu is
+        // still changing three frames later), and the whole document's
+        // element count is blind to a control sliding into place or
+        // dropping out of view without the node count changing.
+        if (document.querySelectorAll("#storybook-root *").length === 0) return false;
+        const signature = window as unknown as { __vaamTargetSignature?: () => string };
+        if (signature.__vaamTargetSignature === undefined) return false;
+        const w = window as unknown as {
+          __mountCount?: string;
+          __mountStable?: number;
+          __signatureAtReturn?: string;
+        };
+        // A running CSS transition resets the counter outright, because
+        // "unchanged for three frames" cannot tell *settled* from *slow*:
+        // the signature rounds geometry to whole pixels, so a control
+        // easing into place holds the same rounded position for several
+        // frames and then moves again.
+        // `primitives-overlays--commands-versus-destinations` is the case
+        // — two controls, the same count on every frame, different
+        // positions — and it defeated a pure frame counter six times out
+        // of six. `settleTransitions` below already encodes this test for
+        // the overlay specs; this is the same one, applied before the
+        // measurement rather than after it.
+        const moving = document
+          .getAnimations()
+          .some((a) => a instanceof CSSTransition && a.playState === "running");
+        const n = signature.__vaamTargetSignature();
+        // What `openStory` last saw. Recorded on every evaluation and
+        // before any branching, so that whenever this predicate returns
+        // true, this holds the page as it was at that instant — with no
+        // round trip in between to let a late commit sneak in first.
+        // `tap-targets.spec.ts`'s reproducibility gate compares it
+        // against the page once everything has finished, which is the
+        // contract in one line: what this function hands back is what is
+        // actually there.
+        w.__signatureAtReturn = n;
+        if (moving || w.__mountCount !== n) {
+          w.__mountCount = n;
+          w.__mountStable = 0;
+          return false;
+        }
+        w.__mountStable = (w.__mountStable ?? 0) + 1;
+        // A heuristic, and it says so: six quiet frames cannot promise
+        // that nothing will change *later*, only that nothing has
+        // changed recently. A control that appears twenty frames after
+        // mount defeats it by construction, and
+        // `tap-targets.spec.ts`'s gate on this contract is written
+        // around that limit rather than pretending it away.
+        //
+        // Six frames, not three, and the number is measured rather than
+        // picked: three left `primitives-select--default` re-rendering
+        // inside the window about once in 120 runs, six removed it from
+        // 120 (though not from 240 — see `tap-targets.spec.ts`'s note on
+        // why that story cannot satisfy the invariant at all). Six frames
+        // is ~96ms of wall clock and cost the full suite nothing
+        // measurable: 25.2s before, 25.6s after, against a 25-30s spread
+        // between runs.
+        return (w.__mountStable ?? 0) >= 6;
+      },
+      // Its own budget, well inside the 15s/30s test timeout, so that the
+      // diagnostic below can still run. Without it `waitForFunction`
+      // inherits the test's timeout, the test dies first, and the catch
+      // block's `page.evaluate` fails with "Target page, context or
+      // browser has been closed" — so the message that distinguishes
+      // "never mounted" from "never settled" is unreachable in exactly
+      // the case it was written for. Found by mutating the wait and
+      // reading the failure it produced.
+      { polling: "raf", timeout: 10_000 },
+    );
+  } catch (cause) {
+    // Two genuinely different failures, and they want different first
+    // moves from whoever reads the message: a story that never mounted is
+    // a wrong id, a missing decorator, or a portal-only story (see this
+    // function's own note above), while one that never settled is an
+    // infinite render loop or an animation with no end. `__mountCount`
+    // already tells them apart — it is never written while the predicate
+    // is still seeing `n === 0`, and holds a real count otherwise.
+    const rooted = await page.evaluate(() => document.querySelectorAll("#storybook-root *").length);
+    throw new Error(
+      rooted === 0
+        ? `story ${id} never mounted: #storybook-root stayed empty for the whole timeout. A mistyped id renders Storybook's own error page, and a portal-only story renders into document.body instead — see openStory's own note on both.`
+        : `story ${id} mounted (${rooted} elements under #storybook-root) but its visible controls never stopped changing: which ones exist, or where they are, differed on every frame for the whole timeout. An endless transition or a render loop, not a missing story.`,
+      { cause },
+    );
+  }
+  const swapped = await page.evaluate(async (budgetMs) => {
+    // Discarded on purpose: reading a rect forces layout, so a story that
+    // has not laid out any text yet schedules its font load here rather
+    // than after the wait. Inert in practice today — see this function's
+    // own "Why the wait is bounded" note, which measured it.
     document.documentElement.getBoundingClientRect();
-    await document.fonts.ready;
-  });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      document.fonts.ready,
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, budgetMs);
+      }),
+    ]);
+    // So a resolved `fonts.ready` does not leave a pending timer behind
+    // for the rest of the page's life; harmless here, but a stray timer
+    // is exactly the kind of thing `copy-button.tsx`'s own doc records
+    // having to fix once already.
+    if (timer !== undefined) clearTimeout(timer);
+    // `"loaded"` means the swap landed; anything else means the budget
+    // won the race and this story is about to be measured in the
+    // fallback face.
+    return document.fonts.status === "loaded";
+  }, FONT_SWAP_BUDGET_MS);
+  if (!swapped) {
+    const note =
+      `webfont swap did not land within ${FONT_SWAP_BUDGET_MS}ms for story ${id}; ` +
+      "measuring the fallback layout. Geometry failures in this test may be about " +
+      "reaching fonts.gstatic.com rather than about the component.";
+    // `test.info()` throws outside a running test, and every caller here is
+    // inside one — but a helper that can only be used from a test body is a
+    // worse helper, so the annotation is best-effort and the stderr line is not.
+    try {
+      testInfo().annotations.push({ type: "font-swap-budget", description: note });
+    } catch {
+      // No running test: the warning below is the whole signal.
+    }
+    process.stderr.write(`${note}\n`);
+  }
   if (expectThemeStamp) {
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
   }
@@ -611,4 +866,162 @@ export async function sampleBoundingClientXs(
     },
     [selectors, durationMs],
   );
+}
+
+/**
+ * What `document.elementFromPoint` actually returns at one viewport point,
+ * reported as "which control, if any, owns this pixel".
+ *
+ * This is the measurement whose absence let D11's first revision ship:
+ * every assertion in that pass was about a *size* — is the overlay 48px —
+ * and none about *whose* 48px it was. An overlay can be exactly 48×48 on
+ * every control in the library and still leave a visible control
+ * unreachable, which is what happened: `MaskedValue`'s reveal toggle
+ * measured a clean 48 while `CopyButton`'s equally clean 48 sat on top of
+ * 16 of its 20 visible pixels, so a click at the eye glyph copied the
+ * secret. Size is necessary and hit-testing is what makes it true.
+ *
+ * `control` is deliberately nullable rather than a string like
+ * `"div.caption"`: "nothing interactive claims this point" is itself an
+ * assertion this suite needs to make — `Calendar`'s month caption is not
+ * a target and must not become one just because a nav button's cover
+ * reaches across it.
+ */
+export interface HitResult {
+  /** Accessible name of the nearest interactive ancestor of whatever was
+   * returned, or `null` when no control owns the point. */
+  control: string | null;
+  /** Tag and leading classes of the element actually returned, so a
+   * failure names the thing in the way rather than only the miss. */
+  element: string;
+}
+
+/** Every role this suite treats as "a target" for hit-testing and for the
+ * no-two-targets-intersect rule. Deliberately concrete rather than
+ * `[onclick]`-ish: a React handler is invisible to the DOM, and every
+ * interactive affordance in this library is one of these elements or
+ * carries one of these roles.
+ *
+ * Exported because `tap-targets.spec.ts`'s reproducibility gate has to
+ * sample the *same* population this file measures, every frame, from
+ * inside the page — and two definitions of "a target" would let that gate
+ * pass while the thing it guards drifted. */
+export const TARGET_SELECTOR =
+  'button, a[href], input, select, textarea, [role="checkbox"], [role="switch"], [role="button"], [role="tab"], [role="option"]';
+
+export async function hitAt(page: Page, x: number, y: number): Promise<HitResult> {
+  return await page.evaluate(
+    ({ x: px, y: py, selector }) => {
+      const hit = document.elementFromPoint(px, py);
+      if (hit === null) return { control: null, element: "<nothing>" };
+      const owner = hit.closest(selector);
+      const classes = hit.className.toString().split(" ").slice(0, 3).join(".");
+      return {
+        control:
+          owner === null
+            ? null
+            : (owner.getAttribute("aria-label") ?? owner.textContent ?? "").trim(),
+        element: `${hit.tagName.toLowerCase()}${classes === "" ? "" : `.${classes}`}`,
+      };
+    },
+    { x, y, selector: TARGET_SELECTOR },
+  );
+}
+
+/** `hitAt` at the centre of `target`'s own **visible** box — the pixel a
+ * reader aims at. Not the centre of its tap region, which is the whole
+ * point: a clamped or asymmetric region has a different centre, and the
+ * question is always whether the glyph you can see still belongs to the
+ * control that draws it. */
+export async function hitAtVisibleCentre(page: Page, target: Locator): Promise<HitResult> {
+  const rect = await box(target);
+  return await hitAt(page, rect.x + rect.width / 2, rect.y + rect.height / 2);
+}
+
+/**
+ * Every target in the document, with the region it actually claims.
+ *
+ * The region is the union of the control's own border box and its D11
+ * cover (`theme.css`'s `.tap-target`), because those are the two things
+ * a pointer can land on and be routed to this control. Reconstructed
+ * rather than read: a pseudo-element has no node, so nothing in the DOM
+ * or in Playwright can hand back its rect — `getComputedStyle(el,
+ * "::before")` gives used insets relative to the host's **padding** box
+ * (CSS Position §4), so the host's border widths have to be added back to
+ * reach viewport coordinates. Valid because no host here carries a
+ * scaling transform; a translate (`DatePicker`'s Clear button) is already
+ * inside `getBoundingClientRect()` and applies equally to the pseudo.
+ */
+export interface TapRegion {
+  name: string;
+  element: string;
+  /** The visible border box. */
+  box: Box;
+  /** Border box ∪ cover — everything that routes a pointer here. */
+  region: Box;
+}
+
+export async function tapRegions(page: Page): Promise<TapRegion[]> {
+  return await page.evaluate((selector) => {
+    const out: TapRegion[] = [];
+    for (const el of document.querySelectorAll<HTMLElement>(selector)) {
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 && r.height === 0) continue;
+      const style = getComputedStyle(el);
+      if (style.visibility === "hidden" || style.pointerEvents === "none") continue;
+      let left = r.left;
+      let top = r.top;
+      let right = r.right;
+      let bottom = r.bottom;
+      const cover = getComputedStyle(el, "::before");
+      if (cover.content !== "none" && cover.position === "absolute") {
+        const bl = Number.parseFloat(style.borderLeftWidth) || 0;
+        const bt = Number.parseFloat(style.borderTopWidth) || 0;
+        const cx = r.left + bl + Number.parseFloat(cover.left);
+        const cy = r.top + bt + Number.parseFloat(cover.top);
+        const cw = Number.parseFloat(cover.width);
+        const ch = Number.parseFloat(cover.height);
+        if (Number.isFinite(cx) && Number.isFinite(cw)) {
+          left = Math.min(left, cx);
+          right = Math.max(right, cx + cw);
+        }
+        if (Number.isFinite(cy) && Number.isFinite(ch)) {
+          top = Math.min(top, cy);
+          bottom = Math.max(bottom, cy + ch);
+        }
+      }
+      const classes = el.className.toString().split(" ").slice(0, 3).join(".");
+      out.push({
+        name: (el.getAttribute("aria-label") ?? el.textContent ?? "").trim(),
+        element: `${el.tagName.toLowerCase()}${classes === "" ? "" : `.${classes}`}`,
+        box: { x: r.x, y: r.y, width: r.width, height: r.height },
+        region: { x: left, y: top, width: right - left, height: bottom - top },
+      });
+    }
+    return out;
+  }, TARGET_SELECTOR);
+}
+
+/** `0` when two regions are disjoint or one is wholly inside the other,
+ * otherwise the area they share.
+ *
+ * Containment is exempt on purpose and it is not a loophole: a trailing
+ * affordance layered over a larger container control — `DatePicker`'s
+ * Clear button inside its own field-shaped trigger — is a real M3
+ * pattern, and the honest requirement there is that the inner target sits
+ * *inside* the outer one and the outer one reserves the room, not that
+ * the two never touch. A region that escapes the control it is layered
+ * over is the defect, and that is exactly what this stops exempting.
+ */
+export function overlapArea(a: Box, b: Box): number {
+  const w = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+  const h = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+  if (w <= 0 || h <= 0) return 0;
+  const contains = (outer: Box, inner: Box): boolean =>
+    inner.x >= outer.x - 0.5 &&
+    inner.y >= outer.y - 0.5 &&
+    inner.x + inner.width <= outer.x + outer.width + 0.5 &&
+    inner.y + inner.height <= outer.y + outer.height + 0.5;
+  if (contains(a, b) || contains(b, a)) return 0;
+  return w * h;
 }
