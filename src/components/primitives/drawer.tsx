@@ -352,35 +352,33 @@ function DetailDrawerContent({
             // desktop right-hand panel keeps reading whatever density the
             // app itself set.
             //
-            // **Both custom properties are needed — `--density` alone is
-            // not enough, found live rather than assumed.** `--density:
-            // 1` here correctly reaches `.btn-sm`'s and `.btn`/
+            // **`--density` alone is enough now.** It used to not be:
+            // `--density: 1` here always reached `.btn-sm`'s and `.btn`/
             // `.btn-circle`'s own formulas (`theme.css`'s D10 section),
             // because those are declared *on the sized element itself*
             // and re-resolve `var(--density, 0)` against whatever
-            // inherits to that exact element. `--size-field` is not: it
-            // is declared exactly once, at the theme root
+            // inherits to that exact element — but `--size-field` used to
+            // be declared exactly once, at the theme root
             // (`:root`/`[data-theme]`), and a CSS custom property's
-            // `calc()` only ever re-evaluates where it is *declared* —
+            // `calc()` only ever re-evaluates where it is *declared*,
             // never per descendant just because `var(--density)` resolves
-            // differently further down. Measured before this second line
-            // was added: `--density` read back as `1` on this very
+            // differently further down. That forced a second, literal
+            // `max-md:[--size-field:0.35rem]` line here — measured before
+            // it was added: `--density` read back as `1` on this very
             // element, and `SelectTrigger` still rendered 40px, not 56px,
             // because `.select`'s `--size: calc(var(--size-field,.25rem)
-            // * 10)` was still inheriting `--size-field`'s value frozen
-            // at the theme root's own `--density: 0`. `0.35rem` is not a
-            // new number — it is `--size-field`'s own comfortable value
-            // (`0.25rem + 1 * 0.1rem`, `theme.css`'s formula evaluated at
-            // density 1), the same value `density.test.ts` already pins
-            // and `density.spec.ts` already measures at 56px elsewhere;
-            // redeclaring the `calc()` itself here was rejected because
-            // this branch is an unconditional "always comfortable below
-            // `md:`", not a value that ever varies with `--density`
-            // locally, so a literal says that honestly instead of
-            // implying a variability that isn't there — the same choice
-            // `theme.css`'s own `.btn-sm` override comment already makes
-            // for the identical reason.
-            "max-md:[--density:1] max-md:[--size-field:0.35rem]",
+            // * 10)` was still inheriting `--size-field`'s value frozen at
+            // the theme root's own `--density: 0`. `theme.css`'s own
+            // "`--size-field`, corrected" comment fixed this at the
+            // source — `--size-field` is now declared directly on
+            // `.input`/`.select`/`.btn`, the same "declare it on the
+            // sized element itself" mechanism `.btn-sm` already used — so
+            // this line's own workaround is dead weight now rather than a
+            // fix, and has been removed: `--density: 1` alone reaches
+            // `SelectTrigger` correctly through the corrected
+            // `--size-field`, verified by re-running this exact
+            // measurement after the fix (56px, not 40px).
+            "max-md:[--density:1]",
             contentClassName,
             className,
           )}

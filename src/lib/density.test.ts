@@ -66,10 +66,42 @@ describe("--size-field re-derives ButtonMediumTokens at both densities", () => {
     expect(formula, "--size-field calc() body").toBeDefined();
   });
 
-  it("appears identically in both the dark and light theme blocks", () => {
+  it("is declared exactly once, shared by both themes — not duplicated per theme", () => {
+    // Pre-nesting-fix, this formula lived once per `@plugin
+    // "daisyui/theme"` block (two copies, pinned identical so they could
+    // not drift). The fix moved it off the theme root entirely, onto the
+    // consuming selectors — see theme.css's own "`--size-field`,
+    // corrected" comment — which collapses the two copies into one
+    // declaration that both themes share, rather than two that merely
+    // agree.
     const occurrences = [...THEME_CSS.matchAll(/--size-field:\s*calc\([^;]+\);/g)];
-    expect(occurrences, "--size-field declarations").toHaveLength(2);
-    expect(occurrences[0]?.[0]).toBe(occurrences[1]?.[0]);
+    expect(occurrences, "--size-field declarations").toHaveLength(1);
+  });
+
+  it("is declared on .input, .select and .btn directly, not the theme root", () => {
+    // The nesting fix in one assertion: a descendant's own `--density`
+    // override only reaches a formula declared *on* the element that
+    // needs it, so pinning this exact selector list is what would fail
+    // if a future edit moved the declaration back to `:root` or an
+    // `@plugin "daisyui/theme"` block, silently reintroducing the freeze
+    // this file's own comment documents in detail.
+    const rule = THEME_CSS.match(
+      /\.input,\s*\.select,\s*\.btn\s*\{\s*--size-field:\s*calc\([^;]+\);\s*\}/,
+    );
+    expect(rule, ".input, .select, .btn { --size-field: calc(...) } rule").not.toBeNull();
+  });
+
+  it('is not declared inside either @plugin "daisyui/theme" block', () => {
+    const themeBlockStarts = [...THEME_CSS.matchAll(/@plugin "daisyui\/theme" \{/g)];
+    expect(themeBlockStarts, '@plugin "daisyui/theme" blocks').toHaveLength(2);
+    for (const { index } of themeBlockStarts) {
+      // Each block runs from its opening brace to the first line that is
+      // only a closing brace — true for both blocks here, neither of
+      // which nests a rule of its own inside it.
+      const end = THEME_CSS.indexOf("\n}", index ?? 0);
+      const block = THEME_CSS.slice(index ?? 0, end);
+      expect(block).not.toMatch(/--size-field:\s*calc\(/);
+    }
   });
 
   it("compact (density 0) is 0.25rem — 4px, unchanged from before D10", () => {

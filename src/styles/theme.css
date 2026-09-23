@@ -232,15 +232,16 @@
   --radius-box: 20px;
   --size-selector: 0.25rem;
   /* Density axis (D10) — see the standalone "Density register" block below
-     this theme's closing brace for the full derivation. `--size-field` is
-     daisyUI's own per-theme scale unit: every `.btn`/`.input`/`.select`
-     multiplies it (`--size: calc(var(--size-field) * N)`, `N` = 10 for the
-     default/`md` size) to get its rendered height, so this one line is
-     what makes `Button`'s default size, `Input` and `Select` all track
-     `--density` for free, with zero component-level changes. `--density`
-     is 0 (compact) unless an ancestor sets `[data-density="comfortable"]`,
-     so a consumer who sets nothing gets exactly 0.25rem, unchanged. */
-  --size-field: calc(0.25rem + var(--density, 0) * 0.1rem);
+     this theme's closing brace for the full derivation, and
+     "`--size-field`, corrected" further down that same block for where
+     the formula itself lives now. It used to be declared right here, at
+     the theme root — the exact defect that block fixes: a custom
+     property's `calc()` only re-evaluates at the element where it is
+     *declared*, so a formula pinned to the theme root freezes against
+     whatever `--density` the root resolves to and never re-reads a
+     descendant's own `[data-density="comfortable"]` override.
+     `--size-field` is declared on `.input`/`.select`/`.btn` themselves
+     now, for the same reason `.btn-sm` already was. */
   --border: 1px;
   --depth: 0;
   --noise: 0;
@@ -316,13 +317,17 @@
  * # Where it resolves — one place, not per screen
  *
  * `--density` is read in exactly three places, so a screen cannot end up
- * half-dense by missing one: `--size-field` above (covers `Button`'s
- * default/`md` size, `Input`, `Select` — everything daisyUI's own field
- * scale drives), and the `.btn-sm` / `.btn` / `.btn-circle` rules below
- * (the one daisyUI multiplier that cannot share `--size-field`, and the
+ * half-dense by missing one: `--size-field`'s own formula — declared
+ * directly on `.input`/`.select`/`.btn` themselves ("`--size-field`,
+ * corrected", below — covering `Button`'s default/`md` size, `Input`,
+ * `Select`, everything daisyUI's own field scale drives), and the
+ * `.btn-sm` / `.btn` / `.btn-circle` rules further below (the one
+ * daisyUI multiplier that cannot share `--size-field`, and the
  * press-morph target, D10's other half). `src/lib/density.test.ts` pins
  * this list and fails if a sized primitive's height stops resolving
- * through one of the three.
+ * through one of the three. All three are now declared on the element
+ * that actually needs the sizing, not an ancestor — see "`--size-field`,
+ * corrected" for why that distinction is load-bearing, not stylistic.
  *
  * `--density: 0` is declared at bare `:root` — not `[data-theme="dark"]`
  * — so it is reachable even outside a `data-theme`-stamped tree, the
@@ -348,6 +353,88 @@
    no-op, not a second code path. */
 [data-density="comfortable"] {
   --density: 1;
+}
+
+/*
+ * `--size-field`, corrected — the fix for D10's nesting defect.
+ *
+ * This formula — `0.25rem` plus a `0.1rem` step per unit of `--density` —
+ * used to be declared once per theme, at the theme root, inside each
+ * `@plugin "daisyui/theme"` block above. That reads fine until a
+ * consumer sets `[data-density="comfortable"]` on a
+ * *subtree* instead of the document root: a CSS custom property's
+ * `calc()` only re-evaluates at the element where it is **declared** —
+ * never at a descendant just because `var(--density)` resolves
+ * differently further down the inheritance chain. Declared at the theme
+ * root, `--size-field` computed once there, against whatever `--density`
+ * the root itself had (`0` by default), and every descendant inherited
+ * that one frozen length — `0.25rem` — regardless of what any of them
+ * set locally. `Input`/`Select`/`Button`'s default size all read
+ * `--size-field` rather than `--density` directly, so a comfortable
+ * subtree's own fields kept rendering compact beside comfortable
+ * buttons: `.btn-sm`/`.btn`/`.btn-circle` below read `--density`
+ * directly and already re-evaluated correctly per element, which is
+ * exactly the split `drawer.tsx`'s own "Both custom properties are
+ * needed — `--density` alone is not enough" comment already found live,
+ * for this same reason, before this fix existed (it worked around it
+ * with a literal `max-md:[--size-field:0.35rem]`, which is redundant
+ * now and has been removed there).
+ *
+ * Measured before this fix, in a real browser (Chromium, via the built
+ * Storybook): opening `primitives-form-controls--fields-and-errors` at
+ * the document root's default `density: "compact"`, then setting
+ * `[data-density="comfortable"]` on `#sb-sender`'s own parent element —
+ * a *subtree*, with the document root left untouched — `#sb-sender`
+ * (`Input`) stayed 40px tall. The identical probe against `#sb-long`
+ * (`Select`, story `primitives-select--disabled-and-scrolling`) and a
+ * `Button size="md"` (story `primitives-button--sizes`) also stayed at
+ * their compact heights, 40px both. `getComputedStyle` on the affected
+ * `Input` confirmed the mechanism directly: `--density` read back as `1`
+ * (correctly inherited from the subtree override) while `--size-field`
+ * read back as `calc(.25rem + 0 * .1rem)` — frozen at the root's own
+ * `--density: 0`, the `0` already substituted in. `e2e/density.spec.ts`'s
+ * "a subtree sets comfortable" suite pins the corrected numbers (56px)
+ * and is the mutation-checked guard against this regressing.
+ *
+ * The fix is the same one `.btn-sm` already uses below: declare the
+ * formula on the consuming element itself, not an ancestor, so it reads
+ * whatever `--density` is in scope exactly where it's declared — the
+ * identical mechanism, just extended to the one hook that didn't already
+ * use it. `.input`, `.select` and `.btn` are the three daisyUI root
+ * classes this package actually exposes that key off `--size-field`
+ * (`node_modules/daisyui/components/{input,select,button}.css`, found by
+ * grepping the installed package's own compiled output for
+ * `size-field`, not assumed — the same route also turned up
+ * `.file-input`, `.otp`, `.megamenu` and `.tabs`, none of which this
+ * package exposes through any exported size variant; `.textarea` was
+ * checked too and does not consume `--size-field` at all — its height is
+ * a fixed `min-height: 5rem`, so `Textarea` was never affected by either
+ * the bug or this fix). `.btn-lg`/`.btn-xs` need no separate mention:
+ * they're always paired with `.btn` on the same element, so they inherit
+ * this same corrected `--size-field` through it. A raw daisyUI class
+ * reached through `className` outside those three root classes (e.g. a
+ * bare `.file-input`) now falls back to daisyUI's own hardcoded
+ * `var(--size-field, .25rem)` default — always compact — rather than the
+ * root-level density tracking it used to get; this is the same
+ * "not exposed, so drift there costs nothing" call the `.btn-sm` comment
+ * below already makes for the M3-exactness question, applied here to the
+ * nesting one, and it is a documented narrowing rather than a silent one.
+ *
+ * Unlike `.btn-sm` below, this rule fights no cascade layer: daisyUI's
+ * own `.input`/`.select`/`.btn` rules only ever *read* `--size-field` via
+ * `var()` — none of them *set* it — so there is no competing, layered
+ * declaration of this specific property on these selectors to outrank.
+ * Confirmed by grepping the compiled CSS for a bare `--size-field:`
+ * (as opposed to `var(--size-field`) inside those three files and
+ * finding no hits; this rule can sit anywhere in this stylesheet and
+ * still win, but it lives here, beside the axis's other two hooks, so
+ * `src/lib/density.test.ts`'s "every sized primitive resolves through
+ * it" suite has one place to look.
+ */
+.input,
+.select,
+.btn {
+  --size-field: calc(0.25rem + var(--density, 0) * 0.1rem);
 }
 
 /*
@@ -833,15 +920,16 @@
   --radius-box: 20px;
   --size-selector: 0.25rem;
   /* Density axis (D10) — see the standalone "Density register" block below
-     this theme's closing brace for the full derivation. `--size-field` is
-     daisyUI's own per-theme scale unit: every `.btn`/`.input`/`.select`
-     multiplies it (`--size: calc(var(--size-field) * N)`, `N` = 10 for the
-     default/`md` size) to get its rendered height, so this one line is
-     what makes `Button`'s default size, `Input` and `Select` all track
-     `--density` for free, with zero component-level changes. `--density`
-     is 0 (compact) unless an ancestor sets `[data-density="comfortable"]`,
-     so a consumer who sets nothing gets exactly 0.25rem, unchanged. */
-  --size-field: calc(0.25rem + var(--density, 0) * 0.1rem);
+     this theme's closing brace for the full derivation, and
+     "`--size-field`, corrected" further down that same block for where
+     the formula itself lives now. It used to be declared right here, at
+     the theme root — the exact defect that block fixes: a custom
+     property's `calc()` only re-evaluates at the element where it is
+     *declared*, so a formula pinned to the theme root freezes against
+     whatever `--density` the root resolves to and never re-reads a
+     descendant's own `[data-density="comfortable"]` override.
+     `--size-field` is declared on `.input`/`.select`/`.btn` themselves
+     now, for the same reason `.btn-sm` already was. */
   --border: 1px;
   --depth: 0;
   --noise: 0;
