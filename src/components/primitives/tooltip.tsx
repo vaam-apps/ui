@@ -11,7 +11,7 @@ import { cn } from "../../lib/cn";
  *
  * Since #32 `@floating-ui/react-dom` *is* a direct dependency — a
  * maintainer's call, for `Select`'s dropdown, which a `Dialog` clipped
- * (`useDropdownPlacement` in `select.tsx`). It positions; it is not a
+ * (`useDropdownPlacement`, `src/lib/dropdown-placement.ts`). It positions; it is not a
  * behaviour library. This tooltip has not been moved onto it, so the
  * limitation below still holds; moving it is now possible, not done.
  *

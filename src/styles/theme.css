@@ -1820,7 +1820,7 @@
     outline-offset: 2px;
   }
 
-  /* A searchable `Select`'s scroll lock (`select.tsx`, `lockScroll`). An
+  /* A searchable `Select`'s scroll lock (`lockScroll`, `src/lib/popup-modality.ts`). An
      attribute, not an inline `overflow`, so it cannot overwrite — or be
      restored over — the inline `overflow: hidden` Headless UI's own dialogs
      set on the same element: the two locks come and go independently.

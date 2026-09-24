@@ -4,7 +4,8 @@ import { STORY } from "./story-ids";
 
 /**
  * Where a `Select`'s dropdown lands from `sm` up (`useDropdownPlacement`
- * in `select.tsx`): Floating UI, `position: fixed`, rendered inline.
+ * in `src/lib/dropdown-placement.ts`): Floating UI, `position: fixed`,
+ * rendered inline.
  *
  * It used to be `absolute` under its trigger, so any scrolling ancestor
  * clipped it — inside a `Dialog`, one row of a 346px search view showed.
