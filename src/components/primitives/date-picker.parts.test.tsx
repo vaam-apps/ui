@@ -35,6 +35,15 @@ afterAll(() => {
   globalThis.ResizeObserver = REAL_RO;
 });
 
+/**
+ * A range picker renders both its trees in jsdom — 27 month grids — on
+ * every open and every tap, and CI's runner does that about 3.4× slower
+ * than a workstation (measured: one open, tap and Save cycle 658ms locally,
+ * 2254ms in CI). A test with two cycles hit vitest's 5s default there, so
+ * the range tests get this instead, and none runs more than one cycle.
+ */
+const RANGE_TIMEOUT = 15_000;
+
 let mounted: { root: Root; host: HTMLElement } | undefined;
 
 async function unmount() {
@@ -110,7 +119,7 @@ function Range({
   );
 }
 
-describe("a range follows M3's taps, not react-day-picker's", () => {
+describe("a range follows M3's taps, not react-day-picker's", { timeout: RANGE_TIMEOUT }, () => {
   async function pickAndSave(start: IsoDateRange, taps: IsoDate[]) {
     const onValueChange = vi.fn();
     await mount(<Range value={start} onValueChange={onValueChange} />);
@@ -130,11 +139,14 @@ describe("a range follows M3's taps, not react-day-picker's", () => {
     });
   });
 
-  it("a tap on or after the start ends the range", async () => {
+  it("a tap after the start ends the range", async () => {
     expect(await pickAndSave(WHOLE, ["2026-09-20", "2026-09-25"])).toEqual({
       from: "2026-09-20",
       to: "2026-09-25",
     });
+  });
+
+  it("a tap on the start ends a one-day range", async () => {
     expect(await pickAndSave(WHOLE, ["2026-09-20", "2026-09-20"])).toEqual({
       from: "2026-09-20",
       to: "2026-09-20",
@@ -156,7 +168,7 @@ describe("a range follows M3's taps, not react-day-picker's", () => {
   });
 });
 
-describe("the full-screen range picker's months", () => {
+describe("the full-screen range picker's months", { timeout: RANGE_TIMEOUT }, () => {
   // The 15th: a month's first and last cells can be its neighbours' days,
   // hidden but still in the grid.
   const monthOf = (element: Element | undefined) =>
@@ -253,7 +265,7 @@ describe("a value changed from outside while the picker is open", () => {
   });
 });
 
-describe("DatePickerClose", () => {
+describe("DatePickerClose", { timeout: RANGE_TIMEOUT }, () => {
   it("keeps a written aria-label when it replaces the icon", async () => {
     await mount(
       <DateRangePicker value={undefined} onValueChange={() => undefined}>
