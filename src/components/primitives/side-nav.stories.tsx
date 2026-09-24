@@ -1,9 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { expect, userEvent, waitFor, within } from "storybook/test";
 import { cn } from "../../lib/cn";
 import { InstrumentPanel } from "../data/instrument-panel";
 import { StatTile } from "../data/stat-tile";
+import { Button } from "./button";
+import { RadioGroup } from "./radio-group";
 import {
   Select,
   SelectContent,
@@ -169,6 +171,12 @@ const meta = {
           "- **1280px and up** — a 256px sidebar with labels, in flow. Pass `collapsed` and " +
           "this band uses the vertical rail too, which is the only way to actually give the " +
           "content its width back.\n\n" +
+          "`accountSlot` renders under the sidebar's footer rows. Wherever a toolbar is the " +
+          "navigation instead, the toolbar ends in a **More** control that opens an M3 modal " +
+          "sheet with the account block in it — a bottom sheet from the phone bar, a navigation " +
+          "drawer from the vertical rail — so it is reachable at every width, and a consumer " +
+          "never needs floating account chrome of its own. Without an `accountSlot` the phone " +
+          "bar keeps its plain overflow menu and the rail gains nothing.\n\n" +
           "There used to be a fourth band: an in-flow 64px icon rail from 1024–1279px. It is " +
           "gone, and its removal is the point rather than a simplification. It was the one " +
           "shape that needed a flex-row parent while its neighbours needed none, so a caller " +
@@ -509,9 +517,10 @@ export const FloatingRailOverflow: Story = {
   ),
 };
 
-/** An account block under the footer rows. Hidden in the icon rail band
- * — there is no room for it at 64px — and shown in the other two, by the
- * same CSS toggle as everything else here. */
+/** An account block under the footer rows of the `≥1280px` sidebar,
+ * unchanged. Below 1280px it is not in the toolbar — there is no room for
+ * it at 64px — but behind the toolbar's "More" control: see the three
+ * "Account sheet" stories. */
 export const WithAnAccountBlock: Story = {
   globals: { viewport: { value: "fullSidebar" } },
   render: (args) => (
@@ -529,6 +538,234 @@ export const WithAnAccountBlock: Story = {
       />
     </Shell>
   ),
+};
+
+/**
+ * A realistic `accountSlot`: who is signed in, a radio group, and a
+ * sign-out action — the three things vaam-apps/vpay puts there, and
+ * exactly what a `role="menu"` cannot hold. Stateful, so a test can prove
+ * each control was *operated*, not merely found: the radio moves, and
+ * the button says so once pressed.
+ *
+ * A `RadioGroup` of its own rather than `ThemeSwitcher`, whose stories
+ * own `data-theme` and opt out of the preview's theme decorator — mounted
+ * here it would fight the toolbar's theme global.
+ */
+function AccountBlock({ organisation = false }: { organisation?: boolean }) {
+  const [density, setDensity] = useState<"compact" | "comfortable">("compact");
+  const [org, setOrg] = useState("acme");
+  const [signedOut, setSignedOut] = useState(false);
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex min-w-0 flex-col gap-0.5 text-caption">
+        <span className="text-subtle-foreground">Signed in as</span>
+        <span className="truncate text-foreground">ops@example.com</span>
+      </div>
+      {/* A popup inside the sheet, for the rail story only: the e2e checks
+          it closes alone — picked, Escaped, or dismissed by a tap on the
+          scrim — and the drawer stays open. The phone story leaves it out,
+          so its keyboard test walks the account block's own tab order. */}
+      {organisation && (
+        <Select value={org} onValueChange={setOrg}>
+          <SelectTrigger aria-label="Organisation">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="acme">Acme Ltd</SelectItem>
+            <SelectItem value="globex">Globex</SelectItem>
+            <SelectItem value="initech">Initech</SelectItem>
+          </SelectContent>
+        </Select>
+      )}
+      <RadioGroup
+        aria-label="Row density"
+        value={density}
+        onValueChange={setDensity}
+        options={[
+          { value: "compact", label: "Compact" },
+          { value: "comfortable", label: "Comfortable" },
+        ]}
+      />
+      <Button variant="secondary" size="sm" onClick={() => setSignedOut(true)}>
+        {signedOut ? "Signed out" : "Sign out"}
+      </Button>
+    </div>
+  );
+}
+
+/** The "More" control's sheet, found where it really lives: portalled to
+ * `document.body`, so a canvas-scoped query would find nothing. */
+async function openAccountSheet(presentation: "bottom" | "side") {
+  const body = within(document.body);
+  const more = await waitFor(() => {
+    const found = [...document.body.querySelectorAll<HTMLElement>("[data-side-nav-more]")].find(
+      (el) => el.checkVisibility(),
+    );
+    if (found === undefined) throw new Error("no visible More control has mounted");
+    return found;
+  });
+  await userEvent.click(more);
+  const sheet = await body.findByRole("dialog", { name: "More" });
+  await expect(sheet).toHaveAttribute("data-side-nav-sheet", presentation);
+  return sheet;
+}
+
+/**
+ * **Account sheet — phone.** Below 640px, with an `accountSlot`, the
+ * bottom toolbar's last control is "More" and opens an M3 modal bottom
+ * sheet: the destinations that did not fit, the footer rows, then the
+ * account block exactly as the caller rendered it. Before this, the
+ * account block did not exist below 1280px at all in the default mode,
+ * and consumers built their own `fixed` chrome to reach Sign out — which
+ * then collided with this toolbar (vaam-apps/ui#36).
+ *
+ * `/routes` is one of the overflowed destinations, so "More" wears the
+ * current-page pill, and the sheet marks Routes as the current row.
+ *
+ * `SideNav` sits inside a `will-change: transform` wrapper here — vaul's
+ * own stamp on every drawer, and the containing-block trap AGENTS.md
+ * names. The sheet is portalled to `document.body`, so it still lands on
+ * the viewport's bottom edge; `e2e/side-nav-account-sheet.spec.ts`
+ * measures that. The play function leaves the sheet open.
+ */
+export const AccountSheetOnAPhone: Story = {
+  globals: { viewport: { value: "tiny" } },
+  args: { currentPath: "/routes", accountSlot: <AccountBlock /> },
+  render: (args) => (
+    <div className="flex h-[40rem] overflow-hidden bg-base-100">
+      <div data-transformed-ancestor="" className="[will-change:transform]">
+        <SideNav {...args} />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-5 pb-24">
+        <div className="h-7 w-40 rounded-sm bg-surface-3" />
+        <div className="h-32 rounded-md bg-surface-2" />
+        <div className="h-32 rounded-md bg-surface-2" />
+      </div>
+    </div>
+  ),
+  play: async ({ step }) => {
+    const sheet = await openAccountSheet("bottom");
+    const inSheet = within(sheet);
+    await step("The rows are the overflow destinations, then the footer", async () => {
+      const rows = inSheet.getAllByRole("link");
+      await expect(rows.map((row) => row.textContent)).toEqual([
+        "Routes",
+        "Documentation",
+        "Settings",
+      ]);
+      await expect(inSheet.getByRole("link", { name: "Routes" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+    });
+    await step("…then the account block, rendered as-is and operable", async () => {
+      await expect(inSheet.getByText("ops@example.com")).toBeInTheDocument();
+      await expect(inSheet.getByRole("radiogroup", { name: "Row density" })).toBeInTheDocument();
+      await expect(inSheet.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
+    });
+  },
+};
+
+/**
+ * **Account sheet — no overflow.** Three destinations, no footer rows: the
+ * bar has room for everything, and before this it had no overflow control
+ * at all. With an `accountSlot` it gains "More" anyway, because the
+ * account block is the one thing the bar can never show — and the sheet
+ * holds only that. The play function leaves the sheet open.
+ */
+export const AccountSheetWithNoOverflow: Story = {
+  globals: { viewport: { value: "tiny" } },
+  args: {
+    currentPath: "/composer",
+    groups: [GROUPS[0] as (typeof GROUPS)[number]],
+    footerItems: [],
+    accountSlot: <AccountBlock />,
+  },
+  render: (args) => (
+    <div className="flex h-[40rem] overflow-hidden bg-base-100">
+      <SideNav {...args} />
+      <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-5 pb-24">
+        <div className="h-7 w-40 rounded-sm bg-surface-3" />
+        <div className="h-32 rounded-md bg-surface-2" />
+      </div>
+    </div>
+  ),
+  play: async () => {
+    const sheet = await openAccountSheet("bottom");
+    await expect(within(sheet).queryAllByRole("link")).toHaveLength(0);
+    await expect(within(sheet).getByRole("button", { name: "Sign out" })).toBeInTheDocument();
+  },
+};
+
+/**
+ * **Account sheet — the vertical rail.** From 640px up to the sidebar (and
+ * at every width when `collapsed`), with an `accountSlot`, the rail ends in
+ * a "More" control under the footer rows. It opens M3's modal navigation
+ * drawer from the left edge — the rail's own edge — holding what the
+ * sidebar holds: every destination, labelled, under its group's header,
+ * the footer rows, and the account block. The rail shows every
+ * destination already, but only as an icon whose label needs a hover a
+ * touch tablet does not have. The play function leaves the drawer open.
+ */
+export const AccountSheetFromTheRail: Story = {
+  globals: { viewport: { value: "iconRail" } },
+  args: { currentPath: "/providers", accountSlot: <AccountBlock organisation /> },
+  render: (args) => (
+    <div className="flex h-[40rem] overflow-hidden bg-base-100">
+      <SideNav {...args} />
+      <div className="flex min-w-0 flex-1 flex-col gap-4 p-6 sm:pl-24 xl:pl-6">
+        <div className="h-7 w-64 rounded-sm bg-surface-3" />
+        <div className="h-40 rounded-md bg-surface-2" />
+      </div>
+    </div>
+  ),
+  play: async ({ step }) => {
+    const sheet = await openAccountSheet("side");
+    const inSheet = within(sheet);
+    await step("Every destination, labelled, in the sidebar's order", async () => {
+      const rows = inSheet.getAllByRole("link");
+      await expect(rows.map((row) => row.textContent)).toEqual([
+        "Dashboard",
+        "Composer",
+        "Messages",
+        "Providers",
+        "Routes",
+        "Documentation",
+        "Settings",
+      ]);
+      await expect(inSheet.getByRole("list", { name: "Delivery" })).toBeInTheDocument();
+    });
+    await step("…then the account block", async () => {
+      await expect(inSheet.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
+    });
+  },
+};
+
+/**
+ * **Account sheet — collapsed on a desktop.** With `collapsed`, the
+ * sidebar never renders, so the vertical rail is the navigation at 1440px
+ * too, and the account block is reachable the same way it is on a tablet:
+ * the rail's "More" control and its drawer. Before #36 a collapsed
+ * `SideNav` rendered the account block nowhere at any width. The play
+ * function leaves the drawer open.
+ */
+export const AccountSheetCollapsedOnDesktop: Story = {
+  globals: { viewport: { value: "fullSidebar" } },
+  args: { currentPath: "/providers", collapsed: true, accountSlot: <AccountBlock /> },
+  render: (args) => (
+    <div className="flex h-[40rem] overflow-hidden bg-base-100">
+      <SideNav {...args} />
+      <div className="flex min-w-0 flex-1 flex-col gap-4 p-6 pl-24">
+        <div className="h-7 w-64 rounded-sm bg-surface-3" />
+        <div className="h-40 rounded-md bg-surface-2" />
+      </div>
+    </div>
+  ),
+  play: async () => {
+    const sheet = await openAccountSheet("side");
+    await expect(within(sheet).getAllByRole("link")).toHaveLength(7);
+    await expect(within(sheet).getByRole("button", { name: "Sign out" })).toBeInTheDocument();
+  },
 };
 
 /**
