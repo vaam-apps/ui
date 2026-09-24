@@ -13,6 +13,35 @@ decision the way the prose below does. The tradeoff is recorded in the
 pull request that made this change.
 -->
 
+## [0.3.0](https://github.com/vaam-apps/ui/compare/v0.2.4...v0.3.0) (2026-09-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* **date-picker:** the single-component DatePicker and DateRangePicker API is replaced by compound parts. placeholder moves to DatePickerValue and no longer names the trigger: outside a FormField, give DatePickerTrigger an aria-label. clearable is replaced by writing DatePickerClear, and a picker without one has no clear button; its name is now "Clear the date" or "Clear the dates" (was `Clear ${placeholder}`). The root no longer takes className, and numberOfMonths is gone. onValueChange fires only on OK or Save, not on each click. A range's first tap is a start with an open end (was a one-day range), and a tap on a whole range starts a new one (was: extended it). min and max now also disable the out-of-bound days of the boundary months. While a picker is open, the rest of the page is inert and does not scroll, docked picker included. Calendar now uses M3's geometry: 40px days in 48px cells (were 32px), 336px months (were 224px), side by side from 768px (was 640px), no top padding, 40px month arrows grouped at the end of the row (were 28px at either side), and today as a Primary ring and label (was a grey ring and semibold).
+* **dialog:** DialogFooter is renamed DialogActions. A Cancel button should be written as `<DialogClose as={Button} …>`, so the full-screen dialog can hide it. The dialog panel now has 28px corners, a surface-3 fill, no border, a 560px default width (was 480px; ConfirmDialog was 384px) and fades in without scaling. DialogClose with no children and no `as` is the dialog's close icon and replaces the default one.
+* **select:** a Select dropdown (and the docked search view) is now `position: fixed`, placed by Floating UI under its trigger. It escapes scrolling and clipping ancestors, shrinks to the room below the trigger, and opens above it when it does not fit below and less than 200px is left there. In SelectContent's or SelectDropdown's className, `top-*`, `left-*` and `inset-*` now replace the placement and `mt-*` adds to the 4px offset; a `max-h-*` replaces the cap that keeps it inside the window.
+* **select:** the floating rails end 80px from their edge (was 64px / ~68px): content columns need `sm:pl-24` instead of `sm:pl-20`, and the bottom offset adds env(safe-area-inset-bottom). Anything pinned beside the bottom bar must clear its 288px width. Rail icons render at size 24. Below 640px every Select opens as a bottom sheet, with no opt-out. The phone detail-drawer header sits ~19px lower. Inside a drawer, Escape or a scrim tap closes an open Select alone instead of closing the drawer too.
+* **side-nav,select:** the floating rails end 80px from their edge (was 64px / ~68px): content columns need `sm:pl-24` instead of `sm:pl-20`, and the bottom offset adds env(safe-area-inset-bottom). Anything pinned beside the bottom bar must clear its 288px width. Rail icons render at size 24. Below 640px every Select opens as a bottom sheet, with no opt-out. The phone detail-drawer header sits ~19px lower. Inside a drawer, Escape or a scrim tap closes an open Select alone instead of closing the drawer too.
+
+### Features
+
+* **date-picker:** M3 date pickers as compound parts ([#35](https://github.com/vaam-apps/ui/issues/35)) ([bcbc9cc](https://github.com/vaam-apps/ui/commit/bcbc9cc65ad4c24e1f3e373e48145bd7fc580593))
+* **dialog:** M3 basic and full-screen dialogs as compound parts ([#33](https://github.com/vaam-apps/ui/issues/33)) ([c4e77f9](https://github.com/vaam-apps/ui/commit/c4e77f91ddfcc47f6820f75729e04a2fa1b4a7f0))
+* **select:** compound Select with M3 search, SelectDropdown and SelectModal ([#29](https://github.com/vaam-apps/ui/issues/29)) ([4ac6a43](https://github.com/vaam-apps/ui/commit/4ac6a43c07e2e4ed239d43dbe13abb70d3e81cfd))
+* **side-nav,select:** M3 Expressive floating toolbar and phone bottom sheet ([#28](https://github.com/vaam-apps/ui/issues/28)) ([12985a2](https://github.com/vaam-apps/ui/commit/12985a2f2b6687bf93b124813e1b24b09b51841e))
+
+
+### Bug Fixes
+
+* **select:** dropdowns escape dialogs and scrolling containers ([#32](https://github.com/vaam-apps/ui/issues/32)) ([548d460](https://github.com/vaam-apps/ui/commit/548d460c74a987d3ce04418d38d9721245606110))
+* **select:** searchable select keyboard, modality, live region and 640px modal ([#31](https://github.com/vaam-apps/ui/issues/31)) ([8f9a8e5](https://github.com/vaam-apps/ui/commit/8f9a8e54b4c5287de5ce9290403f36e75af15bee))
+
+
+### Refactoring
+
+* **select:** move dropdown placement and popup modality into src/lib ([#34](https://github.com/vaam-apps/ui/issues/34)) ([1b18fcc](https://github.com/vaam-apps/ui/commit/1b18fcc26815db9607f5a45c31b4ffdc307dfca5))
+
 ## [0.2.4](https://github.com/vaam-apps/ui/compare/v0.2.3...v0.2.4) (2026-09-23)
 
 
