@@ -278,9 +278,11 @@ bar's fill is the only thing separating it from what scrolls under it.
   over a filled `primary` control (a primary `Button`), which is its own
   colour.
 
-The bottom toolbar hides itself while a `Select` is open as a phone
-sheet, so the sheet is never drawn under it whatever stacking context the
-`Select` sits in.
+The bottom toolbar hides itself while any `Select` is open below 640px
+(a sheet, a full-screen search view, or a `SelectDropdown`), so the popup
+is never drawn under it whatever stacking context the `Select` sits in.
+The vertical toolbar does the same while a `SelectModal` is open, at any
+width.
 
 Neither is a hue, on purpose — a tinted bar would read as a status. Do
 not restyle the rails with a status colour to make them "pop"; use

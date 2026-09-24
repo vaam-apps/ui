@@ -135,7 +135,9 @@ required turns that into a compile error instead.
 - **A hint cannot reach a `Select`.** Headless UI's `ListboxButton` builds
   its own `aria-describedby` from an internal description context and lets
   its own props win, so a value handed down is overwritten with
-  `undefined` before it reaches the DOM. `aria-invalid` threads fine.
+  `undefined` before it reaches the DOM. A searchable `Select`'s trigger
+  (Headless UI's combobox button) does the same. `aria-invalid` threads
+  fine.
   There is a test pinning exactly what each control emits, so this will
   announce itself if it ever changes. Until then: put anything a `Select`
   user must read into the label, not the hint.
@@ -206,15 +208,20 @@ switch from a plain picker to a searchable one.
   `useState<string>()` → `value={v}` pattern would otherwise be a type
   error.
 - **`SelectTrigger`** is the button. Takes `id`, `className`, and
-  `aria-label` / `aria-labelledby` for a select used outside a
-  `FormField` — the trigger only ever renders the selected value, so
-  nothing else can name it.
+  `aria-label` for a select used outside a `FormField` — the trigger only
+  ever renders the selected value, so nothing else can name it. Use
+  `aria-label`, not `aria-labelledby`: the latter is accepted but does not
+  currently reach the rendered button (Headless UI's own label wiring
+  overrides it), so a select named that way is named by its own text —
+  the current value or the placeholder — instead of its label.
 - **`SelectValue`** renders the selected item's *children* (the label),
-  not the raw value, falling back to the value if no item matches. Its
-  `placeholder` shows while nothing is selected. The label is found by
-  walking `Select`'s children, so write `SelectItem`s directly rather than
-  from inside your own wrapper component if the label differs from the
-  value.
+  not the raw value. Its `placeholder` shows while nothing is selected.
+  The label is found by walking `Select`'s children, so write
+  `SelectItem`s directly rather than from inside your own wrapper
+  component if the label differs from the value. An item's label is also
+  remembered once the item has rendered, so the name stays when your own
+  search results (`filter={false}`) no longer include the chosen item;
+  only a value no item has ever shown falls back to the raw value.
 
 ### The container — pick one
 
@@ -230,7 +237,9 @@ switch from a plain picker to a searchable one.
   width, phones included. The opt-out, for a two- or three-option select
   inline in a dense form row. Most selects should not use it.
 - **`SelectModal`** — the sheet (or full-screen search view) at every
-  width; from 640px up the sheet is capped at 640px and centred.
+  width. From 640px up, both are capped at 640px and centred; the
+  searchable one is then the full window height, with the sheet's 28px top
+  corners and scrim.
 
 All three render **inline, not portalled** — a correctness fix, not a
 preference: Headless UI's portalled options land outside a vaul drawer's
@@ -241,13 +250,21 @@ focus trap, where they never become usable. So they all work inside a
 sheet anchors to that ancestor instead of the screen). A width you pass
 to `SelectContent`'s `className` (`w-64`) applies to the dropdown only;
 the phone sheet stays full-width unless you pass a `max-sm:` width.
+`SelectModal` inside a desktop side drawer is laid out against the
+drawer's panel, not the window — measured at 1440px, a 640px modal
+centred in `MoreDetailDrawer`'s 680px panel rather than on the screen.
 
 ### The options
 
 - **`SelectItem`** takes a `value` and its label as children. Labels clamp
-  to two lines. `textValue` is what search matches against — pass it when
-  the children are not plain text, or to be findable by a word not shown
-  (`textValue="Cameroon CM"` makes "CM" find Cameroon).
+  to two lines. Any string is a valid `value`, `""` included (an "Any
+  country" row): picked, the trigger shows its label. Without a
+  `<SelectItem value="">`, `value=""` on `Select` still means "nothing
+  picked" and shows the placeholder. `textValue` is what search matches against — pass it
+  when the children are not plain text, or to be findable by a word not
+  shown. It *replaces* the children's text rather than adding to it, so
+  include the label: `textValue="Cameroon CM"` makes "CM" find Cameroon,
+  where `textValue="CM"` would stop "Cameroon" finding it.
 - **`SelectGroup`** is semantic grouping only — a `contents` fieldset with
   no visual treatment of its own.
 
@@ -258,24 +275,43 @@ the phone sheet stays full-width unless you pass a `max-sm:` width.
   wherever you put it, but it must be a direct part, not inside your own
   wrapper component). It makes the select a WAI-ARIA combobox: focus stays
   in the field while the arrow keys move through the options, Enter picks,
-  Escape closes. Matching is case- and accent-insensitive ("cote" finds
-  "Côte d’Ivoire"). `placeholder`, `aria-label` (default "Search"),
-  `onQueryChange(query)` (called as the text changes, and with `""` on
-  close), and `filter` — pass `filter={false}` when you filter or fetch the
-  items yourself from `onQueryChange`; every item you render is then shown.
+  Escape closes. Enter with nothing to pick does nothing (the view and the
+  text stay). Tab leaves the field and closes the popup *without* picking
+  anything. Matching is case- and accent-insensitive ("cote" finds "Côte
+  d’Ivoire"). `placeholder`; `aria-label` (default "Search" plus the
+  select's own name — "Search Country" inside a `FormField` labelled
+  Country); `clearLabel`, the clear button's name (default "Clear
+  search"); `onQueryChange(query)` (called as the text changes, and with
+  `""` on close if anything was typed — not on the close of a popup nobody
+  searched, so a per-query fetch does not refetch the full list on every
+  open and close); and `filter` — pass `filter={false}` when you filter or
+  fetch the items yourself from `onQueryChange`; every item you render is
+  then shown. Adding or removing the `SelectSearch` swaps the engine and
+  remounts the trigger and the popup, so change it only while the select
+  is closed.
 - **`SelectEmpty`** — shown when no option is shown. Every searchable
   popup renders "No match" on its own; write a `SelectEmpty` to say more
   ("No country matches", or "Searching…" while your fetch is in flight).
-  It is announced politely (`role="status"`).
+  It is plain text, not a live region itself: the popup keeps one polite
+  `role="status"` mounted while it is open and puts this text into it
+  when the list empties, which is what a screen reader reliably
+  announces.
 
 ### Chrome — public parts with defaults, so you rarely write them
 
 - **`SelectClose`** — closes the popup. The full-screen search view leads
-  with one (a back arrow, named "Back") unless you place your own; add one
-  anywhere else with any children (`<SelectClose>Done</SelectClose>`). In a
-  plain (non-searchable) select it is a pointer-only affordance
-  (`aria-hidden`, out of the tab order) because it sits inside the
-  listbox; keyboard users have Escape.
+  with one (a back arrow, named "Back") unless you write your own as a
+  direct part of the container — one wrapped in your own element does not
+  replace it. Add one anywhere else with any children
+  (`<SelectClose>Done</SelectClose>`); with children, they are its name
+  and `aria-label` is ignored. Where it lands decides what it is. Written
+  as a direct part of a searchable select's container, it is lifted into
+  the header beside the field and is a real button, named by its children
+  or, with none, by `aria-label` (default "Back").
+  Anywhere inside the list — every `SelectClose` in a plain select, or one
+  you wrap in your own element in a searchable one — it is a pointer-only
+  affordance (`aria-hidden`, out of the tab order), because a listbox may
+  only expose options; keyboard users have Escape.
 - **`SelectModalHandle`** — the sheet's M3 drag handle. Every sheet
   renders one at its top unless you place your own; there is none in a
   dropdown or a search view.
@@ -283,8 +319,17 @@ the phone sheet stays full-width unless you pass a `max-sm:` width.
 **Behaviour you get for free:** Escape, a tap on the dimmed page, the back
 arrow, a drag of the handle, or picking an option closes it and returns
 focus to the trigger. Inside a drawer, any of those closes the `Select`
-alone; the next Escape closes the drawer. `SideNav`'s bottom toolbar hides
-itself while a phone sheet or search view is open.
+alone; the next Escape closes the drawer. While a searchable popup is
+open the rest of the page is inert and does not scroll, inside a `Dialog`
+or `Drawer` too, and both are restored on close — including when your
+`onValueChange` closes the dialog around it. `SideNav`'s bottom toolbar
+hides itself while any `Select` is open below 640px, and its vertical
+toolbar while a `SelectModal` is open.
+
+**Known limit.** The full-screen search view is `100dvh` tall, and
+neither iOS Safari nor Android Chrome (by default) shrinks `dvh` for the
+on-screen keyboard — it overlays the page — so the last results can sit
+under the keyboard until it is dismissed.
 
 ```tsx
 import {

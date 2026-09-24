@@ -243,7 +243,10 @@ deliberately does not have, or a feature not yet safe to require.
 Headless UI's `ListboxButton` builds `aria-describedby` into its own
 props from an internal description context and lets those win over the
 caller's, so a hint cannot be threaded to it from outside.
-`aria-invalid` does get through.
+`aria-invalid` does get through. A searchable `Select` is no different:
+its trigger is `ComboboxButton`, which does the same — rendered inside a
+`FormField` with a hint and an error, it carries `aria-invalid="true"`
+and no `aria-describedby` at all.
 
 This is pinned as a **limitation** in `form-field.render.test.tsx` rather
 than quietly accepted: if a Headless UI upgrade ever changes it, that

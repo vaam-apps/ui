@@ -82,8 +82,11 @@ wrapper that owns the state, and every visible piece a nested, public
 part — including the presentation (`SelectModal`, `SelectDropdown`) and
 the chrome (`SelectClose`, `SelectModalHandle`, `SelectEmpty`), each with
 a default so a caller rarely writes it. The parts are *semantic and
-platform-neutral* in their props: no DOM-only concepts in a part's
-contract, because the same parts are meant to have a React Native
+platform-neutral* in their props: nothing DOM-only in a part's contract
+beyond `className` and the web's id-based labelling (`id`,
+`aria-labelledby`) — the two things a native implementation would map to
+its own style and label props rather than share — because the same parts
+are meant to have a React Native
 implementation later, where a window-size class read in JS replaces the
 web's CSS breakpoints. Behind the parts the library is free to change
 engines (a `SelectSearch` swaps Headless UI's `Listbox` for `Combobox`)

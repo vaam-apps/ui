@@ -4,7 +4,14 @@ import { expect, userEvent, waitFor, within } from "storybook/test";
 import { cn } from "../../lib/cn";
 import { InstrumentPanel } from "../data/instrument-panel";
 import { StatTile } from "../data/stat-tile";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectModal,
+  SelectTrigger,
+  SelectValue,
+} from "./select";
 import { SideNav } from "./side-nav";
 
 /** Minimal stand-in icons — the real ones come from the consuming app, so
@@ -709,6 +716,51 @@ export const ToolbarUnderAPhoneSheet: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: "Window" }));
+    await expect(await canvas.findByRole("listbox")).toBeInTheDocument();
+  },
+};
+
+/**
+ * A `SelectModal` at tablet width, with the vertical toolbar on screen.
+ * The sheet's scrim is a shadow, which cannot catch a tap, and the toolbar
+ * is portalled to `body`, which a plain select's inert never reaches — so
+ * it used to stay clickable (and navigable) under the scrim. It steps out
+ * of the way while a modal select is open, the same way the bottom toolbar
+ * does for a phone sheet — and only then: the "Sort by" dropdown beside it
+ * leaves the toolbar where it is. The play function leaves the sheet open.
+ */
+export const RailUnderAModalSelect: Story = {
+  globals: { viewport: { value: "medium" } },
+  args: { currentPath: "/messages" },
+  render: (args) => (
+    <div className="flex h-[40rem] bg-base-100">
+      <SideNav {...args} />
+      <div className="flex min-w-0 flex-1 flex-col items-start gap-4 p-6 sm:pl-24">
+        <Select defaultValue="exponential">
+          <SelectTrigger aria-label="Retry policy">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectModal>
+            <SelectItem value="none">Never retry</SelectItem>
+            <SelectItem value="linear">Every 5 minutes, 6 times</SelectItem>
+            <SelectItem value="exponential">Exponential backoff, up to 24 hours</SelectItem>
+          </SelectModal>
+        </Select>
+        <Select defaultValue="newest">
+          <SelectTrigger aria-label="Sort by">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="newest">Newest first</SelectItem>
+            <SelectItem value="oldest">Oldest first</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Retry policy" }));
     await expect(await canvas.findByRole("listbox")).toBeInTheDocument();
   },
 };

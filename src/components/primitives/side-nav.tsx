@@ -727,6 +727,14 @@ function FloatingRail({
         // navigation at every width above `sm` — including `≥1280px`,
         // where it would otherwise hand over.
         collapsed ? "sm:flex" : "xl:hidden",
+        // Gone while a `SelectModal` is open — the one select that is a
+        // modal sheet (or search view) at desktop widths. Its scrim is a
+        // shadow, which cannot catch a tap, and this rail is portalled to
+        // `body`, which the plain engine's inert (Headless UI's, stopping
+        // at `body`) never reaches — so it stayed clickable, and
+        // navigable, under the scrim. Same mechanism as `HorizontalRail`'s
+        // rule, keyed to the presentation rather than the width.
+        '[body:has([data-select-presentation="modal"])_&]:invisible',
       )}
     >
       {destinations.map((item) => (
@@ -854,11 +862,11 @@ function HorizontalRail({
         "bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] max-w-[calc(100vw-2rem)]",
         // Below `sm` only — above it the vertical toolbar takes over.
         "sm:hidden",
-        // Gone while a `Select` is open below `sm` — i.e. while its
-        // phone sheet is (`SelectContent` marks its options with
-        // `data-select-content`, and unmounts them on close). The sheet
-        // is full-width on the bottom edge, so it normally covers this
-        // toolbar anyway — but it is not portalled, so its `z-50` only
+        // Gone while any `Select` is open below `sm` — its phone sheet,
+        // its full-screen search view, or a `SelectDropdown` (each marks
+        // its popup `data-select-content`, and unmounts it on close). The
+        // sheet or view is full-width on the bottom edge, so it normally
+        // covers this toolbar anyway — but it is not portalled, so its `z-50` only
         // counts inside whatever stacking context the `Select` sits in,
         // and inside a `sticky`, `isolate`d (every `InstrumentPanel`) or
         // transformed ancestor this `fixed z-40` bar, portalled to `body`,

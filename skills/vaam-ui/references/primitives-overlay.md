@@ -215,8 +215,11 @@ phone sheets, do not put it on a card) and M3's 32×4 drag handle, with
 22px above it and 22px below. That handle used to be a 5px bar 8px from
 the top, so the title row now sits about 19px lower than it did — worth
 knowing if a screenshot test pins it. Below 640px a `Select` inside one
-opens as a second sheet over it with the same corner and handle; between
-640 and 767px the drawer is a sheet but the `Select` is still a dropdown.
+opens as a second sheet over it with the same corner and handle — or, if
+it has a `SelectSearch`, as the full-screen search view over the whole
+screen, not just the drawer. Between 640 and 767px the drawer is a sheet
+but a `SelectContent` is still a dropdown (a docked search view if
+searchable), and a `SelectDropdown` is a dropdown at every width.
 
 One limitation to know before you pick the quick one for a background
 task: `modal={false}` in vaul 1.1.2 removes the dim and the pointer

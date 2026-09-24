@@ -69,6 +69,10 @@ export const STORY = {
   selectSearchableInDrawer: "primitives-select--searchable-inside-a-drawer",
   selectDropdownOnPhone: "primitives-select--dropdown-on-a-phone",
   selectModalOnDesktop: "primitives-select--modal-on-a-desktop",
+  selectSearchableModalOnDesktop: "primitives-select--searchable-modal-on-a-desktop",
+  selectSearchableInDialog: "primitives-select--searchable-in-a-dialog",
+  selectCallerFiltered: "primitives-select--caller-filtered-search",
+  sideNavRailUnderModalSelect: "primitives-sidenav--rail-under-a-modal-select",
   // `SideNav`'s floating toolbars, one per M3 colour scheme, over real
   // content (`e2e/floating-toolbar.spec.ts`).
   sideNavToolbarStandard: "primitives-sidenav--toolbar-colors-standard",

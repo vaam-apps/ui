@@ -14,7 +14,9 @@ import {
 import { ArrowLeft, Check, ChevronDown, Search, X } from "lucide-react";
 import {
   Children,
+  cloneElement,
   createContext,
+  Fragment,
   isValidElement,
   type ReactElement,
   type ReactNode,
@@ -48,9 +50,11 @@ import { notePointerDownUnderOpenSelect } from "../../lib/select-dismissal";
  * replicates Radix's behaviour by walking `Select`'s own `children` tree
  * (not the DOM — `ListboxOptions` may not be mounted while closed) to find
  * the `SelectItem` whose `value` matches, and using *its* children as the
- * label. Keyboard behaviour (type-ahead, `Escape`, arrow-key nav) is
- * genuinely Headless UI's own `Listbox`, not reimplemented here — this file
- * only adds the label-lookup Radix's `SelectValue` used to give for free.
+ * label. In the plain (listbox) engine, keyboard behaviour (type-ahead,
+ * `Escape`, arrow-key nav) is genuinely Headless UI's own `Listbox`, not
+ * reimplemented here. The searchable (combobox) engine below does take over
+ * three things Headless UI leaves to a combobox whose field outlives its
+ * popup — closing, focus return and modality — and says why at each one.
  *
  * # A compound component, with two engines behind it
  *
@@ -144,6 +148,12 @@ interface SelectContextValue {
    * matches for exactly that reason. */
   matchCount: number;
   registerItem: () => () => void;
+  /** Remembers an option's label as it renders, so `SelectValue` can still
+   * show it once the option is gone from `children` — a remote search
+   * (`filter={false}`) whose current results leave out the selected item.
+   * Measured with it disabled, in `CallerFilteredSearch`: the trigger read
+   * "prv_106" instead of "Safaricom". */
+  rememberLabel: (value: string, label: ReactNode) => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }
 const SelectContext = createContext<SelectContextValue | null>(null);
@@ -160,6 +170,11 @@ function useSelectContext(component: string): SelectContextValue {
  * never flashes a wrong empty state; `useEffect` on the server, where a
  * layout effect does nothing and React 18 warns about it. */
 const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+/** `true` inside the options' own `role="listbox"` element, where only
+ * options and groups may be exposed to assistive technology — what makes a
+ * `SelectClose` written there a pointer-only affordance (its doc). */
+const InListContext = createContext(false);
 
 /** Set by a container for the parts inside it. */
 interface PopupContextValue {
@@ -266,13 +281,22 @@ export function Select({
     onValueChange?.(next);
   }
 
-  const itemLabel = useMemo(() => (v: string) => findItemLabel(children, v), [children]);
+  const labelCache = useRef(new Map<string, ReactNode>());
+  const rememberLabel = useCallback((key: string, label: ReactNode) => {
+    labelCache.current.set(key, label);
+  }, []);
+  const itemLabel = useMemo(
+    () => (v: string) => findItemLabel(children, v) ?? labelCache.current.get(v),
+    [children],
+  );
 
   // The parts decide the engine: a `SelectSearch` among the parts makes
   // this a combobox. Read from the element tree rather than registered on
   // mount, so the very first render already renders the right engine —
   // which is also why `SelectSearch` has to be written as a part itself,
-  // not from inside a wrapper component of the caller's.
+  // not from inside a wrapper component of the caller's (it throws a clear
+  // error if it is), and why adding or removing it swaps the engine and
+  // remounts the popup and trigger.
   const search = useMemo(() => {
     let found: SelectSearchProps | undefined;
     forEachElement(children, (element) => {
@@ -298,6 +322,7 @@ export function Select({
     filtering,
     matchCount,
     registerItem,
+    rememberLabel,
     triggerRef,
   };
 
@@ -307,12 +332,17 @@ export function Select({
       <Combobox
         as="div"
         className="relative"
-        value={currentValue ?? ""}
+        // `null`, not `""`, for "nothing picked": `""` can be a real
+        // option's value, and Headless UI would mark that option selected
+        // before anyone picked it.
+        value={currentValue ?? null}
         // Headless UI hands `null` here when the field is cleared — the
         // combobox pattern's "no value" — but clearing the *search* must
-        // not clear the *selection*, so `null` (and `""`) are ignored.
+        // not clear the *selection*, so `null` is ignored. `""` is not: it
+        // is only ever a real option's value (`<SelectItem value="">Any
+        // country</SelectItem>`), which a plain select can pick too.
         onChange={(next: string | null) => {
-          if (next !== null && next !== "") handleChange(next);
+          if (next !== null) handleChange(next);
         }}
         {...omitUndefined({ disabled })}
       >
@@ -322,6 +352,10 @@ export function Select({
               open={open}
               triggerRef={triggerRef}
               onClose={() => {
+                // Only when there was a search to reset: a caller fetching
+                // on every `onQueryChange` should not refetch the full list
+                // on every close of an untouched popup.
+                if (query === "") return;
                 setQuery("");
                 onQueryChange?.("");
               }}
@@ -343,8 +377,11 @@ export function Select({
     <Listbox
       as="div"
       className="relative"
-      value={currentValue ?? ""}
-      onChange={handleChange}
+      // `null` for "nothing picked" — see the same line on `Combobox` above.
+      value={currentValue ?? null}
+      onChange={(next: string | null) => {
+        if (next !== null) handleChange(next);
+      }}
       {...omitUndefined({ disabled })}
     >
       {({ open }) => (
@@ -461,7 +498,11 @@ export function SelectTrigger({
    * wrapped `Select` keeps working unchanged without either prop. */
   "aria-label"?: string | undefined;
   /** Same, pointing at an existing label element instead of inlining the
-   * text. */
+   * text. **Currently ineffective**: Headless UI's `ListboxButton` and
+   * `ComboboxButton` set their own `aria-labelledby` over the caller's, so
+   * it never reaches the button (measured: the attribute is absent in both
+   * engines) and the trigger is named by its own text — the value or the
+   * placeholder. Use `aria-label` until that is fixed. */
   "aria-labelledby"?: string | undefined;
 }) {
   const { engine, invalid, triggerRef } = useSelectContext("SelectTrigger");
@@ -500,10 +541,15 @@ export function SelectTrigger({
 
 export function SelectValue({ placeholder }: { placeholder?: string }) {
   const { value, itemLabel } = useSelectContext("SelectValue");
-  if (value === undefined || value === "") {
+  // `""` is two things: the "nothing picked" a caller's `value=""` has
+  // always meant, and — when a `<SelectItem value="">` exists — a real
+  // pick ("Any country"). Only the item decides which; without one it
+  // stays the placeholder, as before.
+  const label = value === undefined ? undefined : itemLabel(value);
+  if (value === undefined || (value === "" && label === undefined)) {
     return <span className="text-subtle-foreground">{placeholder}</span>;
   }
-  return <>{itemLabel(value) ?? value}</>;
+  return <>{label ?? value}</>;
 }
 
 /**
@@ -711,7 +757,45 @@ function closeComboboxPopup(surface: HTMLElement, trigger: HTMLElement | null) {
  * surface allowed instead. It climbs to `<html>` rather than stopping at
  * `<body>` as Headless UI's does, so body-level portals — `SideNav`'s
  * toolbars, toasts — are inert too.
+ *
+ * # It shares the page with other modality, and only undoes its own
+ *
+ * The first version recorded the `inert` and `overflow` it found and wrote
+ * them back on close. Inside a Headless UI `Dialog` that is fatal: the
+ * dialog's own modality had already set both, and when a pick closed the
+ * select *and* the dialog in one commit, the dialog's cleanup ran first and
+ * this one then restored the dialog's values — measured: `#storybook-root`
+ * left `inert` and `<html>` `overflow: hidden` for good, the page dead until
+ * a reload. So now it never touches an element that is already inert
+ * (someone else owns that), un-inerts only what it flipped itself, and
+ * locks scroll with an attribute rather than an inline style
+ * (`:root:not(span)[data-select-scroll-lock]` in `theme.css`, whose
+ * comment says why not `html[…]`), reference-counted, so
+ * it and Headless UI's inline `overflow` can come and go in any order.
+ *
+ * The lock also pads the page by the scrollbar it hides, as Headless UI's
+ * does: without it, a page with a classic scrollbar shifted sideways by its
+ * width on every open and close (measured: 488.5 → 496px).
  */
+let scrollLocks = 0;
+
+function lockScroll() {
+  const html = document.documentElement;
+  if (scrollLocks === 0) {
+    const gap = window.innerWidth - html.clientWidth;
+    html.style.setProperty("--select-scroll-gap", `${gap}px`);
+    html.setAttribute("data-select-scroll-lock", "");
+  }
+  scrollLocks += 1;
+  return () => {
+    scrollLocks -= 1;
+    if (scrollLocks === 0) {
+      html.removeAttribute("data-select-scroll-lock");
+      html.style.removeProperty("--select-scroll-gap");
+    }
+  };
+}
+
 function useComboboxModality(
   active: boolean,
   surfaceRef: RefObject<HTMLElement | null>,
@@ -722,30 +806,51 @@ function useComboboxModality(
     const keep = [surfaceRef.current, triggerRef.current].filter(
       (element): element is HTMLElement => element !== null,
     );
-    const touched = new Map<HTMLElement, boolean>();
+    const flipped: HTMLElement[] = [];
     for (const element of keep) {
       let node: HTMLElement = element;
       while (node.parentElement !== null) {
         const parent: HTMLElement = node.parentElement;
         for (const sibling of Array.from(parent.children)) {
-          if (!(sibling instanceof HTMLElement) || sibling === node || touched.has(sibling)) {
-            continue;
-          }
+          if (!(sibling instanceof HTMLElement) || sibling === node || sibling.inert) continue;
           if (keep.some((kept) => sibling.contains(kept))) continue;
-          touched.set(sibling, sibling.inert);
           sibling.inert = true;
+          flipped.push(sibling);
         }
         node = parent;
       }
     }
-    const html = document.documentElement;
-    const overflow = html.style.overflow;
-    html.style.overflow = "hidden";
+    const unlock = lockScroll();
     return () => {
-      for (const [element, was] of touched) element.inert = was;
-      html.style.overflow = overflow;
+      for (const element of flipped) element.inert = false;
+      unlock();
     };
   }, [active, surfaceRef, triggerRef]);
+}
+
+/** A container's direct parts, with fragments opened up — so
+ * `<><SelectSearch /><SelectEmpty /></>` is lifted into the header like the
+ * same parts written bare, rather than landing inside the listbox.
+ *
+ * Each part lifted out of a fragment is re-keyed under that fragment's own
+ * key. `Children.toArray` keys a fragment's children afresh (`.0`,
+ * `.$cm`), so two sibling fragments — "recent" and "all", each mapping
+ * `key={code}` — produced duplicate keys once flattened into one array, and
+ * React then kept stale options on screen: measured, emptying the first
+ * fragment's list left its "Recent Cameroon" and "Recent Kenya" rows in
+ * place. The separator is `:` because `Children.toArray` escapes a `:` in
+ * a caller's own key (to `=2`), so no sibling's key can spell a composed
+ * one; with `/`, a sibling keyed `f/.$cm` collided with `cm` inside a
+ * fragment keyed `f`. */
+function flattenParts(node: ReactNode, prefix = ""): ReactNode[] {
+  return Children.toArray(node).flatMap((part) => {
+    if (!isValidElement(part)) return [part];
+    const key = `${prefix}${String(part.key)}`;
+    if (part.type === Fragment) {
+      return flattenParts((part.props as { children?: ReactNode }).children, `${key}:`);
+    }
+    return prefix === "" ? [part] : [cloneElement(part, { key })];
+  });
 }
 
 /**
@@ -754,16 +859,20 @@ function useComboboxModality(
  * each presents.
  */
 function SelectPopup({
+  component,
   presentation,
   className,
   children,
 }: {
+  component: string;
   presentation: SelectPresentation;
   className?: string | undefined;
   children: ReactNode;
 }) {
-  const { engine, open, triggerRef } = useSelectContext("SelectContent");
+  const { engine, open, triggerRef, matchCount } = useSelectContext(component);
   const surfaceRef = useRef<HTMLElement | null>(null);
+  const matchCountRef = useRef(matchCount);
+  matchCountRef.current = matchCount;
 
   // Escape, caught at the window in the capture phase — the one listener
   // guaranteed to run before Radix's — when it is aimed at this open
@@ -776,8 +885,39 @@ function SelectPopup({
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       const surface = surfaceRef.current;
-      if (event.key !== "Escape" || surface === null) return;
-      if (!(event.target instanceof Node)) return;
+      if (surface === null || !(event.target instanceof Node)) return;
+      const inPopup =
+        engine === "combobox" && event.target instanceof Element && surface.contains(event.target);
+      const inField =
+        inPopup &&
+        event.target instanceof Element &&
+        event.target.closest('[role="combobox"]') !== null;
+      // Tab from the search field moves on, as it does from a plain
+      // select's options. Headless UI's combobox Tab *selects* the active
+      // option — and it makes the first option active on open — so a
+      // keyboard user tabbing through a form silently filled the field
+      // with "Angola" (measured). The popup is closed here instead, focus
+      // parked on the trigger, and the key's default action (not
+      // prevented) then moves focus on from there, either direction.
+      //
+      // From anywhere in the popup, not only the field: focus can sit on
+      // the header's Back or Clear (a screen reader's cursor, a caller's
+      // `.focus()` — `keepOpenOnChromeFocus` keeps the view open for it),
+      // and a Tab from there used to leave the popup open with focus on
+      // `<body>`, where Escape no longer reached it (measured).
+      if (inPopup && event.key === "Tab") {
+        event.stopImmediatePropagation();
+        closeComboboxPopup(surface, triggerRef.current);
+        return;
+      }
+      // Enter with nothing to pick keeps the popup and the typed search,
+      // rather than closing and throwing the search away.
+      if (inField && event.key === "Enter" && matchCountRef.current === 0) {
+        event.stopImmediatePropagation();
+        event.preventDefault();
+        return;
+      }
+      if (event.key !== "Escape") return;
       // Aimed at the popup, or at this select's own trigger. Headless UI
       // moves focus into the popup when it opens, but the trigger stays
       // outside the `inert` it applies, so a screen reader's cursor (or a
@@ -833,17 +973,35 @@ function SelectPopup({
       if (target.closest('[role="listbox"], [role="combobox"]') !== null) return;
       event.stopPropagation();
     }
+    // Focus moving from the field onto the popup's own chrome — a screen
+    // reader's cursor landing on "Clear search", or a caller's `.focus()` —
+    // is the field's blur, which is the combobox's close: the view closed
+    // before the button could be pressed (measured with `.focus()`). That
+    // blur is kept from Headless UI; the one focus move inside the popup
+    // that *is* a close — onto the surface itself, `closeComboboxPopup` —
+    // still goes through.
+    function keepOpenOnChromeFocus(event: FocusEvent) {
+      const surface = surfaceRef.current;
+      const next = event.relatedTarget;
+      if (surface === null || !(next instanceof Node) || next === surface) return;
+      if (!(event.target instanceof Element) || event.target.getAttribute("role") !== "combobox") {
+        return;
+      }
+      if (surface.contains(event.target) && surface.contains(next)) event.stopPropagation();
+    }
     window.addEventListener("pointerup", guard, true);
     window.addEventListener("touchend", guard, true);
+    window.addEventListener("focusout", keepOpenOnChromeFocus, true);
     return () => {
       window.removeEventListener("pointerup", guard, true);
       window.removeEventListener("touchend", guard, true);
+      window.removeEventListener("focusout", keepOpenOnChromeFocus, true);
     };
   }, [engine, open]);
 
   useComboboxModality(engine === "combobox" && open, surfaceRef, triggerRef);
 
-  const parts = Children.toArray(children);
+  const parts = flattenParts(children);
   const hasOwn = (type: unknown) =>
     parts.some((part) => isValidElement(part) && part.type === type);
 
@@ -898,10 +1056,13 @@ function SelectPopup({
           // also a stalled enter transition, not a mispositioned element. A
           // 100ms fade on a select dropdown is not worth a second component
           // that silently does not open, so it is gone rather than debugged.
+          data-select-presentation={presentation}
           className={cn(LISTBOX_SURFACE[presentation], className)}
         >
-          {presentation !== "dropdown" && !hasOwn(SelectModalHandle) && <SelectModalHandle />}
-          {children}
+          <InListContext.Provider value={true}>
+            {presentation !== "dropdown" && !hasOwn(SelectModalHandle) && <SelectModalHandle />}
+            {children}
+          </InListContext.Provider>
         </ListboxOptions>
       </PopupContext.Provider>
     );
@@ -922,6 +1083,11 @@ function SelectPopup({
     (part) => !isPart(part, SelectSearch, SelectClose, SelectEmpty, SelectModalHandle),
   );
   const showDefaultClose = presentation !== "dropdown" && !hasOwn(SelectClose);
+  const emptyPart = empty[0];
+  const emptyText =
+    (isValidElement(emptyPart)
+      ? textOf((emptyPart.props as { children?: ReactNode }).children)
+      : "") || "No match";
 
   return (
     <PopupContext.Provider value={{ presentation }}>
@@ -933,6 +1099,7 @@ function SelectPopup({
         // Focusable only so `closeComboboxPopup` can move focus onto it.
         tabIndex={-1}
         data-select-content=""
+        data-select-presentation={presentation}
         data-vaul-no-drag=""
         className={cn(COMBOBOX_SURFACE[presentation], className)}
         // A press anywhere on the popup's chrome keeps focus in the field:
@@ -950,9 +1117,17 @@ function SelectPopup({
         </div>
         <div className={COMBOBOX_SCROLL[presentation]}>
           <ComboboxOptions portal={false} modal={false} className="outline-none">
-            {list}
+            <InListContext.Provider value={true}>{list}</InListContext.Provider>
           </ComboboxOptions>
           {empty.length > 0 ? empty : <SelectEmpty />}
+        </div>
+        {/* The one live region, mounted for as long as the popup is open
+            and only its *text* changing: a region inserted already holding
+            its message is not reliably announced, and `SelectEmpty` mounts
+            exactly when the list empties. So the visible empty state is
+            plain text, and this says it to a screen reader. */}
+        <div role="status" className="sr-only">
+          {matchCount === 0 ? emptyText : ""}
         </div>
       </div>
     </PopupContext.Provider>
@@ -1021,11 +1196,22 @@ const LISTBOX_SURFACE: Record<SelectPresentation, string> = {
  * under the trigger on a wide window — a 56dp header
  * (`DockedHeaderContainerHeight`) — and **full-screen** on a compact one:
  * square corners (`FullScreenContainerShape` `CornerNone`) and a 72dp
- * header (`FullScreenHeaderContainerHeight`) with the back arrow leading
- * (`ExpandedFullScreenSearchBar`). Full-screen rather than a sheet on a
+ * header (`FullScreenHeaderContainerHeight`), as M3's
+ * `ExpandedFullScreenSearchBar` draws it, with a back arrow leading — the
+ * `ArrowBack` "Back" that androidx's own `SearchBarSamples.kt`
+ * (`SampleLeadingIcon`) puts on any expanded search bar. The docked view
+ * here leads with the magnifier instead, a library choice: that sample
+ * shows the magnifier on the *collapsed* bar, and a back arrow on a desktop
+ * dropdown reads as navigation. Full-screen rather than a sheet on a
  * phone because a searchable picker brings up the on-screen keyboard,
  * which takes roughly half the height: a half-height sheet plus a keyboard
  * leaves almost no room for the results.
+ *
+ * `SelectModal` asks for the full-screen form at every width. From `sm` up
+ * it stops at the sheet's 640px (`SheetMaxWidth`), centred, with the
+ * sheet's 28dp top corners and its scrim — M3 has no wide-window form of
+ * the full-screen view, so that is a library choice, made to match the
+ * modal sheet a plain `SelectModal` is there.
  *
  * "Full-screen" is written as *pinned to the bottom edge, `100dvh` tall*
  * rather than `inset-0`, for the reason the sheet's doc gives about
@@ -1058,10 +1244,16 @@ const COMBOBOX_SURFACE: Record<SelectPresentation, string> = {
   ),
   modal: cn(
     "fixed inset-x-0 top-auto bottom-0 z-50 flex h-dvh flex-col bg-surface-3 pt-[env(safe-area-inset-top,0px)] outline-none",
+    // From `sm` up the same view stops at the sheet's own width and
+    // centres, with the sheet's top corners and scrim: a maintainer's call
+    // (2026-09-24), so a searchable `SelectModal` on a wide window has the
+    // footprint of a plain one rather than blanking the whole screen.
+    "sm:mx-auto sm:max-w-[640px] sm:rounded-t-sheet",
+    "sm:shadow-[0_0_0_100vmax_var(--scrim)] sm:starting:shadow-[0_0_0_100vmax_transparent]",
     "starting:translate-y-4 starting:opacity-0",
-    "[transition-property:translate,opacity]",
-    "[transition-duration:var(--dur-spatial),var(--dur-effects)]",
-    "[transition-timing-function:var(--ease-spatial),var(--ease-effects)]",
+    "[transition-property:translate,opacity,box-shadow]",
+    "[transition-duration:var(--dur-spatial),var(--dur-effects),var(--dur-effects)]",
+    "[transition-timing-function:var(--ease-spatial),var(--ease-effects),var(--ease-effects)]",
   ),
 };
 
@@ -1072,9 +1264,12 @@ const COMBOBOX_HEADER: Record<SelectPresentation, string> = {
 };
 
 const COMBOBOX_SCROLL: Record<SelectPresentation, string> = {
-  dropdown: "max-h-72 overflow-y-auto p-1",
+  // `min-h-0 flex-1` so a caller's `max-h-*` on the container — which
+  // lands on this engine's outer surface, not on the scrolling list as it
+  // does in the plain engine — shrinks the list instead of clipping it.
+  dropdown: "max-h-72 min-h-0 flex-1 overflow-y-auto p-1",
   auto: cn(
-    "max-h-72 overflow-y-auto p-1",
+    "max-h-72 min-h-0 flex-1 overflow-y-auto p-1",
     "max-sm:max-h-none max-sm:min-h-0 max-sm:flex-1 max-sm:overscroll-contain max-sm:px-2 max-sm:pb-[max(0.5rem,env(safe-area-inset-bottom,0px))]",
   ),
   modal:
@@ -1191,7 +1386,7 @@ export function SelectContent({
   children: ReactNode;
 }) {
   return (
-    <SelectPopup presentation="auto" className={className}>
+    <SelectPopup component="SelectContent" presentation="auto" className={className}>
       {children}
     </SelectPopup>
   );
@@ -1212,7 +1407,7 @@ export function SelectDropdown({
   children: ReactNode;
 }) {
   return (
-    <SelectPopup presentation="dropdown" className={className}>
+    <SelectPopup component="SelectDropdown" presentation="dropdown" className={className}>
       {children}
     </SelectPopup>
   );
@@ -1221,9 +1416,11 @@ export function SelectDropdown({
 /**
  * The options as a modal at every width: the M3 bottom sheet (capped at
  * 640px and centred from `sm` up, `BottomSheetDefaults.SheetMaxWidth`) —
- * or, searchable, the full-screen search view. For a picker that is a
- * decision in its own right even on a desktop, and the presentation a
- * native implementation of these parts would use everywhere.
+ * or, searchable, the full-screen search view, capped the same way from
+ * `sm` up (full height there, with the sheet's top corners). For a picker
+ * that is a decision in its own right even on a desktop, and the
+ * presentation a native implementation of these parts would use
+ * everywhere.
  */
 export function SelectModal({
   className,
@@ -1233,7 +1430,7 @@ export function SelectModal({
   children: ReactNode;
 }) {
   return (
-    <SelectPopup presentation="modal" className={className}>
+    <SelectPopup component="SelectModal" presentation="modal" className={className}>
       {children}
     </SelectPopup>
   );
@@ -1243,10 +1440,11 @@ export interface SelectItemProps {
   value: string;
   className?: string | undefined;
   children: ReactNode;
-  /** The text `SelectSearch` matches this option against. Defaults to the
-   * option's own text; pass it when the children are not plain text (an
-   * icon and a name, a formatted number) or should also be found by a
-   * word they do not show (a country found by its ISO code). */
+  /** The text `SelectSearch` matches this option against, *instead of*
+   * the option's own text (the default). Pass it when the children are not
+   * plain text (an icon and a name, a formatted number), or to make the
+   * option findable by a word it does not show — and then include the
+   * label too: `textValue="Cameroon CM"`, not `"CM"`. */
   textValue?: string | undefined;
 }
 
@@ -1312,12 +1510,20 @@ const CHECK_ICON: Record<SelectPresentation, string> = {
 };
 
 export function SelectItem({ value, className, children, textValue }: SelectItemProps) {
-  const { engine, query, filtering, registerItem } = useSelectContext("SelectItem");
+  const { engine, query, filtering, registerItem, rememberLabel } = useSelectContext("SelectItem");
   const { presentation } = useContext(PopupContext);
   const shown =
     engine !== "combobox" || !filtering || matchesQuery(textValue ?? textOf(children), query);
-  // Counted while shown, before paint, so `SelectEmpty` never flashes.
-  useIsomorphicLayoutEffect(() => (shown ? registerItem() : undefined), [shown, registerItem]);
+  // Counted while shown, before paint, so `SelectEmpty` never flashes —
+  // and only in the searchable engine, the one that reads the count: a
+  // plain select would pay a re-render per open for nothing.
+  useIsomorphicLayoutEffect(
+    () => (engine === "combobox" && shown ? registerItem() : undefined),
+    [engine, shown, registerItem],
+  );
+  useIsomorphicLayoutEffect(() => {
+    rememberLabel(value, children);
+  }, [value, children, rememberLabel]);
   // Not matching the search: not rendered at all, so the combobox's
   // keyboard navigation skips it rather than landing on a hidden row.
   if (!shown) return null;
@@ -1351,15 +1557,21 @@ export function SelectItem({ value, className, children, textValue }: SelectItem
 
 export interface SelectSearchProps {
   placeholder?: string | undefined;
-  /** The field's accessible name. Defaults to "Search". */
+  /** The field's accessible name. Defaults to "Search" followed by the
+   * select's own name ("Search Country"), so a screen-reader user hears
+   * which picker they are searching. */
   "aria-label"?: string | undefined;
+  /** The clear button's accessible name. Defaults to "Clear search". */
+  clearLabel?: string | undefined;
   /** Whether `SelectItem`s hide themselves when they do not match. `true`
    * by default; pass `false` when the caller filters or fetches the items
    * itself from `onQueryChange` — `SelectEmpty` then shows whenever the
    * caller renders no items at all. */
   filter?: boolean | undefined;
   /** Called with the search text as it changes, and with `""` when the
-   * popup closes. */
+   * popup closes after something was typed — not on the close of a popup
+   * nobody searched, so a caller fetching per query does not refetch the
+   * full list on every open and close. */
   onQueryChange?: ((query: string) => void) | undefined;
   className?: string | undefined;
 }
@@ -1379,13 +1591,30 @@ export interface SelectSearchProps {
  */
 export function SelectSearch({
   placeholder,
-  "aria-label": ariaLabel = "Search",
+  "aria-label": ariaLabel,
+  clearLabel = "Clear search",
   onQueryChange,
   className,
 }: SelectSearchProps) {
-  const { query, setQuery } = useSelectContext("SelectSearch");
+  const { engine, query, setQuery, triggerRef } = useSelectContext("SelectSearch");
   const { presentation } = useContext(PopupContext);
   const fieldRef = useRef<HTMLInputElement | null>(null);
+  // Found by walking `Select`'s element tree; if it is not the combobox
+  // engine, this part was written inside a component of the caller's that
+  // the walk cannot see into. Headless UI would otherwise throw its own
+  // "<Combobox.Input /> is missing a parent <Combobox />" on the first
+  // open — a crash on a click, naming nothing the caller wrote.
+  if (engine !== "combobox") {
+    throw new Error(
+      "<SelectSearch /> must be written directly among the parts inside <Select> — not from " +
+        "inside a component of your own, which <Select> cannot see into when it decides to be " +
+        "searchable.",
+    );
+  }
+  const trigger = triggerRef.current;
+  const selectName =
+    trigger?.getAttribute("aria-label") ?? trigger?.labels?.[0]?.textContent?.trim() ?? "";
+  const name = ariaLabel ?? (selectName === "" ? "Search" : `Search ${selectName}`);
   const update = (next: string) => {
     setQuery(next);
     onQueryChange?.(next);
@@ -1404,7 +1633,7 @@ export function SelectSearch({
       <ComboboxInput
         ref={fieldRef}
         autoFocus
-        aria-label={ariaLabel}
+        aria-label={name}
         placeholder={placeholder}
         value={query}
         onChange={(event) => update(event.target.value)}
@@ -1417,7 +1646,7 @@ export function SelectSearch({
       {query !== "" && (
         <button
           type="button"
-          aria-label="Clear search"
+          aria-label={clearLabel}
           onClick={() => {
             update("");
             fieldRef.current?.focus({ preventScroll: true });
@@ -1439,11 +1668,17 @@ export function SelectSearch({
  * arrow is named "Back", what it shows — not "Close", which is what the
  * dialogs and drawers it opens inside already call their own buttons.
  *
- * In a searchable select it is an ordinary button in the popup's header.
- * In a plain one it sits inside the sheet's `role="listbox"`, which may own
- * options and groups only, so there it is `aria-hidden` and out of the tab
- * order — a redundant pointer affordance, like the drag handle; keyboard
- * and screen-reader users have Escape, which does the same thing.
+ * Where it lands depends on where it is written. In a searchable select, a
+ * `SelectClose` written directly among the container's parts is lifted into
+ * the popup's header — replacing the default back arrow — as an ordinary
+ * button. Anywhere else it sits inside the options' `role="listbox"`, which
+ * may own options and groups only, so there it is `aria-hidden` and out of
+ * the tab order — a redundant pointer affordance, like the drag handle;
+ * keyboard and screen-reader users have Escape, which does the same thing.
+ * (Measured before: a "Done" wrapped in a `<div>` inside a searchable
+ * select was a focusable button in the listbox — axe
+ * `aria-required-children`, critical.) That is every `SelectClose` in a
+ * plain select, which has no header.
  */
 export function SelectClose({
   children,
@@ -1456,6 +1691,7 @@ export function SelectClose({
 }) {
   const { engine, triggerRef } = useSelectContext("SelectClose");
   const { presentation } = useContext(PopupContext);
+  const inList = useContext(InListContext);
   const close = (button: HTMLElement) => {
     if (engine === "combobox") {
       const surface = button.closest<HTMLElement>("[data-select-content]");
@@ -1468,11 +1704,10 @@ export function SelectClose({
       .closest<HTMLElement>('[role="listbox"]')
       ?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   };
-  const listbox = engine === "listbox";
   return (
     <button
       type="button"
-      {...(listbox
+      {...(inList
         ? { "aria-hidden": true, tabIndex: -1 }
         : omitUndefined({ "aria-label": children == null ? ariaLabel : undefined }))}
       onClick={(event) => close(event.currentTarget)}
@@ -1494,9 +1729,14 @@ export function SelectClose({
  * What a searchable select shows when the search matches nothing. A public
  * part with a default ("No match") that every searchable popup renders on
  * its own, for a caller who wants to say more — "No country matches", or
- * an action to add one. Announced politely (`role="status"`), so a
- * screen-reader user typing into the field hears that the list emptied. A
- * plain select, which cannot be searched empty, renders nothing for it.
+ * "Searching…" while a fetch is in flight. Text, not an action: a button
+ * here is out of a keyboard user's reach, because Tab anywhere in the
+ * popup closes it. Its text is also what the popup's live region
+ * (`role="status"`, mounted for as long as the popup is open) says when
+ * the list empties, so a screen-reader user typing hears it; this element
+ * itself is plain text, because a region inserted already holding its
+ * message is not reliably announced. A plain select, which cannot be
+ * searched empty, renders nothing for it.
  */
 export function SelectEmpty({ children }: { children?: ReactNode }) {
   const { engine, open, matchCount } = useSelectContext("SelectEmpty");
@@ -1504,7 +1744,6 @@ export function SelectEmpty({ children }: { children?: ReactNode }) {
   if (engine !== "combobox" || !open || matchCount > 0) return null;
   return (
     <div
-      role="status"
       className={cn(
         "px-4 py-6 text-center text-body text-muted-foreground",
         presentation === "modal" && "text-prose",
