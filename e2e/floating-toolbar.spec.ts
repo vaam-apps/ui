@@ -25,7 +25,9 @@ function container(target: Locator): Locator {
 }
 
 test.describe("the horizontal floating toolbar, below 640px", () => {
-  test("is 64px tall, fully round, and floats 16px off the bottom edge", async ({ page }) => {
+  test("is 64px tall, fully round, unbordered, and floats 16px off the bottom edge", async ({
+    page,
+  }) => {
     await openStory(page, STORY.sideNavToolbarStandard, { width: 375, height: 812 });
     const bar = page.locator(horizontal);
     await expect(bar).toBeVisible();
@@ -46,17 +48,6 @@ test.describe("the horizontal floating toolbar, below 640px", () => {
     expect(radius, "fully round").toBeGreaterThanOrEqual(rect.height / 2);
     const border = await bar.evaluate((el) => getComputedStyle(el).borderTopWidth);
     expect(border, "M3's toolbar has no outline").toBe("0px");
-    // `ElevationTokens.Level0`, as androidx ships it — a maintainer's call
-    // (2026-09-24) over a soft shadow; `side-nav.tsx`'s `TOOLBAR_CONTAINER`
-    // has the trade-off. Tailwind composes empty ring layers into
-    // `box-shadow` whenever any shadow utility is present, so "every layer
-    // is transparent" is the honest reading, not `=== "none"`.
-    const shadow = await bar.evaluate((el) => getComputedStyle(el).boxShadow);
-    expect(
-      shadow === "none" ||
-        shadow.split(/,(?![^(]*\))/).every((layer) => /rgba\(0, 0, 0, 0\)/.test(layer)),
-      `M3's floating toolbar has no elevation (box-shadow: ${shadow})`,
-    ).toBe(true);
   });
 
   test("every target is 48×48 around a 40px container, and the current page is a 64×40 pill", async ({
@@ -135,6 +126,54 @@ test.describe("the horizontal floating toolbar, below 640px", () => {
     expect(vibrant, "vibrant is the page's foreground colour").toBe(fg);
     expect(vibrant).not.toBe(page_);
   });
+});
+
+test.describe("no elevation, in either scheme, on either axis", () => {
+  /**
+   * `ElevationTokens.Level0`, as androidx ships it — a maintainer's call
+   * (2026-09-24) over a soft shadow; `side-nav.tsx`'s `TOOLBAR_CONTAINER`
+   * has the trade-off. Every bar is checked, because a shadow can come
+   * back through a scheme's own `container` classes or one rail's own
+   * class list as easily as through the shared container. Tailwind
+   * composes empty ring layers into `box-shadow` whenever any shadow
+   * utility is present, so "every layer is transparent" is the honest
+   * reading rather than `=== "none"`; `filter` is checked too, because a
+   * `drop-shadow()` leaves `box-shadow` at `none`.
+   */
+  const flat = (shadow: string) =>
+    shadow === "none" ||
+    shadow.split(/,(?![^(]*\))/).every((layer) => /rgba\(0, 0, 0, 0\)/.test(layer));
+
+  const cases = [
+    {
+      name: "horizontal, standard",
+      story: STORY.sideNavToolbarStandard,
+      width: 375,
+      bar: horizontal,
+    },
+    {
+      name: "horizontal, vibrant",
+      story: STORY.sideNavToolbarVibrant,
+      width: 375,
+      bar: horizontal,
+    },
+    { name: "vertical, standard", story: STORY.sideNavInAShell, width: 900, bar: vertical },
+  ];
+  for (const theme of ["dark", "light"] as const) {
+    for (const c of cases) {
+      test(`${c.name}, ${theme} theme`, async ({ page }) => {
+        await openStory(page, c.story, { width: c.width, height: 800, theme });
+        const bar = page.locator(c.bar);
+        await expect(bar).toBeVisible();
+        const style = await bar.evaluate((el) => {
+          const s = getComputedStyle(el);
+          return { shadow: s.boxShadow, filter: s.filter };
+        });
+        expect(flat(style.shadow), `box-shadow: ${style.shadow}`).toBe(true);
+        expect(style.filter, "no drop-shadow filter either").toBe("none");
+      });
+    }
+  }
 });
 
 test.describe("the vertical floating toolbar, 640–1279px", () => {

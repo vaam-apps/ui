@@ -135,9 +135,11 @@ export interface SideNavProps {
    *   is the inverse of the page: near-white on the dark theme,
    *   near-black on the light one) with the current page cut back out of
    *   it in `SurfaceContainer` (`VibrantButtonSelectedContainerColor`).
-   *   It is the one that stays legible over *any* content, because it is
-   *   the only one whose contrast against the page does not depend on
-   *   what happens to be scrolling underneath it.
+   *   Its fill is the page's own foreground, which no surface uses, so
+   *   its edge holds over every surface — `Card`, `StatTile`, the page —
+   *   where the standard bar's does not. Not over *everything*: a filled
+   *   `primary` control (a primary `Button`) passing under it is the same
+   *   colour.
    */
   toolbarVariant?: SideNavToolbarVariant | undefined;
   className?: string;
@@ -616,13 +618,14 @@ function ToolbarLink({
  * floating layers get one"). Without one, the container colour is the
  * only separation. On Android a `Level0` toolbar sits over a `Surface`
  * the same theme painted a tonal step darker; here it sits over whatever
- * a consumer's page scrolls under it, and on the dark theme `surface-2`
- * over a `surface-2` card is the same colour — over such a card the
- * standard bar's edge disappears and only its icons remain. A shadow was
- * weighed against that and dropped by the maintainer (2026-09-24) in
- * favour of M3's `Level0` exactly. A screen that puts `surface-2` content
- * under the bar has `toolbarVariant="vibrant"`, whose contrast with the
- * page does not depend on what scrolls underneath.
+ * a consumer's page scrolls under it, and in *either* theme the standard
+ * bar is `surface-2` — the same fill as `Card` and `StatTile` (both
+ * `bg-base-300`), measured 1.000:1 against them in dark and light alike —
+ * so over those the standard bar's edge disappears and only its icons
+ * remain. A shadow was weighed against that and dropped by the maintainer
+ * (2026-09-24) in favour of M3's `Level0` exactly. A screen that scrolls
+ * cards or stat tiles under the bar has `toolbarVariant="vibrant"`, whose
+ * fill no surface uses.
  */
 const TOOLBAR_CONTAINER = "fixed z-40 flex rounded-full p-2 gap-1";
 
@@ -632,8 +635,8 @@ const TOOLBAR_CONTAINER = "fixed z-40 flex rounded-full p-2 gap-1";
  * *vertical* floating toolbar, `fixed`, vertically centred, 16px from the
  * left edge, layered over the page instead of hidden behind a hamburger
  * the caller has to build and the reader has to find first. `TOOLBAR_CONTAINER`'s
- * doc has the geometry and the one departure from androidx; the
- * orientation is the only thing this function adds.
+ * doc has the geometry and the elevation; the orientation is the only
+ * thing this function adds.
  *
  * # Why every group's items are flattened
  *

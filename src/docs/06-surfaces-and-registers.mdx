@@ -43,9 +43,10 @@ rail, which is M3's floating toolbar and carries **no** shadow, because
 androidx ships it at elevation `Level0` and the library follows M3
 exactly there. It is permanent chrome floating unanchored over
 unknown-contrast content — the case the rule exists for — so its fill is
-doing a job a shadow would share: on the dark theme a standard bar over a
-`surface-2` card loses its edge. `toolbarVariant="vibrant"` is the answer
-for a screen where that happens.
+doing a job a shadow would share: a standard bar is `surface-2`, the
+same fill as `Card` and `StatTile` in both themes, and over them it loses
+its edge. `toolbarVariant="vibrant"` is the answer for a screen where that
+happens.
 
 **Reach for instrument** when the surface is a single readable
 instrument — a row of metrics, a chart, a headline figure and its

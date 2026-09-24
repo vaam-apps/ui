@@ -339,6 +339,24 @@ test.describe("a sheet inside a drawer dismisses alone", () => {
     await expect(drawer).toHaveCount(0);
   });
 
+  test("Escape with focus on the trigger, listbox still open, closes only the listbox", async ({
+    page,
+  }) => {
+    // Headless UI moves focus into the options on open, but the trigger is
+    // left outside the `inert` it applies — a screen reader's cursor can
+    // sit on it while the listbox is open. Put focus there the way that
+    // cursor would, then press Escape: this used to close the drawer too.
+    const { trigger, drawer } = await openInDrawer(page);
+    await trigger.evaluate((el) => (el as HTMLElement).focus());
+    await expect(trigger).toBeFocused();
+    await expect(page.getByRole("listbox")).toHaveCount(1);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("listbox")).toHaveCount(0);
+    await page.waitForTimeout(600);
+    await expect(drawer).toHaveAttribute("data-state", "open");
+    await expect(trigger).toBeFocused();
+  });
+
   test("a tap on the scrim above the drawer closes only the sheet", async ({ page }) => {
     const { drawer } = await openInDrawer(page);
     const top = await box(drawer);

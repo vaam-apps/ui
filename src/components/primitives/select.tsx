@@ -547,7 +547,15 @@ export function SelectContent({
     function onKeyDown(event: KeyboardEvent) {
       const options = optionsRef.current;
       if (event.key !== "Escape" || options === null) return;
-      if (!(event.target instanceof Node) || !options.contains(event.target)) return;
+      if (!(event.target instanceof Node)) return;
+      // Aimed at the options, or at this listbox's own trigger. Headless UI
+      // moves focus into the options when it opens, but the trigger stays
+      // outside the `inert` it applies, so a screen reader's cursor (or a
+      // caller's `.focus()`) can be sitting on it while the listbox is open
+      // — and an Escape there closed the drawer along with the listbox,
+      // measured in the "Inside a drawer" story at 375px and 1280px.
+      const trigger = document.querySelector(`[aria-controls="${options.id}"]`);
+      if (!options.contains(event.target) && event.target !== trigger) return;
       if (options.closest("[data-vaul-drawer]") === null) return;
       event.stopImmediatePropagation();
       event.preventDefault();

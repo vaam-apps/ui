@@ -600,7 +600,9 @@ function BusyPage({ bottomPad }: { bottomPad: string }) {
         <div
           // biome-ignore lint/suspicious/noArrayIndexKey: static filler rows
           key={index}
-          className="flex flex-col gap-2 rounded-box border border-edge bg-surface-1 p-4"
+          // `surface-2`, the fill every `Card` has — the case the standard
+          // bar's missing shadow costs, so this story has to show it.
+          className="flex flex-col gap-2 rounded-box border border-edge bg-surface-2 p-4"
         >
           <div className="h-4 w-1/2 rounded-sm bg-surface-3" />
           <p className="text-body text-muted-foreground">
@@ -617,10 +619,11 @@ function BusyPage({ bottomPad }: { bottomPad: string }) {
  * **Toolbar colours — standard.** M3's default floating-toolbar scheme:
  * a `SurfaceContainer` bar (`surface-2`) with muted icons, and the current
  * page as a filled `primary` pill, with no shadow — androidx ships it at
- * elevation `Level0`, and so does this. Scroll the page on the dark theme:
- * where a `surface-2` card passes under it the bar's edge disappears and
- * only its icons remain. That is the accepted cost of matching M3; the
- * vibrant story is the answer for a screen where it matters.
+ * elevation `Level0`, and so does this. Scroll the page, in either
+ * theme: where a card passes under it — `surface-2`, the bar's own fill,
+ * like every `Card` and `StatTile` — the bar's edge disappears and only
+ * its icons remain. That is the accepted cost of matching M3; the vibrant
+ * story is the answer for a screen where it matters.
  */
 export const ToolbarColorsStandard: Story = {
   globals: { viewport: { value: "tiny" } },
@@ -637,8 +640,9 @@ export const ToolbarColorsStandard: Story = {
  * **Toolbar colours — vibrant.** M3's other scheme: a `PrimaryContainer`
  * bar — `primary` here, so near-white on the dark theme and near-black on
  * the light one — with the current page cut back out of it in
- * `SurfaceContainer`. Loud, and legible over anything, because its
- * contrast with the page does not depend on what is scrolling under it.
+ * `SurfaceContainer`. Loud, and its edge holds over every surface,
+ * because no surface uses its fill — only a filled `primary` control
+ * passing under it would match.
  * Switch the theme toolbar to light to see it invert.
  */
 export const ToolbarColorsVibrant: Story = {
@@ -675,7 +679,7 @@ export const VerticalToolbarVibrant: Story = {
  * *under* the toolbar, which is portalled to `body` at `z-40`: an
  * undimmed bar sitting over the bottom 80px of the sheet, above its
  * scrim. The toolbar hides itself while a sheet is open instead
- * (`HorizontalRail`'s `body:has([data-sheet-handle])` rule), which is
+ * (`HorizontalRail`'s `body:has([data-select-content])` rule), which is
  * what the play function leaves you looking at. Close the sheet and the
  * toolbar comes back.
  */

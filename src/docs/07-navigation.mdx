@@ -128,12 +128,12 @@ still holds, and a tinted bar would read as a status.
 elevation `Level0`, and so does this one — no border, no blur, no
 shadow; the fill is the only separation. The cost is stated rather than
 hidden: the bar floats over whatever a consumer's page scrolls under it,
-and on the dark theme `surface-2` over a `surface-2` card is the same
-colour, so over such a card the standard bar's edge disappears and only
+and the standard bar is `surface-2` — the same fill as `Card` and
+`StatTile`, in both themes — so over those its edge disappears and only
 its icons remain. A soft shadow was weighed against that and dropped in
-favour of M3's `Level0`. A screen that puts `surface-2` content under
-the bar should use `toolbarVariant="vibrant"`, whose contrast with the
-page does not depend on what scrolls underneath.
+favour of M3's `Level0`. A screen that scrolls cards or stat tiles under
+the bar should use `toolbarVariant="vibrant"`, whose fill (the page's own
+foreground) no surface uses.
 
 [**Story: Toolbar colours — standard**](?path=/story/primitives-sidenav--toolbar-colors-standard) and [**vibrant**](?path=/story/primitives-sidenav--toolbar-colors-vibrant) — both at 375px, over an instrument panel and scrolling cards, which is where the difference matters.
 

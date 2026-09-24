@@ -11,8 +11,8 @@ two sections are the ones to read before writing a screen.
 
 ## `Card` / `CardHeader` / `CardBody`
 
-The diagnostic surface: a hairline border on a `--surface-3` step, no
-shadow. This is the default container for a section of a screen — a
+The diagnostic surface: a hairline border on a `surface-2` step
+(`bg-base-300`), no shadow. This is the default container for a section of a screen — a
 provider's configuration, a delivery's detail, a group of related fields.
 
 | Prop                        | Type                    | Notes                                                       |
@@ -268,12 +268,15 @@ bar's fill is the only thing separating it from what scrolls under it.
 `toolbarVariant` picks M3's two schemes:
 
 - `"standard"` (default) — a `surface-2` bar, muted icons, the current
-  page as a filled `primary` pill. Quiet — and on the dark theme, over a
-  `surface-2` card, its edge disappears (same colour, no shadow). If your
-  screen scrolls `surface-2` cards under the bar, use `"vibrant"`.
+  page as a filled `primary` pill. Quiet — and its fill is `surface-2`,
+  the same as `Card` and `StatTile` in both themes, so over those its
+  edge disappears (same colour, no shadow). If your screen scrolls cards
+  or stat tiles under the bar, use `"vibrant"`.
 - `"vibrant"` — a `primary` bar, i.e. the inverse of the page (near-white
   on dark, near-black on light), with the current page cut out in
-  `surface-2`. Loud, and legible over any content.
+  `surface-2`. Loud, and its edge holds over every surface — though not
+  over a filled `primary` control (a primary `Button`), which is its own
+  colour.
 
 The bottom toolbar hides itself while a `Select` is open as a phone
 sheet, so the sheet is never drawn under it whatever stacking context the
