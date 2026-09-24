@@ -494,26 +494,29 @@ export function DatePickerCancel({ children }: { children?: ReactNode }) {
 /**
  * The full-screen range picker's close icon, leading its bar: closes and
  * throws the pick away, as Cancel does where there is no bar. An X named
- * "Close" by default; write one to rename it (`aria-label`) or to replace
- * the icon with text (`children`). Only the full-screen picker has a bar,
- * so anywhere else a written one is not shown.
+ * "Close" by default. Write one to rename it (`aria-label`), to replace the
+ * icon with another (`children` *and* `aria-label`: a 48dp icon button
+ * named by the label), or with text (`children` alone: a text button named
+ * by its text). Only the full-screen picker has a bar, so anywhere else a
+ * written one is not shown.
  */
 export function DatePickerClose({
   children,
-  "aria-label": ariaLabel = "Close",
+  "aria-label": ariaLabel,
 }: {
   children?: ReactNode;
   "aria-label"?: string | undefined;
 }) {
   const picker = usePicker("DatePickerClose");
+  const icon = children == null || ariaLabel !== undefined;
   return (
     <button
       type="button"
-      {...omitUndefined({ "aria-label": children == null ? ariaLabel : undefined })}
+      {...omitUndefined({ "aria-label": ariaLabel ?? (children == null ? "Close" : undefined) })}
       onClick={() => picker.closePicker(false)}
       className={cn(
         "flex shrink-0 items-center justify-center rounded-full text-foreground hover:bg-foreground/8",
-        children == null ? "size-12" : "h-10 px-3 font-medium text-prose",
+        icon ? "size-12" : "h-10 px-3 font-medium text-prose",
       )}
     >
       {children ?? <X aria-hidden="true" className="size-6" strokeWidth={1.5} />}
@@ -1035,9 +1038,18 @@ function RangePicker({
   // the finger (measured in review). The anchor is clamped into `min` /
   // `max` first: unclamped, a `max` a year before today left a window of
   // one month with no selectable day in it.
-  const [{ first, stackedCount, anchorIndex }] = useState(() =>
-    stackedWindow(selected?.from ?? new Date(), min, max),
-  );
+  const [{ first, stackedCount, anchorIndex, focusAnchor }] = useState(() => {
+    const span = stackedWindow(selected?.from ?? selected?.to ?? new Date(), min, max);
+    // With nothing picked and today outside the window (a bound more than
+    // a year away), react-day-picker's autofocus falls back to the
+    // window's first day, and scrolling to focus it put the list 12 months
+    // before a past `max` (found in review). Then the anchor month's first
+    // selectable day takes focus instead, without scrolling.
+    const today = new Date();
+    const todayShown =
+      monthsBetween(span.first, today) >= 0 && monthsBetween(span.first, today) < span.stackedCount;
+    return { ...span, focusAnchor: selected === undefined && !todayShown };
+  });
 
   // Scroll the stacked list to the anchor month when it is the one shown.
   const stackRef = useRef<HTMLDivElement | null>(null);
@@ -1046,6 +1058,11 @@ function RangePicker({
     if (stack === null || stack.getClientRects().length === 0) return;
     const months = stack.querySelectorAll<HTMLElement>("[data-picker-month]");
     months[anchorIndex]?.scrollIntoView({ block: "start" });
+    if (focusAnchor) {
+      months[anchorIndex]
+        ?.querySelector<HTMLButtonElement>("td button:not([disabled])")
+        ?.focus({ preventScroll: true });
+    }
     // Once, on open (the tree mounts with the surface); the list is the
     // user's to scroll after that.
   }, []);
@@ -1099,7 +1116,7 @@ function RangePicker({
           <Calendar
             mode="range"
             numberOfMonths={stackedCount}
-            autoFocus
+            autoFocus={!focusAnchor}
             hideNavigation
             hideWeekdays
             showOutsideDays={false}
@@ -1163,36 +1180,54 @@ function RangePicker({
  */
 /**
  * Marks the rest of the current press handled (`useDismissal`'s doc has
- * why): its pointer-up and touch-end `preventDefault`ed, its click
- * `preventDefault`ed and stopped. Ends at that click, or — for a press
- * that makes no click (a handled touch-end, a drag) — at the next press or
- * key, or half a second after the press ends, so a later click the
- * keyboard makes is never eaten.
+ * why). Ends at the press's click, or — for a press that makes no click (a
+ * handled touch-end, a drag) — at the next press or key, or half a second
+ * after the press ends.
+ *
+ * Where each part is caught is the point:
+ *
+ * - its pointer-up, mouse-down and touch-end are `preventDefault`ed at the
+ *   **window**, in capture, ahead of Headless UI's document listeners,
+ *   which skip a handled one. A handled touch-end makes no click at all;
+ *   a handled mouse-down keeps focus on the trigger `closePicker` returned
+ *   it to, where the browser's own focus change used to move it to
+ *   `<body>` (found in review).
+ * - its click is stopped at **`<html>`**, in capture — after the document.
+ *   Radix's dismissable layer (a vaul drawer, a consumer's Radix dialog)
+ *   watches clicks at the document in capture and again in bubble, and
+ *   reads one it saw only in capture as intercepted: it does not dismiss.
+ *   Stopped at the window, Radix saw nothing at all and stayed armed, and
+ *   the *next* click anywhere — Enter on the trigger, measured in review —
+ *   closed a consumer's Radix dialog.
+ * - a click a script makes (`isTrusted` false) is not part of any press
+ *   and is let through; so is anything the browser says cannot be
+ *   cancelled, rather than logging an intervention for trying.
  */
 function spendRestOfPress() {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const html = document.documentElement;
   const handled = (event: Event) => {
+    if (event.cancelable) event.preventDefault();
+    clearTimeout(timer);
+    timer = setTimeout(done, 500);
+  };
+  const stopClick = (event: Event) => {
+    if (!event.isTrusted) return;
     event.preventDefault();
-    if (event.type === "click") {
-      event.stopImmediatePropagation();
-      done();
-    } else {
-      clearTimeout(timer);
-      timer = setTimeout(done, 500);
-    }
+    event.stopImmediatePropagation();
+    done();
   };
   const options = { capture: true, passive: false } as const;
+  const HANDLED = ["pointerup", "mousedown", "touchend"];
   function done() {
     clearTimeout(timer);
-    for (const type of ["pointerup", "touchend", "click"]) {
-      window.removeEventListener(type, handled, options);
-    }
+    for (const type of HANDLED) window.removeEventListener(type, handled, options);
+    html.removeEventListener("click", stopClick, true);
     window.removeEventListener("pointerdown", done, true);
     window.removeEventListener("keydown", done, true);
   }
-  for (const type of ["pointerup", "touchend", "click"]) {
-    window.addEventListener(type, handled, options);
-  }
+  for (const type of HANDLED) window.addEventListener(type, handled, options);
+  html.addEventListener("click", stopClick, true);
   // Registered now, so it does not fire for the pointer-down in progress:
   // a listener added during dispatch at the same target is not run.
   window.addEventListener("pointerdown", done, true);
@@ -1231,7 +1266,15 @@ function useDismissal(picker: PickerContextValue, surfaceRef: RefObject<HTMLDivE
         const firstEl = focusable[0];
         const lastEl = focusable[focusable.length - 1];
         if (firstEl === undefined || lastEl === undefined) return;
-        if (event.shiftKey && document.activeElement === firstEl) {
+        // Focus on no stop at all — the surface itself, after a press on
+        // its own background — has no neighbour inside for the browser to
+        // move to, and Shift+Tab walked out to the trigger (found in
+        // review). From there, Tab goes to the first stop and Shift+Tab to
+        // the last.
+        if (!focusable.includes(document.activeElement as HTMLElement)) {
+          event.preventDefault();
+          (event.shiftKey ? lastEl : firstEl).focus();
+        } else if (event.shiftKey && document.activeElement === firstEl) {
           event.preventDefault();
           lastEl.focus();
         } else if (!event.shiftKey && document.activeElement === lastEl) {

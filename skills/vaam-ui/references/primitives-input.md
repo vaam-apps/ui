@@ -623,6 +623,13 @@ committing a start alone gives an open-ended range (`{ from, to:
 undefined }`). Focus goes
 back to the trigger on close.
 
+**A press outside only closes the picker.** It does not also act on what
+it lands on: the page is inert while the picker is open, and the rest of
+that press (its click included) is spent on closing. So a button beside
+an open picker takes two presses: one to close the picker, one to press
+it. Inside a `Dialog`, a `Drawer` or your own Radix dialog, the same
+press closes the picker and leaves the dialog open.
+
 #### The parts
 
 - **`DatePickerTrigger`** is the field-looking button. It takes `id` (the
@@ -669,9 +676,11 @@ back to the trigger on close.
   - `DatePickerConfirm` defaults to "OK", or "Save" for a range.
   - `DatePickerClose` is the full-screen range picker's close icon, at the
     start of its bar; it throws the pick away, as Cancel does elsewhere.
-    Named "Close" by default: give it an `aria-label` to rename it, or
-    `children` to replace the icon with text. Only the full-screen picker
-    has a bar, so anywhere else a written one is not shown.
+    Named "Close" by default. Give it an `aria-label` to rename it;
+    `children` with an `aria-label` to replace the icon with another (a
+    48px icon button named by the label); or `children` alone for a text
+    button named by its text. Only the full-screen picker has a bar, so
+    anywhere else a written one is not shown.
 
 A docked range shows two months side by side from 768px up, and stacked
 between 640px and 768px.

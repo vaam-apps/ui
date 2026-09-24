@@ -1,3 +1,4 @@
+import * as RadixDialog from "@radix-ui/react-dialog";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import type { DateRange } from "react-day-picker";
@@ -208,6 +209,29 @@ export const RangeRelabelledOnAPhone: Story = {
   play: openPicker("Reporting period"),
 };
 
+/**
+ * A range bounded more than a year before today, on a phone: the stacked
+ * list is the twelve months up to `max`, and it opens on `max`'s month,
+ * not twelve months earlier.
+ */
+export const RangeBoundedInThePastOnAPhone: Story = {
+  globals: { viewport: { value: "phone" } },
+  render: function Render() {
+    const [value, setValue] = useState<IsoDateRange | undefined>();
+    return (
+      <div className="w-full max-w-80 p-4">
+        <DateRangePicker value={value} onValueChange={setValue} max="2024-12-31">
+          <DatePickerTrigger aria-label="Archived between">
+            <DatePickerValue placeholder="Any time before 2025" />
+          </DatePickerTrigger>
+          <DatePickerContent />
+        </DateRangePicker>
+      </div>
+    );
+  },
+  play: openPicker("Archived between"),
+};
+
 /** `min`/`max` bound navigation and disable every day outside them. */
 export const Bounded: Story = {
   render: function Render() {
@@ -352,6 +376,51 @@ export const InsideADialog: Story = {
             </DialogActions>
           </DialogContent>
         </Dialog>
+      </div>
+    );
+  },
+};
+
+/**
+ * **Inside a consumer's own Radix dialog** — not this library's `Dialog`
+ * or `Drawer`, and without the handshake those two share. A press outside
+ * the picker closes it and leaves the dialog open, and so does the click
+ * after it: Radix defers an outside dismissal to the click, and a click
+ * hidden from it left the dismissal armed for the next one.
+ */
+export const InsideARadixDialog: Story = {
+  globals: { viewport: { value: "desktop" } },
+  render: function Render() {
+    const [value, setValue] = useState<IsoDate | undefined>();
+    return (
+      <div className="flex flex-col items-start gap-3 p-4">
+        <RadixDialog.Root>
+          <RadixDialog.Trigger asChild>
+            <Button variant="secondary" size="sm">
+              Open Radix dialog
+            </Button>
+          </RadixDialog.Trigger>
+          <p className="font-mono text-caption text-subtle-foreground">value: {value ?? "—"}</p>
+          <RadixDialog.Portal>
+            <RadixDialog.Overlay className="fixed inset-0 z-40 bg-[var(--scrim)]" />
+            <RadixDialog.Content
+              aria-describedby={undefined}
+              className="fixed inset-x-4 top-24 z-40 mx-auto flex max-w-md flex-col gap-4 rounded-sheet bg-surface-2 p-6"
+            >
+              <RadixDialog.Title className="font-medium text-title">
+                Pick a cut-off
+              </RadixDialog.Title>
+              <FormField label="Cut-off" htmlFor="radix-cut-off">
+                <DatePicker value={value} onValueChange={setValue}>
+                  <DatePickerTrigger id="radix-cut-off">
+                    <DatePickerValue placeholder="Pick a date" />
+                  </DatePickerTrigger>
+                  <DatePickerContent />
+                </DatePicker>
+              </FormField>
+            </RadixDialog.Content>
+          </RadixDialog.Portal>
+        </RadixDialog.Root>
       </div>
     );
   },

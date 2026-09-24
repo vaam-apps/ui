@@ -59,6 +59,8 @@ export const STORY = {
   calendarRange: "primitives-date-pickers--calendar-range",
   calendarToday: "primitives-date-pickers--calendar-today",
   datePickerInDialog: "primitives-date-pickers--inside-a-dialog",
+  datePickerInRadixDialog: "primitives-date-pickers--inside-a-radix-dialog",
+  datePickerRangeBoundedPast: "primitives-date-pickers--range-bounded-in-the-past-on-a-phone",
   datePickerRangeRelabelledPhone: "primitives-date-pickers--range-relabelled-on-a-phone",
   sideNavInAShell: "primitives-sidenav--in-a-shell",
   tableAsAScreenUsesIt: "primitives-table--as-a-screen-uses-it",

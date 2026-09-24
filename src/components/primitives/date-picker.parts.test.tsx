@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   DatePicker,
+  DatePickerClose,
   DatePickerContent,
   DatePickerTrigger,
   DatePickerValue,
@@ -194,6 +195,14 @@ describe("the full-screen range picker's months", () => {
     expect(monthOf(months[12])).toBe("2024-12");
   });
 
+  it("are anchored on the end when the value has only an end", async () => {
+    await mount(<Range value={{ to: "2020-03-10" }} onValueChange={() => undefined} />);
+    await click(trigger());
+    const months = stacked();
+    expect(months).toHaveLength(25);
+    expect(monthOf(months[12]), "failed: the list does not hold the value's end").toBe("2020-03");
+  });
+
   it("keep twelve months when min is far after today", async () => {
     await mount(<Range value={undefined} onValueChange={() => undefined} min="2099-03-01" />);
     await click(trigger());
@@ -241,5 +250,44 @@ describe("a value changed from outside while the picker is open", () => {
     await rerender(<Single value="2026-09-20" onValueChange={onValueChange} />);
     await click(buttonNamed("OK"));
     expect(onValueChange).toHaveBeenCalledWith("2026-09-15");
+  });
+});
+
+describe("DatePickerClose", () => {
+  it("keeps a written aria-label when it replaces the icon", async () => {
+    await mount(
+      <DateRangePicker value={undefined} onValueChange={() => undefined}>
+        <DatePickerTrigger aria-label="Window">
+          <DatePickerValue />
+        </DatePickerTrigger>
+        <DatePickerContent>
+          <DatePickerClose aria-label="Back">
+            <span data-glyph="" aria-hidden="true">
+              ←
+            </span>
+          </DatePickerClose>
+        </DatePickerContent>
+      </DateRangePicker>,
+    );
+    await click(trigger());
+    const back = document.querySelector("[data-date-picker] [data-glyph]")?.closest("button");
+    expect(back?.getAttribute("aria-label"), "failed: the icon button lost its name").toBe("Back");
+  });
+
+  it("is named by its text when it has text and no label", async () => {
+    await mount(
+      <DateRangePicker value={undefined} onValueChange={() => undefined}>
+        <DatePickerTrigger aria-label="Window">
+          <DatePickerValue />
+        </DatePickerTrigger>
+        <DatePickerContent>
+          <DatePickerClose>Discard</DatePickerClose>
+        </DatePickerContent>
+      </DateRangePicker>,
+    );
+    await click(trigger());
+    const discard = buttonNamed("Discard");
+    expect(discard).toBeDefined();
+    expect(discard?.hasAttribute("aria-label")).toBe(false);
   });
 });
