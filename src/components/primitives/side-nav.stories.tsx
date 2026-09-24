@@ -551,8 +551,9 @@ export const WithAnAccountBlock: Story = {
  * own `data-theme` and opt out of the preview's theme decorator — mounted
  * here it would fight the toolbar's theme global.
  */
-function AccountBlock() {
+function AccountBlock({ organisation = false }: { organisation?: boolean }) {
   const [density, setDensity] = useState<"compact" | "comfortable">("compact");
+  const [org, setOrg] = useState("acme");
   const [signedOut, setSignedOut] = useState(false);
   return (
     <div className="flex flex-col gap-3">
@@ -560,6 +561,22 @@ function AccountBlock() {
         <span className="text-subtle-foreground">Signed in as</span>
         <span className="truncate text-foreground">ops@example.com</span>
       </div>
+      {/* A popup inside the sheet, for the rail story only: the e2e checks
+          it closes alone — picked, Escaped, or dismissed by a tap on the
+          scrim — and the drawer stays open. The phone story leaves it out,
+          so its keyboard test walks the account block's own tab order. */}
+      {organisation && (
+        <Select value={org} onValueChange={setOrg}>
+          <SelectTrigger aria-label="Organisation">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="acme">Acme Ltd</SelectItem>
+            <SelectItem value="globex">Globex</SelectItem>
+            <SelectItem value="initech">Initech</SelectItem>
+          </SelectContent>
+        </Select>
+      )}
       <RadioGroup
         aria-label="Row density"
         value={density}
@@ -692,7 +709,7 @@ export const AccountSheetWithNoOverflow: Story = {
  */
 export const AccountSheetFromTheRail: Story = {
   globals: { viewport: { value: "iconRail" } },
-  args: { currentPath: "/providers", accountSlot: <AccountBlock /> },
+  args: { currentPath: "/providers", accountSlot: <AccountBlock organisation /> },
   render: (args) => (
     <div className="flex h-[40rem] overflow-hidden bg-base-100">
       <SideNav {...args} />
@@ -721,6 +738,33 @@ export const AccountSheetFromTheRail: Story = {
     await step("…then the account block", async () => {
       await expect(inSheet.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
     });
+  },
+};
+
+/**
+ * **Account sheet — collapsed on a desktop.** With `collapsed`, the
+ * sidebar never renders, so the vertical rail is the navigation at 1440px
+ * too, and the account block is reachable the same way it is on a tablet:
+ * the rail's "More" control and its drawer. Before #36 a collapsed
+ * `SideNav` rendered the account block nowhere at any width. The play
+ * function leaves the drawer open.
+ */
+export const AccountSheetCollapsedOnDesktop: Story = {
+  globals: { viewport: { value: "fullSidebar" } },
+  args: { currentPath: "/providers", collapsed: true, accountSlot: <AccountBlock /> },
+  render: (args) => (
+    <div className="flex h-[40rem] overflow-hidden bg-base-100">
+      <SideNav {...args} />
+      <div className="flex min-w-0 flex-1 flex-col gap-4 p-6 pl-24">
+        <div className="h-7 w-64 rounded-sm bg-surface-3" />
+        <div className="h-40 rounded-md bg-surface-2" />
+      </div>
+    </div>
+  ),
+  play: async () => {
+    const sheet = await openAccountSheet("side");
+    await expect(within(sheet).getAllByRole("link")).toHaveLength(7);
+    await expect(within(sheet).getByRole("button", { name: "Sign out" })).toBeInTheDocument();
   },
 };
 

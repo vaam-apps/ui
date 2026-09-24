@@ -103,6 +103,7 @@ export const STORY = {
   sideNavAccountSheetPhone: "primitives-sidenav--account-sheet-on-a-phone",
   sideNavAccountSheetNoOverflow: "primitives-sidenav--account-sheet-with-no-overflow",
   sideNavAccountSheetRail: "primitives-sidenav--account-sheet-from-the-rail",
+  sideNavAccountSheetCollapsed: "primitives-sidenav--account-sheet-collapsed-on-desktop",
   sideNavWithAnAccountBlock: "primitives-sidenav--with-an-account-block",
   // `SideNav`'s floating toolbars, one per M3 colour scheme, over real
   // content (`e2e/floating-toolbar.spec.ts`).

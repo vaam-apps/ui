@@ -430,6 +430,117 @@ test.describe("the vertical rail's More drawer (1100px)", () => {
     await openedSheet(page, "side");
     expect(await axeWithSheetOpen(page)).toEqual([]);
   });
+
+  /**
+   * The account block is arbitrary markup, and a `Select` is the popup
+   * most likely to be in it (an organisation switch). Each way of closing
+   * the listbox must close the listbox alone: Radix only judges an outside
+   * press on the `click` that follows it, by when the listbox has gone
+   * (`lib/select-dismissal.ts` has the timings), so without the handshake
+   * a tap on the scrim closes the drawer too.
+   */
+  test("a Select in the account block closes alone — picked, Escaped, or by a tap on the scrim — and the drawer stays open", async ({
+    page,
+  }) => {
+    await openStory(page, STORY.sideNavAccountSheetRail, TABLET);
+    const drawer = await openedSheet(page, "side");
+    const trigger = drawer.getByRole("button", { name: "Organisation" });
+    const listbox = page.getByRole("listbox");
+    const stillOpen = async (after: string) => {
+      await settleAnimations(page);
+      await expect(drawer, `the drawer after ${after}`).toHaveAttribute("data-state", "open");
+    };
+
+    await trigger.click();
+    await expect(listbox).toBeVisible();
+    await page.getByRole("option", { name: "Globex" }).click();
+    await expect(listbox).toBeHidden();
+    await expect(trigger).toContainText("Globex");
+    await stillOpen("picking an option");
+
+    await trigger.click();
+    await expect(listbox).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(listbox).toBeHidden();
+    await stillOpen("Escape in the listbox");
+
+    // The scrim, well clear of the 360px drawer.
+    const scrim = { x: TABLET.width - 40, y: TABLET.height / 2 };
+    await trigger.click();
+    await expect(listbox).toBeVisible();
+    await page.mouse.click(scrim.x, scrim.y);
+    await expect(listbox).toBeHidden();
+    await stillOpen("a tap on the scrim with the listbox open");
+
+    // …and with nothing open inside it, the same tap is the drawer's.
+    await page.mouse.click(scrim.x, scrim.y);
+    await expect(drawer).toBeHidden();
+  });
+
+  /**
+   * `NavSheetLink` closes the sheet on a plain primary click, because a
+   * client-side router that intercepts the navigation would otherwise
+   * leave it open over the new page — and leaves it open on a click that
+   * opens a new tab or window, because the page under it has not changed.
+   * The rows point at routes this Storybook does not have, so the page's
+   * own navigation is cancelled here to keep the drawer observable.
+   */
+  test("a plain click on a row closes the drawer and hands focus back to More; a modified or middle click leaves it open", async ({
+    page,
+  }) => {
+    await openStory(page, STORY.sideNavAccountSheetRail, TABLET);
+    await page.evaluate(() => {
+      for (const type of ["click", "auxclick"]) {
+        window.addEventListener(type, (event) => {
+          if ((event.target as Element | null)?.closest("a[href]")) event.preventDefault();
+        });
+      }
+    });
+    const drawer = await openedSheet(page, "side");
+    const routes = drawer.getByRole("link", { name: "Routes" });
+
+    await routes.click({ modifiers: ["ControlOrMeta"] });
+    await routes.click({ modifiers: ["Shift"] });
+    await routes.click({ button: "middle" });
+    await settleAnimations(page);
+    await expect(drawer, "a new tab or window leaves this page as it was").toHaveAttribute(
+      "data-state",
+      "open",
+    );
+
+    await routes.click();
+    await expect(drawer).toBeHidden();
+    await expect(visibleMore(page)).toBeFocused();
+  });
+});
+
+/**
+ * `collapsed` keeps the vertical rail at every width from 640px up, so at
+ * 1440px the account block is reached exactly as on a tablet — and there
+ * is no sidebar to hold another visible copy of it.
+ */
+test("collapsed at 1440px, the rail's More opens the same drawer, and it is the only place the account block shows", async ({
+  page,
+}) => {
+  await openStory(page, STORY.sideNavAccountSheetCollapsed, { width: 1440, height: 760 });
+  const drawer = await openedSheet(page, "side");
+  const rect = await box(drawer);
+  expect([rect.x, rect.y, rect.width, rect.height]).toEqual([0, 0, 360, 760]);
+  expect(await drawer.getByRole("link").count()).toBe(7);
+  const signOut = drawer.getByRole("button", { name: "Sign out" });
+  expect((await hitAtVisibleCentre(page, signOut)).control).toBe("Sign out");
+
+  await page.keyboard.press("Escape");
+  await expect(drawer).toBeHidden();
+  await expect(visibleMore(page)).toBeFocused();
+  // The sidebar's copy is still in the DOM, under `display: none`, and
+  // nothing a reader can reach.
+  const sidebarCopy = page
+    .locator('nav[aria-label="Primary"]:not([data-floating-rail])')
+    .getByText("ops@example.com");
+  await expect(sidebarCopy).toHaveCount(1);
+  await expect(sidebarCopy).toBeHidden();
+  await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
 });
 
 test.describe("unchanged where nothing was missing", () => {
