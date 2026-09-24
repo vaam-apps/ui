@@ -441,7 +441,19 @@ describe("the audit itself is wired up", () => {
  * jsdom has no CSS, so the audit sees both: a duplicated id or an
  * unnamed control in either fails here.
  */
-describe("DatePicker and DateRangePicker, closed and open", () => {
+/**
+ * An open range picker renders both its trees in jsdom, 27 month grids, and
+ * axe then audits every cell. That is the slowest audit in this file, and
+ * CI's runner is several times slower than a workstation. Measured: the open
+ * `DateRangePicker` case took 1283ms locally and 6127ms in CI's `check` job,
+ * past vitest's 5s default. `date-picker.parts.test.tsx` gives its range
+ * tests the same allowance for the same reason.
+ */
+const PICKER_AUDIT_TIMEOUT = 20_000;
+
+describe("DatePicker and DateRangePicker, closed and open", {
+  timeout: PICKER_AUDIT_TIMEOUT,
+}, () => {
   // Floating UI's `autoUpdate` observes the trigger with a `ResizeObserver`
   // jsdom does not have; nothing here depends on a size.
   const REAL_RO = globalThis.ResizeObserver;
