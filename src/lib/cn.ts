@@ -102,8 +102,13 @@ const FONT_SIZES = [
   "metric-lg",
 ] as const;
 
-/** daisyUI's radius tiers, which its own components read from. */
-const RADII = ["selector", "field", "box"] as const;
+/** daisyUI's radius tiers, which its own components read from — plus
+ * `sheet`, the phone-bottom-sheet corner `theme.css` declares as
+ * `--radius-sheet`. Without it `rounded-t-sheet` is not a radius class to
+ * `tailwind-merge` at all, so a caller's `rounded-t-*` passed through a
+ * sheet's `className`/`contentClassName` would survive *beside* it and
+ * stylesheet order would pick — point 2 above, one more time. */
+const RADII = ["selector", "field", "box", "sheet"] as const;
 
 const DAISY_COLOURS = [
   "primary",

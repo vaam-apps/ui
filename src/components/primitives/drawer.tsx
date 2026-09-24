@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import { forwardRef, type ReactNode } from "react";
 import { Drawer as DrawerPrimitive } from "vaul";
 import { cn } from "../../lib/cn";
+import { wasPointerDownUnderOpenSelect } from "../../lib/select-dismissal";
 
 // vaul is standalone. **`direction` defaults to `"bottom"`** — vaul's, not
 // ours; this comment said `"right"` for a while and the same file
@@ -40,10 +41,30 @@ export const DrawerOverlay = forwardRef<
 ));
 DrawerOverlay.displayName = "DrawerOverlay";
 
+/**
+ * A drawer must not dismiss on a tap that belonged to a `Select` open
+ * inside it. Radix (under vaul) treats a tap on the listbox's scrim above
+ * the drawer as a pointer-down outside the drawer, and — measured, at
+ * 375px in `Select`'s "Inside a drawer" story — that tap closed the
+ * listbox *and* the drawer. `SelectContent` notes every such pointer-down
+ * (`lib/select-dismissal.ts`, which also has why "is a select open right
+ * now" cannot answer this: Radix only asks on the `click` that follows,
+ * after the listbox has closed), and the drawer declines the dismissal for
+ * those. Headless UI's own outside-click still closes the listbox, alone.
+ *
+ * Escape, the other route to the same bug, cannot be fixed from this
+ * side — declining it leaves the event `defaultPrevented`, which Headless
+ * UI then ignores too — so `SelectContent` intercepts it before Radix sees
+ * it; see `closeListboxInsideDrawer` there.
+ */
+function keepOpenForSelect(event: CustomEvent<{ originalEvent: PointerEvent }>) {
+  if (wasPointerDownUnderOpenSelect(event.detail.originalEvent)) event.preventDefault();
+}
+
 export const DrawerContent = forwardRef<
   React.ElementRef<typeof DrawerPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, onPointerDownOutside, ...props }, ref) => (
   <DrawerPortal>
     <DrawerOverlay />
     <DrawerPrimitive.Content
@@ -54,6 +75,12 @@ export const DrawerContent = forwardRef<
         className,
       )}
       {...props}
+      // The caller's handler first, so it can still prevent a dismissal
+      // of its own; `keepOpenForSelect` only ever adds one.
+      onPointerDownOutside={(event) => {
+        onPointerDownOutside?.(event);
+        keepOpenForSelect(event);
+      }}
     >
       {children}
     </DrawerPrimitive.Content>
@@ -224,7 +251,7 @@ DrawerDescription.displayName = "DrawerDescription";
 // contract). But `direction="bottom"` above already establishes the
 // precedent this leans on: below `md:`, this component is *never* the
 // console panel — it is unconditionally the phone bottom sheet
-// (`inset-x-0 bottom-0 rounded-t-box`, no border-radius/border/position
+// (`inset-x-0 bottom-0 rounded-t-sheet`, no border-radius/border/position
 // left ambiguous, all reset explicitly per D12's own correction note).
 // A bottom sheet on a ≤767px viewport is a touch surface by
 // construction, not by the app's density choice — the thumb reaching
@@ -336,10 +363,15 @@ function DetailDrawerContent({
       <DrawerPrimitive.Portal>
         {dimmed && <DrawerPrimitive.Overlay className="fixed inset-0 z-50 bg-scrim" />}
         <DrawerPrimitive.Content
+          // A `Select` open inside closes alone — see `keepOpenForSelect`.
+          onPointerDownOutside={keepOpenForSelect}
           className={cn(
             "fixed z-50 flex flex-col bg-surface-2 shadow-[var(--shadow-dialog)] outline-none",
-            // Phone: bottom sheet.
-            "inset-x-0 bottom-0 rounded-t-box border-edge border-t",
+            // Phone: bottom sheet, with M3's own sheet corner — 28dp on
+            // the top two only (`--radius-sheet`, `theme.css`) — the same
+            // corner `Select`'s phone sheet wears, so a select opened from
+            // inside this sheet is visibly the same kind of object.
+            "inset-x-0 bottom-0 rounded-t-sheet border-edge border-t",
             // `md`+: right-hand panel — every sheet-only property above is
             // reset explicitly (inset, rounding, border side, max-height),
             // not just overridden by a wider max-width, per this file's
@@ -403,8 +435,21 @@ function DetailDrawerContent({
               cascade order — so a bare `md:hidden` lost the tie and the
               handle stayed visible at desktop width, confirmed by
               inspecting `getComputedStyle(...).display` in a real browser
-              at 1280px before this fix, and confirmed gone after it. */}
-          <DrawerPrimitive.Handle className="mt-2 shrink-0 bg-edge-strong md:hidden!" />
+              at 1280px before this fix, and confirmed gone after it.
+              **The same injected rule also sets `background`, `opacity`
+              and `height`, and it won those too** — this handle carried
+              `bg-edge-strong` for its whole life and never painted it.
+              Measured at 375px: `rgb(226, 226, 228)` at opacity 0.7 in
+              *both* themes, 32×5 — which on the light theme's
+              `rgb(236, 238, 242)` sheet is a handle nobody can see.
+              So every property vaul writes is `!` here, and the values
+              are M3's `DragHandle` (`SheetDefaults.kt`): 32×4
+              (`SheetBottomTokens.DockedDragHandleWidth`/`Height`) in
+              `OnSurfaceVariant` (`muted-foreground`), at full opacity,
+              22dp above it (`DragHandleVerticalPadding`) and 22dp below
+              — 6px of margin plus the header row's own 16px. The same
+              handle `Select`'s phone sheet draws. */}
+          <DrawerPrimitive.Handle className="mt-[22px] mb-1.5 h-1! w-8! shrink-0 bg-muted-foreground! opacity-100! md:hidden!" />
 
           <div className="flex items-start justify-between gap-3 border-edge border-b px-5 py-4">
             <div className="min-w-0">

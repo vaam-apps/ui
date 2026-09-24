@@ -11,19 +11,19 @@ months ago, a message that expired while they were looking at a payload.
 
 ## Choosing one
 
-| The operator is… | Use | Not |
-|---|---|---|
-| deciding something irreversible, and must stop | `ConfirmDialog` | a toast |
-| confirming a row-level action | `InlineConfirm` | `ConfirmDialog` |
-| confirming something **inside an open drawer** | `InlineConfirm` | a nested `Dialog` — it does not work, see below |
-| reading one record's headline without leaving the list | `QuickDetailDrawer` | `Dialog` |
-| working through a whole record — every field, an edit form, destructive actions | `MoreDetailDrawer` | `Dialog` |
-| taking one focused action with a form in it | `Dialog` | a drawer |
-| picking from a short list of actions on a row | `DropdownMenu` | `Popover` |
-| reading a little extra anchored content, possibly interactive | `Popover` | `Tooltip` |
-| reading a one-line gloss on a label | `Tooltip` | `Popover` |
-| jumping somewhere by typing | `CommandMenu` | `DropdownMenu` |
-| being told something already finished | `toast` | anything modal |
+| The operator is…                                                                | Use                 | Not                                             |
+| ------------------------------------------------------------------------------- | ------------------- | ----------------------------------------------- |
+| deciding something irreversible, and must stop                                  | `ConfirmDialog`     | a toast                                         |
+| confirming a row-level action                                                   | `InlineConfirm`     | `ConfirmDialog`                                 |
+| confirming something **inside an open drawer**                                  | `InlineConfirm`     | a nested `Dialog` — it does not work, see below |
+| reading one record's headline without leaving the list                          | `QuickDetailDrawer` | `Dialog`                                        |
+| working through a whole record — every field, an edit form, destructive actions | `MoreDetailDrawer`  | `Dialog`                                        |
+| taking one focused action with a form in it                                     | `Dialog`            | a drawer                                        |
+| picking from a short list of actions on a row                                   | `DropdownMenu`      | `Popover`                                       |
+| reading a little extra anchored content, possibly interactive                   | `Popover`           | `Tooltip`                                       |
+| reading a one-line gloss on a label                                             | `Tooltip`           | `Popover`                                       |
+| jumping somewhere by typing                                                     | `CommandMenu`       | `DropdownMenu`                                  |
+| being told something already finished                                           | `toast`             | anything modal                                  |
 
 Two rules that cut most of the wrong answers:
 
@@ -208,6 +208,15 @@ interface DetailDrawerProps {
   **caller is expected to own a shallow `?panel=<recordId>` route** so the
   panel survives a refresh and can be linked to; the component owns the
   weight, never the routing.
+
+Below 768px both are a phone bottom sheet with M3's own shape: 28px top
+corners (`rounded-t-sheet`, the `--radius-sheet` token — reserved for
+phone sheets, do not put it on a card) and M3's 32×4 drag handle, with
+22px above it and 22px below. That handle used to be a 5px bar 8px from
+the top, so the title row now sits about 19px lower than it did — worth
+knowing if a screenshot test pins it. Below 640px a `Select` inside one
+opens as a second sheet over it with the same corner and handle; between
+640 and 767px the drawer is a sheet but the `Select` is still a dropdown.
 
 One limitation to know before you pick the quick one for a background
 task: `modal={false}` in vaul 1.1.2 removes the dim and the pointer
