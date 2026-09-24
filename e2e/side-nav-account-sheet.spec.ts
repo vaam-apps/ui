@@ -499,14 +499,16 @@ test.describe("the vertical rail's More drawer (1100px)", () => {
     const drawer = await openedSheet(page, "side");
     const routes = drawer.getByRole("link", { name: "Routes" });
 
-    await routes.click({ modifiers: ["ControlOrMeta"] });
-    await routes.click({ modifiers: ["Shift"] });
-    await routes.click({ button: "middle" });
-    await settleAnimations(page);
-    await expect(drawer, "a new tab or window leaves this page as it was").toHaveAttribute(
-      "data-state",
-      "open",
-    );
+    // Each asserted on its own, so a failure names the click that closed it.
+    for (const [how, click] of [
+      ["a ⌘/Ctrl-click (new tab)", () => routes.click({ modifiers: ["ControlOrMeta"] })],
+      ["a Shift-click (new window)", () => routes.click({ modifiers: ["Shift"] })],
+      ["a middle click", () => routes.click({ button: "middle" })],
+    ] as const) {
+      await click();
+      await settleAnimations(page);
+      await expect(drawer, `the drawer after ${how}`).toHaveAttribute("data-state", "open");
+    }
 
     await routes.click();
     await expect(drawer).toBeHidden();
