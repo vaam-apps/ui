@@ -1,6 +1,5 @@
 "use client";
 
-import { autoUpdate, flip, hide, offset, shift, size, useFloating } from "@floating-ui/react-dom";
 import {
   Combobox,
   ComboboxButton,
@@ -15,7 +14,6 @@ import {
 import { ArrowLeft, Check, ChevronDown, Search, X } from "lucide-react";
 import {
   Children,
-  type CSSProperties,
   createContext,
   isValidElement,
   type ReactElement,
@@ -31,8 +29,10 @@ import {
   useState,
 } from "react";
 import { cn } from "../../lib/cn";
+import { useDropdownPlacement } from "../../lib/dropdown-placement";
 import { omitUndefined } from "../../lib/omit-undefined";
 import { flattenParts } from "../../lib/parts";
+import { usePopupModality } from "../../lib/popup-modality";
 import { notePointerDownUnderOpenSelect } from "../../lib/select-dismissal";
 
 /**
@@ -741,195 +741,6 @@ function closeComboboxPopup(surface: HTMLElement, trigger: HTMLElement | null) {
 }
 
 /**
- * The combobox engine's modality: the page cannot scroll, and everything
- * but the trigger and the popup is `inert`.
- *
- * `Listbox` does this for itself (`useScrollLock` + `useInertOthers`), and
- * so would `ComboboxOptions` — but its inert allowlist is the field, the
- * button and the *options*, and the combobox engine's popup is more than
- * its options: a header with a back arrow (`SelectClose`) and a clear
- * button sits beside the field. Under Headless UI's modality those would
- * be inert, and could not be tapped. So `ComboboxOptions` runs with
- * `modal={false}` and this does the same two things with the popup's own
- * surface allowed instead. It climbs to `<html>` rather than stopping at
- * `<body>` as Headless UI's does, so body-level portals — `SideNav`'s
- * toolbars, toasts — are inert too.
- *
- * # It shares the page with other modality, and only undoes its own
- *
- * The first version recorded the `inert` and `overflow` it found and wrote
- * them back on close. Inside a Headless UI `Dialog` that is fatal: the
- * dialog's own modality had already set both, and when a pick closed the
- * select *and* the dialog in one commit, the dialog's cleanup ran first and
- * this one then restored the dialog's values — measured: `#storybook-root`
- * left `inert` and `<html>` `overflow: hidden` for good, the page dead until
- * a reload. So now it never touches an element that is already inert
- * (someone else owns that), un-inerts only what it flipped itself, and
- * locks scroll with an attribute rather than an inline style
- * (`:root:not(span)[data-select-scroll-lock]` in `theme.css`, whose
- * comment says why not `html[…]`), reference-counted, so
- * it and Headless UI's inline `overflow` can come and go in any order.
- *
- * The lock also pads the page by the scrollbar it hides, as Headless UI's
- * does: without it, a page with a classic scrollbar shifted sideways by its
- * width on every open and close (measured: 488.5 → 496px).
- */
-let scrollLocks = 0;
-
-function lockScroll() {
-  const html = document.documentElement;
-  if (scrollLocks === 0) {
-    const gap = window.innerWidth - html.clientWidth;
-    html.style.setProperty("--select-scroll-gap", `${gap}px`);
-    html.setAttribute("data-select-scroll-lock", "");
-  }
-  scrollLocks += 1;
-  return () => {
-    scrollLocks -= 1;
-    if (scrollLocks === 0) {
-      html.removeAttribute("data-select-scroll-lock");
-      html.style.removeProperty("--select-scroll-gap");
-    }
-  };
-}
-
-function useComboboxModality(
-  active: boolean,
-  surfaceRef: RefObject<HTMLElement | null>,
-  triggerRef: RefObject<HTMLElement | null>,
-) {
-  useEffect(() => {
-    if (!active) return;
-    const keep = [surfaceRef.current, triggerRef.current].filter(
-      (element): element is HTMLElement => element !== null,
-    );
-    const flipped: HTMLElement[] = [];
-    for (const element of keep) {
-      let node: HTMLElement = element;
-      while (node.parentElement !== null) {
-        const parent: HTMLElement = node.parentElement;
-        for (const sibling of Array.from(parent.children)) {
-          if (!(sibling instanceof HTMLElement) || sibling === node || sibling.inert) continue;
-          if (keep.some((kept) => sibling.contains(kept))) continue;
-          sibling.inert = true;
-          flipped.push(sibling);
-        }
-        node = parent;
-      }
-    }
-    const unlock = lockScroll();
-    return () => {
-      for (const element of flipped) element.inert = false;
-      unlock();
-    };
-  }, [active, surfaceRef, triggerRef]);
-}
-
-/** The shortest a dropdown shrinks to before it flips to the other side
- * of its trigger instead — a library choice: a docked search view's 56px
- * header, four of its 32px rows and the list's 8px of padding (192px,
- * measured), rounded up. */
-const DROPDOWN_MIN_HEIGHT = 200;
-
-/**
- * Where the dropdown goes: under its trigger, by Floating UI, in
- * `position: fixed`, while staying rendered inline.
- *
- * It used to be `absolute` under the trigger, which any scrolling or
- * clipping ancestor cut off — inside a `Dialog` the dropdown lived in the
- * dialog's own scrolling body, measured at 1280px: one row showing of a
- * 346px-tall search view, the rest clipped by a 156px dialog. `fixed`
- * escapes every ancestor that clips, and Floating UI resolves it against
- * the right box when an ancestor *is* a containing block — vaul stamps
- * `will-change: transform` on every drawer (AGENTS.md's trap), so inside
- * one the coordinates are the drawer's, not the viewport's. What `fixed`
- * cannot escape is an ancestor that is both: a containing block that also
- * clips (`transform`, `filter`, `backdrop-filter` or `contain`, with
- * `overflow: hidden`) clips it as it clipped `absolute` — measured, one
- * row left in a 120px `backdrop-filter` card. Nothing in this library is
- * built that way at rest — a `Dialog`'s panel is, for the length of its
- * enter transition, while `scale-95` applies — and a caller's container
- * can be. The popup
- * still renders inline, not portalled: the reason is `SelectContent`'s
- * `portal={false}` comment, and it has not changed.
- *
- * `size` hands the trigger's width and the height available to CSS, so
- * the dropdown shrinks to fit. `flip` opens it upward when it does not fit
- * below and less than `DROPDOWN_MIN_HEIGHT` is left there — a short list
- * that fits never flips — and, checking the horizontal edges too, aligns
- * it to the trigger's right edge instead of its left when a docked search
- * view's 16rem would run off the right of the window. `shift` only acts
- * when neither alignment fits, on a window narrower than the view.
- *
- * The result goes out as custom properties, never as inline `top`/`left`:
- * below `sm` a `SelectContent` is a sheet or a full-screen view whose
- * `max-sm:` classes must win, and an inline style would beat them. The
- * classes decide whether to use the numbers; no breakpoint is read here.
- */
-function useDropdownPlacement(
-  presentation: SelectPresentation,
-  triggerRef: RefObject<HTMLButtonElement | null>,
-) {
-  const { refs, x, y, middlewareData } = useFloating({
-    strategy: "fixed",
-    placement: "bottom-start",
-    elements: { reference: triggerRef.current },
-    middleware: [
-      offset(4),
-      // `size` before `flip`, holding the dropdown at no less than
-      // `DROPDOWN_MIN_HEIGHT`: it shrinks to the room under its trigger
-      // when that room is reasonable, and flips only when it is not. With
-      // `flip` first, a 346px search view flipped above a trigger that had
-      // 335px under it — measured in a `Dialog` at 1280×800 — a jump for
-      // 11px.
-      size({
-        padding: 8,
-        apply({ availableHeight, elements }) {
-          const floor = Math.max(DROPDOWN_MIN_HEIGHT, Math.floor(availableHeight));
-          elements.floating.style.setProperty("--select-float-max-h", `${floor}px`);
-        },
-      }),
-      flip({ padding: 8 }),
-      shift({ padding: 8 }),
-      // …and again once the side is settled, without the floor: when
-      // neither side has `DROPDOWN_MIN_HEIGHT`, `flip` keeps the side that
-      // overflows least, and the floor would then push it off the window
-      // (measured: 6px past the bottom of a 420px-tall one).
-      size({
-        padding: 8,
-        apply({ rects, availableHeight, elements }) {
-          const height = Math.max(0, Math.floor(availableHeight));
-          elements.floating.style.setProperty("--select-float-w", `${rects.reference.width}px`);
-          elements.floating.style.setProperty("--select-float-max-h", `${height}px`);
-        },
-      }),
-      // A trigger scrolled out of its container's view takes the dropdown
-      // with it. `absolute`, the scroller used to clip the dropdown too;
-      // `fixed`, it floated on over the container's own chrome — measured
-      // in a drawer: the dropdown drawn over the drawer's header at y 68,
-      // its trigger 100px scrolled up under it. The surface goes
-      // transparent and stops taking the pointer instead (its classes,
-      // on `data-reference-hidden`), and comes back when the trigger
-      // does. Not `visibility: hidden`: Chromium blurs a focused element
-      // that stops being rendered, and focus lands on `<body>` while the
-      // popup stays open — measured in both engines, after which the next
-      // Escape closed the drawer and left the popup open. Transparent, the
-      // list keeps focus and still answers the keyboard, which is also what
-      // a list the scroller clipped used to do.
-      hide({ strategy: "referenceHidden" }),
-    ],
-    whileElementsMounted: autoUpdate,
-  });
-  // A modal is placed by its own classes at every width.
-  if (presentation === "modal") {
-    return { setFloating: undefined, style: undefined, referenceHidden: undefined };
-  }
-  const style = { "--select-float-x": `${x}px`, "--select-float-y": `${y}px` } as CSSProperties;
-  const referenceHidden = middlewareData.hide?.referenceHidden === true ? "" : undefined;
-  return { setFloating: refs.setFloating, style, referenceHidden };
-}
-
-/**
  * The options' container, in whichever engine and presentation — shared by
  * `SelectContent`, `SelectDropdown` and `SelectModal`, whose docs say what
  * each presents.
@@ -947,7 +758,7 @@ function SelectPopup({
 }) {
   const { engine, open, triggerRef, matchCount } = useSelectContext(component);
   const surfaceRef = useRef<HTMLElement | null>(null);
-  const placement = useDropdownPlacement(presentation, triggerRef);
+  const placement = useDropdownPlacement(presentation !== "modal", triggerRef);
   const matchCountRef = useRef(matchCount);
   matchCountRef.current = matchCount;
 
@@ -1076,7 +887,7 @@ function SelectPopup({
     };
   }, [engine, open]);
 
-  useComboboxModality(engine === "combobox" && open, surfaceRef, triggerRef);
+  usePopupModality(engine === "combobox" && open, surfaceRef, triggerRef);
 
   const parts = flattenParts(children);
   const hasOwn = (type: unknown) =>
@@ -1436,7 +1247,7 @@ const COMBOBOX_SCROLL: Record<SelectPresentation, string> = {
  * nothing underneath, and Headless UI's own outside-click handler closes
  * the sheet. That is exactly a modal scrim's behaviour, and it was
  * already true of the dropdown. (The combobox engine does the same with
- * its own `useComboboxModality`, whose doc has why.)
+ * `usePopupModality` in `lib/popup-modality.ts`, whose doc has why.)
  *
  * **Not everything is inert, and the gap is measured, not assumed.**
  * `useInertOthers` stops climbing at `body`, so anything portalled to
