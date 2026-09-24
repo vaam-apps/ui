@@ -88,7 +88,8 @@ implementation can share them. The panel is bounded at `max-h-[85vh]`
 **Inside a dialog, surfaces step up one.** The panel is `surface-3`, which
 is also this library's hover and selected fill — so everything inside it
 reads `surface-1` as `surface-2`, `surface-2` as `surface-3`, and
-`surface-3` as a `surface-4` one step lighter. A `RadioGroup`'s checked
+`surface-3` as a `surface-4` half a step on (lighter in the dark theme,
+darker in the light one — as far as text contrast allows). A `RadioGroup`'s checked
 row, a table's hover, a switch track keep their meaning without you doing
 anything. Do not compensate with your own fills. (Full-screen on a phone
 the panel is the page's own ground, and nothing shifts.)
@@ -106,8 +107,9 @@ the panel is the page's own ground, and nothing shifts.)
   dismissing one in as a `DialogClose`, so the full-screen dialog knows to
   hide it. Write it as a direct part of the container — inside your own
   `relative` (or otherwise positioned) wrapper it never reaches the bar.
-  The bar holds **one short confirming action**, as M3's does: at 320px
-  there is room for about one label beside the close icon. **Renamed from
+  The bar holds **one short confirming action**, as M3's does. More fit —
+  three short labels at 320px — but they crowd the bar, and a long label
+  leaves little room for another. **Renamed from
   `DialogFooter` in 0.3.0** — same place, same children.
 - **`DialogClose`** — closes the dialog, two ways:
   - **Bare** (`<DialogClose />`, no children, no `as`): the close icon.
@@ -208,7 +210,9 @@ own `overflow-y-auto`; putting it on the panel is the exact bug this
 layout was built to avoid.
 
 A `Select` inside a dialog works: its dropdown floats over the panel
-rather than being clipped by it, and on a phone its sheet opens over the
+rather than being clipped by it — on the panel's own material, told apart
+by its border and shadow, the way a sheet opened over a sheet is the same
+material as the one under it — and on a phone its sheet opens over the
 dialog.
 
 ---

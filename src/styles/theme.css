@@ -900,9 +900,9 @@
      `SurfaceContainerHigh`. Half the ladder's usual step, and not by
      taste: `contrast.test.ts` measures every foreground on it, and the
      ladder's own +6/+7/+8 step (`#22262d`) put `--subtle-foreground` at
-     4.36:1. `#1f2228` is the largest +n/+n/+n step that keeps it at AA
-     (4.58:1, the worst case on this ground). */
-  --surface-4: #1f2228;
+     4.36:1. `#202329` is the largest step that keeps every case at AA
+     (4.52:1, `--subtle-foreground`); one more (`#21242a`) fails it. */
+  --surface-4: #202329;
 
   /* The aurora ramp.
    *
@@ -1161,9 +1161,9 @@
   /* Dark's `--surface-4`, mirrored, and bounded the same way: the
      ladder's own −11 step (`#d6dbe1`) put `--subtle-foreground` at 4.35:1
      and the loud `progress` and `uncertain` pills under AA over their
-     tints. `#dde1e7` is the largest step that keeps every case at AA
-     (worst: loud `progress`, 4.56:1). */
-  --surface-4: #dde1e7;
+     tints. `#dce0e5` is the largest step that keeps every case at AA
+     (worst: loud `progress`, 4.51:1); one more (`#dbdfe4`) fails it. */
+  --surface-4: #dce0e5;
 
   /* Cooler and far softer than dark's. A near-black shadow on a light
      ground reads as dirt; the hue-matched slate at low alpha reads as
@@ -1362,7 +1362,12 @@
  * inside). So inside this class `surface-1` reads as `surface-2`,
  * `surface-2` as `surface-3` and `surface-3` as `--surface-4`, one step
  * past the top of the ladder. Relative order — resting, hover, selected —
- * is what components communicate with, and that is preserved.
+ * is what components communicate with, and that is preserved; the step
+ * itself is half the ladder's (contrast 1.049 between `surface-3` and
+ * `--surface-4`, against 1.076 between `surface-2` and `surface-3`),
+ * because `--surface-4` is bounded by the contrast gate. daisyUI's own
+ * reads of `--color-base-200/300` move with it — a disabled input's fill
+ * and border, the ghost and secondary buttons' hover — in the same order.
  *
  * The tokens it moves are the ones the utilities actually read. This
  * block is `@theme inline`, so `bg-surface-1` compiles to

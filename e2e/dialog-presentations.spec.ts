@@ -455,3 +455,73 @@ test.describe("the full-screen dialog's layout below 640px", () => {
     ).toBeGreaterThanOrEqual(20 - 1);
   });
 });
+
+test("a bare DialogClose in the header is a 24px icon button, not a stretched pill", async ({
+  page,
+}) => {
+  await openStory(page, STORY.dialogCloseAmongActions, DESKTOP);
+  await opened(page);
+  const icon = await box(page.getByRole("button", { name: "Close the draft" }));
+  expect(
+    [icon.width, icon.height],
+    "failed: the header's column stretched the icon button",
+  ).toEqual([24, 24]);
+});
+
+test.describe("a touchscreen gets M3's 24dp between the text and the buttons", () => {
+  test.use({ hasTouch: true, isMobile: true, userAgent: devices["Pixel 5"].userAgent });
+  test("straight after the header", async ({ page }) => {
+    await openStory(page, STORY.dialogBasicPhone, PHONE);
+    await opened(page);
+    const description = await box(page.getByText("The current secret keeps verifying"));
+    const button = await box(page.getByRole("button", { name: "Rotate" }));
+    expect(
+      button.y - (description.y + description.height),
+      "failed: not 24px from the text to the buttons on touch",
+    ).toBeCloseTo(24, 0);
+  });
+});
+
+test("full-screen, actions straight after the header still centre in the bar", async ({ page }) => {
+  await openStory(page, STORY.dialogFullScreenPhone, PHONE);
+  await opened(page);
+  // No body between the header and the actions: the rule that closes up
+  // the header's margin for the basic dialog must not move the bar's
+  // buttons.
+  await page.evaluate(() => document.getElementById("sb-endpoint-form")?.remove());
+  const create = await box(page.getByRole("button", { name: "Create" }));
+  expect(create.y + create.height / 2, "failed: Create left the centre of the bar").toBeCloseTo(
+    32,
+    0,
+  );
+});
+
+test("inside the dialog, surface-1 reads as surface-2 too", async ({ page }) => {
+  await openStory(page, STORY.dialogFullScreenDesktop, DESKTOP);
+  await opened(page);
+  const result = await page.evaluate(() => {
+    const paint = (parent: Element) => {
+      const el = document.createElement("div");
+      el.className = "bg-surface-1";
+      parent.append(el);
+      const value = getComputedStyle(el).backgroundColor;
+      el.remove();
+      return value;
+    };
+    const header = document.querySelector("[data-dialog-header]") as HTMLElement;
+    const outside = paint(document.body);
+    const inside = paint(header.parentElement as HTMLElement);
+    const probe = document.createElement("div");
+    probe.className = "bg-surface-2";
+    document.body.append(probe);
+    const surface2 = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return { outside, inside, surface2 };
+  });
+  expect(result.inside, "failed: surface-1 did not step up inside the dialog").toBe(
+    result.surface2,
+  );
+  expect(result.outside, "failed: the probe did not paint surface-1 at all").not.toBe(
+    result.inside,
+  );
+});

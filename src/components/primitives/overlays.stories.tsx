@@ -383,7 +383,10 @@ export const BasicDialogOnAPhone: Story = {
  * "Save draft", while the dialog's own ✕ stays in its corner; below 640px,
  * full-screen, it is hidden like any dismiss action, because the bar's
  * close icon already is one. "Keep for later" is a `DialogClose` in the
- * body, not among the actions, so it stays at every width.
+ * body, not among the actions, so it stays at every width. The ✕ beside
+ * the headline is a bare `DialogClose` inside `DialogHeader`: in-flow too,
+ * a 24px icon button — not a second corner icon, and not stretched by the
+ * header's column.
  */
 export const CloseIconAmongTheActions: Story = {
   render: () => (
@@ -393,6 +396,7 @@ export const CloseIconAmongTheActions: Story = {
         <DialogHeader>
           <DialogTitle>Unsent broadcast</DialogTitle>
           <DialogDescription>Saved drafts stay in the outbox for 30 days.</DialogDescription>
+          <DialogClose aria-label="Close the draft" />
         </DialogHeader>
         <div className="flex flex-col items-start gap-3">
           <p className="text-body text-muted-foreground">

@@ -275,7 +275,9 @@ export function DialogClose<T extends ElementType = "button">({
  * (`drawer.tsx`), with its in-flow tap target — `[--tap-rest:-4px]` against
  * `p-1`, `.tap-target` reserving the room in flow (D11). */
 const CLOSE_INLINE = cn(
-  "relative inline-flex shrink-0 items-center justify-center rounded-full p-1 text-subtle-foreground hover:bg-foreground/8 hover:text-foreground",
+  // `size-6`: an explicit 24px box. Content-sized, it was stretched by a
+  // flex column — in `DialogHeader`, a 516×24 pill (found in review).
+  "relative inline-flex size-6 shrink-0 items-center justify-center rounded-full p-1 text-subtle-foreground hover:bg-foreground/8 hover:text-foreground",
   "[--btn-press-radius:calc(24px*0.1)] [--tap-rest:-4px] [--tap-size:24px] tap-target",
   PRESS_SHAPE_MORPH,
 );
@@ -411,35 +413,42 @@ function DialogSurface({
           fullscreen && "max-sm:p-0 max-sm:[--dialog-fill:var(--color-base-100)]",
         )}
       >
+        {/* This dialog's parts answer to this dialog: a `DialogFullScreen`
+            declared inside another dialog's `DialogActions` inherited "in
+            the actions" through the portal and hid a `DialogClose` in its
+            own body (found in review). */}
         <PresentationContext.Provider value={presentation}>
-          <DialogPanel
-            transition
-            className={cn(
-              "relative flex max-h-[85vh] w-full max-w-[560px] flex-col overflow-hidden rounded-sheet bg-(--dialog-fill) shadow-[var(--shadow-dialog)]",
-              // Full-screen below `sm`, the panel is the page's own ground,
-              // and what is inside it reads as on a page: no shift there.
-              fullscreen ? "sm:surface-raised" : "surface-raised",
-              "[--dialog-pad:24px] pointer-fine:[--dialog-pad:20px]",
-              "[--dialog-text-pad:24px] pointer-fine:[--dialog-text-pad:16px]",
-              "duration-[var(--dur-effects)] ease-[var(--ease-effects)] data-closed:opacity-0",
-              fullscreen &&
-                "max-sm:h-dvh max-sm:max-h-none max-sm:max-w-none max-sm:rounded-none max-sm:shadow-none max-sm:pt-[env(safe-area-inset-top,0px)]",
-              className,
-            )}
-          >
-            {fullscreen && <div aria-hidden="true" className="h-16 shrink-0 sm:hidden" />}
-            <div
+          <InActionsContext.Provider value={false}>
+            <DialogPanel
+              transition
               className={cn(
-                "min-h-0 flex-1 overflow-y-auto p-(--dialog-pad)",
-                fullscreen && "max-sm:pb-[max(var(--dialog-pad),env(safe-area-inset-bottom,0px))]",
+                "relative flex max-h-[85vh] w-full max-w-[560px] flex-col overflow-hidden rounded-sheet bg-(--dialog-fill) shadow-[var(--shadow-dialog)]",
+                // Full-screen below `sm`, the panel is the page's own ground,
+                // and what is inside it reads as on a page: no shift there.
+                fullscreen ? "sm:surface-raised" : "surface-raised",
+                "[--dialog-pad:24px] pointer-fine:[--dialog-pad:20px]",
+                "[--dialog-text-pad:24px] pointer-fine:[--dialog-text-pad:16px]",
+                "duration-[var(--dur-effects)] ease-[var(--ease-effects)] data-closed:opacity-0",
+                fullscreen &&
+                  "max-sm:h-dvh max-sm:max-h-none max-sm:max-w-none max-sm:rounded-none max-sm:shadow-none max-sm:pt-[env(safe-area-inset-top,0px)]",
+                className,
               )}
             >
-              {body}
-            </div>
-            <ChromeSlotContext.Provider value={true}>
-              {ownClose ?? <DialogClose />}
-            </ChromeSlotContext.Provider>
-          </DialogPanel>
+              {fullscreen && <div aria-hidden="true" className="h-16 shrink-0 sm:hidden" />}
+              <div
+                className={cn(
+                  "min-h-0 flex-1 overflow-y-auto p-(--dialog-pad)",
+                  fullscreen &&
+                    "max-sm:pb-[max(var(--dialog-pad),env(safe-area-inset-bottom,0px))]",
+                )}
+              >
+                {body}
+              </div>
+              <ChromeSlotContext.Provider value={true}>
+                {ownClose ?? <DialogClose />}
+              </ChromeSlotContext.Provider>
+            </DialogPanel>
+          </InActionsContext.Provider>
         </PresentationContext.Provider>
       </div>
     </HeadlessDialog>
