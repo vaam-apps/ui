@@ -251,7 +251,7 @@ const CLOSE_CHROME: Record<DialogPresentation, string> = {
     "-m-1 absolute top-4 right-4 z-20 rounded-full p-1 text-subtle-foreground hover:bg-foreground/8 hover:text-foreground",
     "[--btn-press-radius:calc(24px*0.1)] [--tap-size:24px] tap-target-anchored",
     PRESS_SHAPE_MORPH,
-    "max-sm:top-2 max-sm:right-auto max-sm:left-1 max-sm:m-0 max-sm:flex max-sm:size-12 max-sm:items-center max-sm:justify-center max-sm:p-0 max-sm:text-foreground",
+    "max-sm:top-[calc(env(safe-area-inset-top,0px)+0.5rem)] max-sm:right-auto max-sm:left-[calc(env(safe-area-inset-left,0px)+0.25rem)] max-sm:m-0 max-sm:flex max-sm:size-12 max-sm:items-center max-sm:justify-center max-sm:p-0 max-sm:text-foreground",
     "max-sm:[--btn-press-radius:calc(48px*0.1)] max-sm:[--tap-size:48px]",
   ),
 };
@@ -288,7 +288,12 @@ const CLOSE_CHROME: Record<DialogPresentation, string> = {
  * The panel fills the screen with square corners on the page's own
  * `base-100` (`AppBarTokens.ContainerColor` is `Surface`), and a 64dp top
  * bar (`AppBarSmallTokens.ContainerHeight`) is reserved above the
- * scrolling body. The bar holds the close icon, leading, and
+ * scrolling body, below the top safe-area inset (a notch, a status bar in
+ * a `viewport-fit=cover` web app), as the full-screen search view in
+ * `select.tsx` does; the close icon, the actions and the body's last line
+ * clear the insets too. Headless Chromium reports every inset as 0, so
+ * the e2e suite checks the geometry without them; with them, it is not
+ * measured here. The bar holds the close icon, leading, and
  * `DialogActions`, trailing — both positioned into it against this
  * panel, so neither moves in the DOM or scrolls with the body. Compose M3
  * has no full-screen dialog tokens of its own; the bar is its small top
@@ -362,13 +367,20 @@ function DialogSurface({
               "[--dialog-text-pad:24px] pointer-fine:[--dialog-text-pad:16px]",
               "duration-[var(--dur-effects)] ease-[var(--ease-effects)] data-closed:opacity-0",
               fullscreen &&
-                "max-sm:h-dvh max-sm:max-h-none max-sm:max-w-none max-sm:rounded-none max-sm:bg-base-100 max-sm:shadow-none",
+                "max-sm:h-dvh max-sm:max-h-none max-sm:max-w-none max-sm:rounded-none max-sm:bg-base-100 max-sm:shadow-none max-sm:pt-[env(safe-area-inset-top,0px)]",
               className,
             )}
             {...props}
           >
             {fullscreen && <div aria-hidden="true" className="h-16 shrink-0 sm:hidden" />}
-            <div className="min-h-0 flex-1 overflow-y-auto p-(--dialog-pad)">{body}</div>
+            <div
+              className={cn(
+                "min-h-0 flex-1 overflow-y-auto p-(--dialog-pad)",
+                fullscreen && "max-sm:pb-[max(var(--dialog-pad),env(safe-area-inset-bottom,0px))]",
+              )}
+            >
+              {body}
+            </div>
             {ownClose ?? <DialogClose />}
           </DialogPanel>
         </PresentationContext.Provider>
@@ -473,7 +485,7 @@ export function DialogActions({ className, ...props }: React.HTMLAttributes<HTML
         className={cn(
           "sticky -bottom-(--dialog-pad) z-10 -mx-(--dialog-pad) -mb-(--dialog-pad) mt-(--dialog-text-pad) flex items-center justify-end gap-2 bg-surface-3 px-(--dialog-pad) pt-2 pb-(--dialog-pad)",
           presentation === "fullscreen" &&
-            "max-sm:absolute max-sm:top-0 max-sm:right-0 max-sm:bottom-auto max-sm:z-20 max-sm:m-0 max-sm:h-16 max-sm:bg-transparent max-sm:p-0 max-sm:pr-1",
+            "max-sm:absolute max-sm:top-[env(safe-area-inset-top,0px)] max-sm:right-[env(safe-area-inset-right,0px)] max-sm:bottom-auto max-sm:z-20 max-sm:m-0 max-sm:h-16 max-sm:bg-transparent max-sm:p-0 max-sm:pr-1",
           className,
         )}
         {...props}
