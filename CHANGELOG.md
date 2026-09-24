@@ -13,6 +13,23 @@ decision the way the prose below does. The tradeoff is recorded in the
 pull request that made this change.
 -->
 
+## [0.4.0](https://github.com/vaam-apps/ui/compare/v0.3.0...v0.4.0) (2026-09-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* **side-nav:** an app that passes `accountSlot` to `SideNav` gets a new control below 1280px, and at every width when `collapsed`: a "More" button at the end of the floating toolbar that opens a modal sheet holding the account block. On the phone bar (below 640px) that app's overflow control is now this sheet, named "More", instead of a menu named "More destinations", so a test that clicks "More destinations" must click "More" and expect a `dialog` rather than a `menu`. Remove your own floating account chrome (vaam-apps/vpay's Menu pill, for example) and pass the account markup as `accountSlot` at every width. Do not hard-code an `id` inside `accountSlot`: while the sheet is open it is mounted twice. Confirm inside it with `InlineConfirm`, not a `Dialog`.
+
+### Features
+
+* **side-nav:** reach accountSlot from the floating toolbars ([#36](https://github.com/vaam-apps/ui/issues/36)) ([#40](https://github.com/vaam-apps/ui/issues/40)) ([8efac15](https://github.com/vaam-apps/ui/commit/8efac1541536e493072c847bd870707095e7593d))
+
+
+### Bug Fixes
+
+* **side-nav:** one visible Primary landmark at every width ([#16](https://github.com/vaam-apps/ui/issues/16)) ([#39](https://github.com/vaam-apps/ui/issues/39)) ([2ea49aa](https://github.com/vaam-apps/ui/commit/2ea49aabc4410d5ef3e7337402d34ec596110401))
+* **skill:** pass the org's markdownlint, and lint every Markdown file ([#37](https://github.com/vaam-apps/ui/issues/37)) ([539966c](https://github.com/vaam-apps/ui/commit/539966c44ae0937268dbf69c7a2e693c02ecd7dd))
+
 ## [0.3.0](https://github.com/vaam-apps/ui/compare/v0.2.4...v0.3.0) (2026-09-24)
 
 
