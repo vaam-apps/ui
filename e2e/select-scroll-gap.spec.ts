@@ -4,8 +4,9 @@ import { STORY } from "./story-ids";
 
 /**
  * A searchable `Select` locks the page's scroll while it is open, and pads
- * `<html>` by the scrollbar the lock hides (`lockScroll` in `select.tsx`,
- * `--select-scroll-gap` in `theme.css`), so the page does not shift
+ * `<html>` by the scrollbar the lock hides (`lockScroll` in
+ * `src/lib/popup-modality.ts`, `--select-scroll-gap` in `theme.css`), so
+ * the page does not shift
  * sideways on every open and close.
  *
  * Headless Chromium hides scrollbars by default, which makes that gap 0 in
