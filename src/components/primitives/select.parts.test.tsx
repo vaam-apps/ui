@@ -92,6 +92,7 @@ describe("a Select's parts land in the same place bare or inside a fragment", ()
     await withOpenSelect(
       searchable && (
         <>
+          {/* biome-ignore lint/complexity/noUselessFragments: the fragment is what this test is about */}
           <>
             <SelectSearch />
           </>
@@ -110,5 +111,81 @@ describe("a Select's parts land in the same place bare or inside a fragment", ()
         expect(host.querySelector('[role="listbox"]')?.textContent).not.toContain("Nothing");
       },
     );
+  });
+});
+
+/**
+ * Opening a fragment must not cost its parts their identity. Two sibling
+ * fragments that each map `key={code}` used to flatten into one array with
+ * duplicate keys, and React then left stale options on screen: emptying
+ * the "recent" list kept its rows. Asserted on the options rendered after
+ * each re-render, which is what the user sees.
+ */
+describe("parts lifted out of fragments keep distinct keys", () => {
+  const NAMES: Record<string, string> = { cm: "Cameroon", ke: "Kenya", gh: "Ghana" };
+  function Picker({ recent }: { recent: string[] }) {
+    return (
+      <Select>
+        <SelectTrigger aria-label="Country">
+          <SelectValue placeholder="Choose" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectSearch />
+          {/* biome-ignore lint/complexity/noUselessFragments: the fragment is what this test is about */}
+          <>
+            {recent.map((code) => (
+              <SelectItem key={code} value={`recent-${code}`}>
+                {`Recent ${NAMES[code]}`}
+              </SelectItem>
+            ))}
+          </>
+          {/* biome-ignore lint/complexity/noUselessFragments: the fragment is what this test is about */}
+          <>
+            {["cm", "ke", "gh"].map((code) => (
+              <SelectItem key={code} value={code}>
+                {NAMES[code]}
+              </SelectItem>
+            ))}
+          </>
+        </SelectContent>
+      </Select>
+    );
+  }
+
+  it("re-renders a changed fragment list without stale rows", async () => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const host = document.createElement("main");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    const options = () =>
+      [...host.querySelectorAll('[role="option"]')].map((option) => option.textContent);
+    try {
+      await act(async () => {
+        root.render(<Picker recent={["cm"]} />);
+      });
+      const trigger = host.querySelector("button");
+      if (trigger === null) throw new Error("no trigger rendered");
+      await act(async () => {
+        trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+      });
+      expect(options()).toEqual(["Recent Cameroon", "Cameroon", "Kenya", "Ghana"]);
+      await act(async () => {
+        root.render(<Picker recent={["ke"]} />);
+      });
+      expect(options()).toEqual(["Recent Kenya", "Cameroon", "Kenya", "Ghana"]);
+      await act(async () => {
+        root.render(<Picker recent={[]} />);
+      });
+      expect(options(), "the emptied fragment's rows stayed on screen").toEqual([
+        "Cameroon",
+        "Kenya",
+        "Ghana",
+      ]);
+    } finally {
+      await act(async () => {
+        root.unmount();
+      });
+      host.remove();
+    }
   });
 });

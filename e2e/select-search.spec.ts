@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { devices, expect, type Page, test } from "@playwright/test";
-import { box, openStory, settleTransitions, storyRoot } from "./helpers";
+import { box, openStory, paintedColors, settleTransitions, storyRoot } from "./helpers";
 import { STORY } from "./story-ids";
 
 /**
@@ -72,12 +72,29 @@ test.describe("searchable, on a phone: M3's full-screen search view", () => {
   });
 
   test("Enter with nothing to pick keeps the view and the search", async ({ page }) => {
+    // The popup's own window listener stops the key before anything else
+    // sees it, so the event is recorded by a listener registered ahead of
+    // it, at page load, and read after dispatch: its default must be
+    // prevented, or Enter in the field submits a surrounding `<form>`.
+    await page.addInitScript(() => {
+      window.addEventListener(
+        "keydown",
+        (event) => {
+          if (event.key === "Enter") (window as { lastEnter?: Event }).lastEnter = event;
+        },
+        true,
+      );
+    });
     await openStory(page, STORY.selectSearchablePhone, PHONE);
     await openedByPlay(page);
     await page.keyboard.type("zzzz");
     await page.keyboard.press("Enter");
     await expect(surface(page)).toHaveCount(1);
     await expect(field(page)).toHaveValue("zzzz");
+    expect(
+      await page.evaluate(() => (window as { lastEnter?: Event }).lastEnter?.defaultPrevented),
+      "Enter's default was left to the browser: a surrounding form would submit",
+    ).toBe(true);
   });
 
   test("the field is named after its select", async ({ page }) => {
@@ -99,6 +116,22 @@ test.describe("searchable, on a phone: M3's full-screen search view", () => {
     await expect(surface(page)).toHaveCount(1);
     await page.keyboard.press("Enter");
     await expect(surface(page)).toHaveCount(0);
+    await expect(storyRoot(page).getByRole("button", { name: "Country" })).toBeFocused();
+  });
+
+  test("Tab from Back or Clear closes the view, as Tab from the field does", async ({ page }) => {
+    // Focus there is kept from closing the view (above); a Tab from there
+    // used to leave the view open with focus on `<body>`, out of Escape's
+    // reach.
+    await openStory(page, STORY.selectSearchablePhone, PHONE);
+    await openedByPlay(page);
+    await page.keyboard.type("gh");
+    await page.getByRole("button", { name: "Clear search" }).focus();
+    await page.keyboard.press("Tab");
+    await expect(surface(page)).toHaveCount(0);
+    // Parked on the trigger and moved on from there, as from the field —
+    // nothing follows the trigger in this story, so back is where it is.
+    await page.keyboard.press("Shift+Tab");
     await expect(storyRoot(page).getByRole("button", { name: "Country" })).toBeFocused();
   });
 
@@ -193,6 +226,14 @@ test.describe("searchable, on a phone: M3's full-screen search view", () => {
     await expect(trigger).not.toBeFocused();
     await page.keyboard.press("Shift+Tab");
     await expect(trigger).toBeFocused();
+  });
+
+  test("Shift+Tab from the field moves back without picking anything", async ({ page }) => {
+    await openStory(page, STORY.selectSearchableDesktop, DESKTOP);
+    await openedByPlay(page);
+    await page.keyboard.press("Shift+Tab");
+    await expect(surface(page)).toHaveCount(0);
+    await expect(storyRoot(page).getByText("value: —")).toBeVisible();
   });
 });
 
@@ -333,6 +374,20 @@ test.describe("searchable, inside a Dialog", () => {
     });
   }
 
+  test("Escape closes the select alone, and the dialog stays modal", async ({ page }) => {
+    // The dialog inerted the page first; the select must leave what it did
+    // not do itself. Un-inerting every sibling on close handed the page
+    // back to the pointer while the dialog was still open.
+    await openSelect(page);
+    await page.keyboard.press("Escape");
+    await expect(surface(page)).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Choose where to send from" })).toBeVisible();
+    expect(
+      await page.evaluate(() => (document.getElementById("storybook-root") as HTMLElement).inert),
+      "the dialog's inert on the page was undone by the select closing",
+    ).toBe(true);
+  });
+
   test('an option whose value is "" can be picked, and the trigger then shows it', async ({
     page,
   }) => {
@@ -409,6 +464,18 @@ test("a searchable SelectModal on a desktop is the sheet's 640px, centred, full 
   expect(await surface(page).evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe(
     "28px",
   );
+  // And the scrim, in pixels (the sheet spec's note says why not the
+  // computed `box-shadow`): the field's label, left of the 640px sheet,
+  // read with the modal open and then closed.
+  const label = await box(storyRoot(page).getByText("Country", { exact: true }));
+  const brightest = (colours: readonly (readonly [number, number, number])[]) =>
+    Math.max(...colours.map(([r, g, b]) => r + g + b));
+  const dimmed = brightest(await paintedColors(page, label));
+  await page.keyboard.press("Escape");
+  await expect(surface(page)).toHaveCount(0);
+  await settleTransitions(page);
+  const clear = brightest(await paintedColors(page, label));
+  expect(dimmed, "brightest pixel beside the open modal").toBeLessThan(clear * 0.75);
 });
 
 test("the vertical toolbar steps out of the way while a SelectModal is open", async ({ page }) => {
@@ -421,6 +488,10 @@ test("the vertical toolbar steps out of the way while a SelectModal is open", as
   expect(await rail.evaluate((el) => getComputedStyle(el).visibility)).toBe("hidden");
   await page.keyboard.press("Escape");
   await expect(storyRoot(page).getByRole("listbox")).toHaveCount(0);
+  expect(await rail.evaluate((el) => getComputedStyle(el).visibility)).toBe("visible");
+  // Only a modal: an ordinary dropdown beside the toolbar leaves it alone.
+  await storyRoot(page).getByRole("button", { name: "Sort by" }).click();
+  await expect(storyRoot(page).getByRole("listbox")).toBeVisible();
   expect(await rail.evaluate((el) => getComputedStyle(el).visibility)).toBe("visible");
 });
 

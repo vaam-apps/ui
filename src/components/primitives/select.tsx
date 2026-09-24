@@ -14,6 +14,7 @@ import {
 import { ArrowLeft, Check, ChevronDown, Search, X } from "lucide-react";
 import {
   Children,
+  cloneElement,
   createContext,
   Fragment,
   isValidElement,
@@ -825,13 +826,24 @@ function useComboboxModality(
 
 /** A container's direct parts, with fragments opened up — so
  * `<><SelectSearch /><SelectEmpty /></>` is lifted into the header like the
- * same parts written bare, rather than landing inside the listbox. */
-function flattenParts(node: ReactNode): ReactNode[] {
-  return Children.toArray(node).flatMap((part) =>
-    isValidElement(part) && part.type === Fragment
-      ? flattenParts((part.props as { children?: ReactNode }).children)
-      : [part],
-  );
+ * same parts written bare, rather than landing inside the listbox.
+ *
+ * Each part lifted out of a fragment is re-keyed under that fragment's own
+ * key. `Children.toArray` keys a fragment's children afresh (`.0`,
+ * `.$cm`), so two sibling fragments — "recent" and "all", each mapping
+ * `key={code}` — produced duplicate keys once flattened into one array, and
+ * React then kept stale options on screen: measured, emptying the first
+ * fragment's list left its "Recent Cameroon" and "Recent Kenya" rows in
+ * place. */
+function flattenParts(node: ReactNode, prefix = ""): ReactNode[] {
+  return Children.toArray(node).flatMap((part) => {
+    if (!isValidElement(part)) return [part];
+    const key = `${prefix}${String(part.key)}`;
+    if (part.type === Fragment) {
+      return flattenParts((part.props as { children?: ReactNode }).children, `${key}/`);
+    }
+    return prefix === "" ? [part] : [cloneElement(part, { key })];
+  });
 }
 
 /**
@@ -867,10 +879,11 @@ function SelectPopup({
     function onKeyDown(event: KeyboardEvent) {
       const surface = surfaceRef.current;
       if (surface === null || !(event.target instanceof Node)) return;
+      const inPopup =
+        engine === "combobox" && event.target instanceof Element && surface.contains(event.target);
       const inField =
-        engine === "combobox" &&
+        inPopup &&
         event.target instanceof Element &&
-        surface.contains(event.target) &&
         event.target.closest('[role="combobox"]') !== null;
       // Tab from the search field moves on, as it does from a plain
       // select's options. Headless UI's combobox Tab *selects* the active
@@ -879,7 +892,13 @@ function SelectPopup({
       // with "Angola" (measured). The popup is closed here instead, focus
       // parked on the trigger, and the key's default action (not
       // prevented) then moves focus on from there, either direction.
-      if (inField && event.key === "Tab") {
+      //
+      // From anywhere in the popup, not only the field: focus can sit on
+      // the header's Back or Clear (a screen reader's cursor, a caller's
+      // `.focus()` — `keepOpenOnChromeFocus` keeps the view open for it),
+      // and a Tab from there used to leave the popup open with focus on
+      // `<body>`, where Escape no longer reached it (measured).
+      if (inPopup && event.key === "Tab") {
         event.stopImmediatePropagation();
         closeComboboxPopup(surface, triggerRef.current);
         return;
