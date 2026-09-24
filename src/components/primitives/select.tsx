@@ -498,7 +498,11 @@ export function SelectTrigger({
    * wrapped `Select` keeps working unchanged without either prop. */
   "aria-label"?: string | undefined;
   /** Same, pointing at an existing label element instead of inlining the
-   * text. */
+   * text. **Currently ineffective**: Headless UI's `ListboxButton` and
+   * `ComboboxButton` set their own `aria-labelledby` over the caller's, so
+   * it never reaches the button (measured: the attribute is absent in both
+   * engines) and the trigger is named by its own text — the value or the
+   * placeholder. Use `aria-label` until that is fixed. */
   "aria-labelledby"?: string | undefined;
 }) {
   const { engine, invalid, triggerRef } = useSelectContext("SelectTrigger");
@@ -834,13 +838,16 @@ function useComboboxModality(
  * `key={code}` — produced duplicate keys once flattened into one array, and
  * React then kept stale options on screen: measured, emptying the first
  * fragment's list left its "Recent Cameroon" and "Recent Kenya" rows in
- * place. */
+ * place. The separator is `:` because `Children.toArray` escapes a `:` in
+ * a caller's own key (to `=2`), so no sibling's key can spell a composed
+ * one; with `/`, a sibling keyed `f/.$cm` collided with `cm` inside a
+ * fragment keyed `f`. */
 function flattenParts(node: ReactNode, prefix = ""): ReactNode[] {
   return Children.toArray(node).flatMap((part) => {
     if (!isValidElement(part)) return [part];
     const key = `${prefix}${String(part.key)}`;
     if (part.type === Fragment) {
-      return flattenParts((part.props as { children?: ReactNode }).children, `${key}/`);
+      return flattenParts((part.props as { children?: ReactNode }).children, `${key}:`);
     }
     return prefix === "" ? [part] : [cloneElement(part, { key })];
   });
@@ -1722,7 +1729,9 @@ export function SelectClose({
  * What a searchable select shows when the search matches nothing. A public
  * part with a default ("No match") that every searchable popup renders on
  * its own, for a caller who wants to say more — "No country matches", or
- * an action to add one. Its text is also what the popup's live region
+ * "Searching…" while a fetch is in flight. Text, not an action: a button
+ * here is out of a keyboard user's reach, because Tab anywhere in the
+ * popup closes it. Its text is also what the popup's live region
  * (`role="status"`, mounted for as long as the popup is open) says when
  * the list empties, so a screen-reader user typing hears it; this element
  * itself is plain text, because a region inserted already holding its

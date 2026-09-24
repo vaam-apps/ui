@@ -212,7 +212,8 @@ switch from a plain picker to a searchable one.
   ever renders the selected value, so nothing else can name it. Use
   `aria-label`, not `aria-labelledby`: the latter is accepted but does not
   currently reach the rendered button (Headless UI's own label wiring
-  overrides it), so a select named that way has no name at all.
+  overrides it), so a select named that way is named by its own text —
+  the current value or the placeholder — instead of its label.
 - **`SelectValue`** renders the selected item's *children* (the label),
   not the raw value. Its `placeholder` shows while nothing is selected.
   The label is found by walking `Select`'s children, so write

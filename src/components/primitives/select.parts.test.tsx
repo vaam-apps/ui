@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { act, type ReactNode } from "react";
+import { act, Fragment, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   Select,
   SelectContent,
@@ -182,6 +182,60 @@ describe("parts lifted out of fragments keep distinct keys", () => {
         "Ghana",
       ]);
     } finally {
+      await act(async () => {
+        root.unmount();
+      });
+      host.remove();
+    }
+  });
+});
+
+describe("a composed key cannot collide with a caller's own key", () => {
+  // `cm` inside a fragment keyed `f` is re-keyed from the fragment's key;
+  // siblings keyed as that composition would spell with either separator
+  // must stay distinct, or React warns and keeps stale rows.
+  it("renders every option once, with no duplicate-key warning", async () => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const host = document.createElement("main");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    try {
+      await act(async () => {
+        root.render(
+          <Select>
+            <SelectTrigger aria-label="Country">
+              <SelectValue placeholder="Choose" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectSearch />
+              <Fragment key="f">
+                <SelectItem key="cm" value="cm">
+                  Cameroon
+                </SelectItem>
+              </Fragment>
+              <SelectItem key="f/.$cm" value="slash">
+                Slash
+              </SelectItem>
+              <SelectItem key="f:.$cm" value="colon">
+                Colon
+              </SelectItem>
+            </SelectContent>
+          </Select>,
+        );
+      });
+      const trigger = host.querySelector("button");
+      if (trigger === null) throw new Error("no trigger rendered");
+      await act(async () => {
+        trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+      });
+      expect(
+        [...host.querySelectorAll('[role="option"]')].map((option) => option.textContent),
+      ).toEqual(["Cameroon", "Slash", "Colon"]);
+      const duplicate = errors.mock.calls.filter((call) => String(call[0]).includes("same key"));
+      expect(duplicate, "React reported two children with the same key").toEqual([]);
+    } finally {
+      errors.mockRestore();
       await act(async () => {
         root.unmount();
       });

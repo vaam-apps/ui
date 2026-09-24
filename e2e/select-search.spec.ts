@@ -125,14 +125,18 @@ test.describe("searchable, on a phone: M3's full-screen search view", () => {
     // reach.
     await openStory(page, STORY.selectSearchablePhone, PHONE);
     await openedByPlay(page);
+    // Something focusable after the story, so "parked on the trigger and
+    // moved on from there" is told apart from focus dropped on `<body>`.
+    await page.evaluate(() => {
+      const next = document.createElement("button");
+      next.textContent = "After the story";
+      document.body.append(next);
+    });
     await page.keyboard.type("gh");
     await page.getByRole("button", { name: "Clear search" }).focus();
     await page.keyboard.press("Tab");
     await expect(surface(page)).toHaveCount(0);
-    // Parked on the trigger and moved on from there, as from the field —
-    // nothing follows the trigger in this story, so back is where it is.
-    await page.keyboard.press("Shift+Tab");
-    await expect(storyRoot(page).getByRole("button", { name: "Country" })).toBeFocused();
+    await expect(page.getByRole("button", { name: "After the story" })).toBeFocused();
   });
 
   test("the clear button empties the field and keeps the view open", async ({ page }) => {
