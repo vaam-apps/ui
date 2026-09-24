@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { expect, userEvent, waitFor, within } from "storybook/test";
 import { Button } from "./button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./dialog";
@@ -752,7 +752,11 @@ const PROVIDER_DIRECTORY = [
  * the caller fetches per keystroke (a server search), the select must not
  * filter a second time. With `filter={false}` every `SelectItem` rendered
  * is shown, and `SelectEmpty` appears when the caller renders none. Here
- * the "server" is a 300ms timer over a fixed list.
+ * the "server" is a 300ms timer over a fixed list. Only the latest query's
+ * answer is applied — each keystroke cancels the previous request — and
+ * nothing is applied after unmount: a real server answers out of order,
+ * and a template that let a stale answer overwrite a newer one would be
+ * copied with the bug.
  */
 export const CallerFilteredSearch: Story = {
   globals: { viewport: { value: "desktop" } },
@@ -760,9 +764,12 @@ export const CallerFilteredSearch: Story = {
     const [provider, setProvider] = useState<string>();
     const [results, setResults] = useState(PROVIDER_DIRECTORY);
     const [pending, setPending] = useState(false);
+    const request = useRef<number | undefined>(undefined);
+    useEffect(() => () => window.clearTimeout(request.current), []);
     function search(query: string) {
+      window.clearTimeout(request.current);
       setPending(true);
-      window.setTimeout(() => {
+      request.current = window.setTimeout(() => {
         const q = query.trim().toLowerCase();
         setResults(PROVIDER_DIRECTORY.filter((p) => p.name.toLowerCase().includes(q)));
         setPending(false);
