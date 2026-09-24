@@ -247,7 +247,11 @@ focus trap, where they never become usable. So they all work inside a
 `Drawer`. The dropdown (and the docked search view) is nonetheless
 `position: fixed`, placed under its trigger by Floating UI, so a scrolling
 or clipping ancestor — a `Dialog`'s body, a drawer's, a card with
-`overflow-hidden` — no longer cuts it off. It matches the trigger's width,
+`overflow-hidden` — no longer cuts it off. The exception is a container
+that clips *and* has a `transform`, `filter`, `backdrop-filter` or
+`contain`: that one still clips it, so do not put a `Select` in one.
+When its trigger scrolls out of its container's view, the dropdown fades
+out and ignores the pointer until the trigger scrolls back. It matches the trigger's width,
 shrinks to the room below it, and opens *above* the trigger only when it
 does not fit below and less than 200px is left there (a short list that
 fits never flips); with too little room either side it keeps the better

@@ -1,6 +1,6 @@
 "use client";
 
-import { autoUpdate, flip, offset, shift, size, useFloating } from "@floating-ui/react-dom";
+import { autoUpdate, flip, hide, offset, shift, size, useFloating } from "@floating-ui/react-dom";
 import {
   Combobox,
   ComboboxButton,
@@ -868,7 +868,12 @@ const DROPDOWN_MIN_HEIGHT = 200;
  * escapes every ancestor that clips, and Floating UI resolves it against
  * the right box when an ancestor *is* a containing block — vaul stamps
  * `will-change: transform` on every drawer (AGENTS.md's trap), so inside
- * one the coordinates are the drawer's, not the viewport's. The popup
+ * one the coordinates are the drawer's, not the viewport's. What `fixed`
+ * cannot escape is an ancestor that is both: a containing block that also
+ * clips (`transform`, `filter`, `backdrop-filter` or `contain`, with
+ * `overflow: hidden`) clips it as it clipped `absolute` — measured, one
+ * row left in a 120px `backdrop-filter` card. Nothing in this library is
+ * built that way; a caller's container can be. The popup
  * still renders inline, not portalled: the reason is `SelectContent`'s
  * `portal={false}` comment, and it has not changed.
  *
@@ -889,7 +894,7 @@ function useDropdownPlacement(
   presentation: SelectPresentation,
   triggerRef: RefObject<HTMLButtonElement | null>,
 ) {
-  const { refs, x, y } = useFloating({
+  const { refs, x, y, middlewareData } = useFloating({
     strategy: "fixed",
     placement: "bottom-start",
     elements: { reference: triggerRef.current },
@@ -922,13 +927,27 @@ function useDropdownPlacement(
           elements.floating.style.setProperty("--select-float-max-h", `${height}px`);
         },
       }),
+      // A trigger scrolled out of its container's view takes the dropdown
+      // with it. `absolute`, the scroller used to clip the dropdown too;
+      // `fixed`, it floated on over the container's own chrome — measured
+      // in a drawer: the dropdown drawn over the drawer's header at y 68,
+      // its trigger 100px scrolled up under it. The surface goes
+      // transparent and stops taking the pointer instead (its classes,
+      // on `data-reference-hidden`), and comes back when the trigger
+      // does. Not `visibility: hidden`: an element that stops being
+      // rendered loses focus, and the search field's blur is the popup's
+      // close.
+      hide({ strategy: "referenceHidden" }),
     ],
     whileElementsMounted: autoUpdate,
   });
   // A modal is placed by its own classes at every width.
-  if (presentation === "modal") return { setFloating: undefined, style: undefined };
+  if (presentation === "modal") {
+    return { setFloating: undefined, style: undefined, referenceHidden: undefined };
+  }
   const style = { "--select-float-x": `${x}px`, "--select-float-y": `${y}px` } as CSSProperties;
-  return { setFloating: refs.setFloating, style };
+  const referenceHidden = middlewareData.hide?.referenceHidden === true ? "" : undefined;
+  return { setFloating: refs.setFloating, style, referenceHidden };
 }
 
 /**
@@ -1093,6 +1112,7 @@ function SelectPopup({
             placement.setFloating?.(element);
           }}
           style={placement.style}
+          data-reference-hidden={placement.referenceHidden}
           // `portal={false}` is a correctness fix, not a preference.
           //
           // Headless UI's `anchor` prop portals the options into
@@ -1181,6 +1201,7 @@ function SelectPopup({
           placement.setFloating?.(element);
         }}
         style={placement.style}
+        data-reference-hidden={placement.referenceHidden}
         // Focusable only so `closeComboboxPopup` can move focus onto it.
         tabIndex={-1}
         data-select-content=""
@@ -1233,9 +1254,14 @@ const LISTBOX_DROPDOWN =
   "fixed top-(--select-float-y) left-(--select-float-x) z-50 max-h-[min(20rem,var(--select-float-max-h))] w-(--select-float-w) min-w-[8rem] overflow-y-auto rounded-md border border-edge bg-surface-2 p-1 shadow-[var(--shadow-popover)] focus:outline-none";
 
 const LISTBOX_SURFACE: Record<SelectPresentation, string> = {
-  dropdown: LISTBOX_DROPDOWN,
+  dropdown: cn(
+    LISTBOX_DROPDOWN,
+    "data-reference-hidden:pointer-events-none data-reference-hidden:opacity-0",
+  ),
   auto: cn(
     LISTBOX_DROPDOWN,
+    // Only where it is a dropdown: the sheet does not hang off its trigger.
+    "sm:data-reference-hidden:pointer-events-none sm:data-reference-hidden:opacity-0",
     // Below `sm`: the M3 modal bottom sheet (`SelectContent`'s doc).
     // The top corners are `SheetBottomTokens.DockedContainerShape`,
     // `CornerExtraLargeTop` (`--radius-sheet`, 28dp), the bottom edge
@@ -1323,9 +1349,15 @@ const COMBOBOX_DOCKED =
   "fixed top-(--select-float-y) left-(--select-float-x) z-50 flex max-h-(--select-float-max-h) w-(--select-float-w) min-w-[16rem] flex-col overflow-hidden rounded-md border border-edge bg-surface-2 shadow-[var(--shadow-popover)] outline-none";
 
 const COMBOBOX_SURFACE: Record<SelectPresentation, string> = {
-  dropdown: COMBOBOX_DOCKED,
+  dropdown: cn(
+    COMBOBOX_DOCKED,
+    "data-reference-hidden:pointer-events-none data-reference-hidden:opacity-0",
+  ),
   auto: cn(
     COMBOBOX_DOCKED,
+    // Only where it is the docked view: the full-screen one covers its
+    // trigger by design.
+    "sm:data-reference-hidden:pointer-events-none sm:data-reference-hidden:opacity-0",
     "max-sm:fixed max-sm:inset-x-0 max-sm:top-auto max-sm:bottom-0 max-sm:h-dvh max-sm:max-h-none max-sm:mt-0 max-sm:w-full max-sm:min-w-0 max-sm:rounded-none max-sm:border-0",
     "max-sm:bg-surface-3 max-sm:shadow-none max-sm:pt-[env(safe-area-inset-top,0px)]",
     "max-sm:starting:translate-y-4 max-sm:starting:opacity-0",

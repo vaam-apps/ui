@@ -139,3 +139,108 @@ test("inside a drawer, whose transform makes it the containing block, it still l
   expect(rect.x).toBeCloseTo(trigger.x, 0);
   expect(rect.width).toBeCloseTo(trigger.width, 0);
 });
+
+for (const [engine, story, name] of [
+  ["plain", STORY.selectDisabledAndScrolling, "Timezone"],
+  ["searchable", STORY.selectSearchableDesktop, "Country"],
+] as const) {
+  test(`${engine}, on a page scrolled down: still 4px under its trigger`, async ({ page }) => {
+    // Coordinates for `fixed` are the viewport's; a scrolled page is where
+    // mixing them up with the document's shows — 400px off, off the window.
+    await openStory(page, story, DESKTOP);
+    await page.keyboard.press("Escape");
+    await expect(surface(page)).toHaveCount(0);
+    await page.evaluate(() => {
+      const root = document.getElementById("storybook-root") as HTMLElement;
+      root.style.paddingTop = "700px";
+      root.style.paddingBottom = "1200px";
+      window.scrollTo(0, 400);
+    });
+    expect(await page.evaluate(() => window.scrollY), "failed: the page did not scroll").toBe(400);
+    const triggerLocator = storyRoot(page).getByRole("button", { name });
+    await triggerLocator.click();
+    await expect(surface(page)).toBeVisible();
+    await settleTransitions(page);
+    const trigger = await box(triggerLocator);
+    const rect = await box(surface(page));
+    expect(rect.y - (trigger.y + trigger.height), "failed: not 4px under its trigger").toBeCloseTo(
+      4,
+      0,
+    );
+  });
+}
+
+test("plain, with too little room on either side: it stays on the window, shorter", async ({
+  page,
+}) => {
+  // The combobox's clamp is tested above; this is the listbox's, on a
+  // window too short for the Timezone list either side of its trigger.
+  await openStory(page, STORY.selectDisabledAndScrolling, { width: 1280, height: 360 });
+  const trigger = storyRoot(page).getByRole("button", { name: "Timezone" });
+  await trigger.click();
+  await expect(surface(page)).toBeVisible();
+  await settleTransitions(page);
+  const rect = await box(surface(page));
+  expect(rect.y, "failed: the dropdown runs past the window's top edge").toBeGreaterThanOrEqual(
+    8 - 1,
+  );
+  expect(
+    rect.y + rect.height,
+    "failed: the dropdown runs past the window's bottom edge",
+  ).toBeLessThanOrEqual(360 - 8 + 1);
+});
+
+test("inside a scrolling drawer: it follows its trigger, and fades out when the trigger scrolls away", async ({
+  page,
+}) => {
+  await openStory(page, STORY.selectInsideADrawer, DESKTOP);
+  await storyRoot(page).getByRole("button", { name: "Open drawer" }).click();
+  const triggerLocator = page.getByRole("button", { name: "Provider" });
+  await expect(triggerLocator).toBeVisible();
+  await settleTransitions(page);
+  // A drawer body long enough to scroll.
+  const scrolled = await triggerLocator.evaluate((trigger) => {
+    let scroller = trigger.parentElement;
+    while (scroller !== null && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) {
+      scroller = scroller.parentElement;
+    }
+    if (scroller === null) return false;
+    const spacer = document.createElement("div");
+    spacer.style.height = "2000px";
+    scroller.append(spacer);
+    scroller.setAttribute("data-test-scroller", "");
+    return true;
+  });
+  expect(scrolled, "failed: no scrolling ancestor found in the drawer").toBe(true);
+  await triggerLocator.click();
+  await expect(page.getByRole("listbox")).toBeVisible();
+  await settleTransitions(page);
+  const scrollBy = async (top: number) => {
+    await page.locator("[data-test-scroller]").evaluate((element, y) => {
+      element.scrollTop = y;
+    }, top);
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    );
+  };
+  const opacity = () => surface(page).evaluate((element) => getComputedStyle(element).opacity);
+
+  await scrollBy(30);
+  const trigger = await box(triggerLocator);
+  const rect = await box(surface(page));
+  expect(
+    rect.y - (trigger.y + trigger.height),
+    "failed: the dropdown stayed put while its trigger scrolled",
+  ).toBeCloseTo(4, 0);
+  expect(await opacity()).toBe("1");
+
+  // Scrolled well past: the trigger is out of the drawer body's view.
+  await scrollBy(600);
+  expect(await opacity(), "failed: the dropdown floats on without its trigger").toBe("0");
+  expect(await surface(page).evaluate((element) => getComputedStyle(element).pointerEvents)).toBe(
+    "none",
+  );
+
+  await scrollBy(0);
+  expect(await opacity(), "failed: the dropdown did not come back with its trigger").toBe("1");
+});
