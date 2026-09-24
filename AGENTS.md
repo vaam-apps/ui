@@ -15,7 +15,7 @@ Run the project's own scripts. There is no hidden wrapper.
 
 ```sh
 pnpm install
-pnpm lint          # biome check .   — the whole tree, not per-file
+pnpm lint          # biome check . + markdownlint-cli2 — the whole tree
 pnpm typecheck     # tsc --noEmit    — covers src, .storybook AND e2e
 pnpm test          # vitest run
 pnpm build         # tsc -p tsconfig.build.json + copy styles + fix specifiers
@@ -28,6 +28,15 @@ pnpm e2e           # playwright, against the built storybook-static/
 pass while the repo gate fails, because formatting and the
 `suppressions/unused` rule are only meaningful across the tree. Always run
 the bare script before claiming green.
+
+`pnpm lint` also runs the org's Markdown gate (`.markdownlint-cli2.yaml`,
+a copy of the config Super-linter applies) over **every** tracked `.md`
+file. Super-linter checks only the files a pull request changes, so the
+`vaam-ui` skill piled up 221 MD060 failures that no upstream check saw.
+Every consumer that vendors the skill then found them in its own CI.
+`markdownlint-cli2 --fix` does not repair MD060 (unaligned table pipes).
+`npx --yes prettier@3 --prose-wrap preserve --write <file>` does, and it
+is the style the config is written against.
 
 `pnpm e2e` needs `storybook-static/` to exist (`pnpm build-storybook`) and
 downloads Chromium on first use (`npx playwright install chromium`).
