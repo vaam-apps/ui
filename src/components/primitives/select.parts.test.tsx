@@ -1,0 +1,114 @@
+// @vitest-environment jsdom
+import { act, type ReactNode } from "react";
+import { createRoot } from "react-dom/client";
+import { describe, expect, it } from "vitest";
+import {
+  Select,
+  SelectContent,
+  SelectEmpty,
+  SelectItem,
+  SelectSearch,
+  SelectTrigger,
+  SelectValue,
+} from "./select";
+
+/**
+ * Where a part lands depends on the element tree the caller wrote, and a
+ * caller's fragment is part of that tree.
+ *
+ * The combobox popup lifts `SelectSearch` and `SelectClose` out of the
+ * container's children into its header, and `SelectEmpty` under the list,
+ * by comparing each child's `type`. A fragment's `type` is `Fragment`, so
+ * `<><SelectSearch /><SelectEmpty /></>` — what a caller writes to toggle
+ * both behind one condition — used to be one opaque child: it went into
+ * the list, which put a `role="combobox"` inside the `role="listbox"`,
+ * where only options and groups may live.
+ *
+ * Asserted on where the elements are in the DOM, which is the contract:
+ * a combobox outside the listbox, and no empty state inside it.
+ */
+
+async function withOpenSelect(parts: ReactNode, inspect: (host: HTMLElement) => void) {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  const host = document.createElement("main");
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  try {
+    await act(async () => {
+      root.render(
+        <Select>
+          <SelectTrigger aria-label="Country">
+            <SelectValue placeholder="Choose" />
+          </SelectTrigger>
+          <SelectContent>
+            {parts}
+            <SelectItem value="cm">Cameroon</SelectItem>
+            <SelectItem value="ke">Kenya</SelectItem>
+          </SelectContent>
+        </Select>,
+      );
+    });
+    const trigger = host.querySelector("button");
+    if (trigger === null) throw new Error("no trigger rendered");
+    await act(async () => {
+      trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    });
+    inspect(host);
+  } finally {
+    await act(async () => {
+      root.unmount();
+    });
+    host.remove();
+  }
+}
+
+function placement(host: HTMLElement) {
+  const listbox = host.querySelector('[role="listbox"]');
+  const field = host.querySelector('input[role="combobox"]');
+  if (listbox === null) throw new Error("the select did not open");
+  return {
+    fieldRendered: field !== null,
+    fieldInsideListbox: field !== null && listbox.contains(field),
+    listboxChildren: [...listbox.querySelectorAll('[role="option"]')].map((o) => o.textContent),
+  };
+}
+
+describe("a Select's parts land in the same place bare or inside a fragment", () => {
+  it("bare, the field is in the header and the list holds only options", async () => {
+    await withOpenSelect(
+      [<SelectSearch key="search" />, <SelectEmpty key="empty">Nothing</SelectEmpty>],
+      (host) => {
+        expect(placement(host)).toEqual({
+          fieldRendered: true,
+          fieldInsideListbox: false,
+          listboxChildren: ["Cameroon", "Kenya"],
+        });
+      },
+    );
+  });
+
+  it("inside a nested fragment, exactly the same", async () => {
+    const searchable = true;
+    await withOpenSelect(
+      searchable && (
+        <>
+          <>
+            <SelectSearch />
+          </>
+          <SelectEmpty>Nothing</SelectEmpty>
+        </>
+      ),
+      (host) => {
+        expect(
+          placement(host),
+          "a fragment's parts were treated as one list child: the field ended up inside role=listbox",
+        ).toEqual({
+          fieldRendered: true,
+          fieldInsideListbox: false,
+          listboxChildren: ["Cameroon", "Kenya"],
+        });
+        expect(host.querySelector('[role="listbox"]')?.textContent).not.toContain("Nothing");
+      },
+    );
+  });
+});

@@ -1749,6 +1749,25 @@
     outline: 2px solid var(--color-ring);
     outline-offset: 2px;
   }
+
+  /* A searchable `Select`'s scroll lock (`select.tsx`, `lockScroll`). An
+     attribute, not an inline `overflow`, so it cannot overwrite — or be
+     restored over — the inline `overflow: hidden` Headless UI's own dialogs
+     set on the same element: the two locks come and go independently.
+     `--select-scroll-gap` is the hidden scrollbar's width, measured at lock
+     time, so the page does not shift sideways by it.
+
+     The selector is `:root:not(span)[…]` rather than `html[…]` on purpose:
+     daisyUI 5 runs its own page scroll lock as `:root:not(span) { overflow:
+     var(--page-overflow) }` in this same layer, specificity (0,1,1) —
+     exactly `html[attr]`'s — and later in source order, so the plain
+     selector lost to it: measured, the attribute set and the computed
+     `overflow` still `visible`. One more class-level term wins cleanly
+     without an `!important`. */
+  :root:not(span)[data-select-scroll-lock] {
+    overflow: hidden;
+    padding-right: var(--select-scroll-gap, 0px);
+  }
 }
 
 /* ---------------------------------------------------------------------------

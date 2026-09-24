@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, userEvent, waitFor, within } from "storybook/test";
 import { Button } from "./button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./dialog";
 import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger, MoreDetailDrawer } from "./drawer";
 import { FormField } from "./form-field";
 import {
@@ -730,17 +731,20 @@ export const SearchWithCustomEmpty: Story = {
   },
 };
 
+// Ids, not names, as the values: the trigger has to show the name of an
+// option the caller's results no longer include, and a value equal to its
+// label cannot tell that apart from showing the raw value.
 const PROVIDER_DIRECTORY = [
-  "Orange Cameroon",
-  "MTN Cameroon",
-  "Nexttel",
-  "Camtel",
-  "Airtel Kenya",
-  "Safaricom",
-  "Vodacom Tanzania",
-  "Tigo Ghana",
-  "Moov Africa",
-  "Glo Nigeria",
+  { id: "prv_101", name: "Orange Cameroon" },
+  { id: "prv_102", name: "MTN Cameroon" },
+  { id: "prv_103", name: "Nexttel" },
+  { id: "prv_104", name: "Camtel" },
+  { id: "prv_105", name: "Airtel Kenya" },
+  { id: "prv_106", name: "Safaricom" },
+  { id: "prv_107", name: "Vodacom Tanzania" },
+  { id: "prv_108", name: "Tigo Ghana" },
+  { id: "prv_109", name: "Moov Africa" },
+  { id: "prv_110", name: "Glo Nigeria" },
 ];
 
 /**
@@ -754,13 +758,13 @@ export const CallerFilteredSearch: Story = {
   globals: { viewport: { value: "desktop" } },
   render: function Render() {
     const [provider, setProvider] = useState<string>();
-    const [results, setResults] = useState<string[]>(PROVIDER_DIRECTORY);
+    const [results, setResults] = useState(PROVIDER_DIRECTORY);
     const [pending, setPending] = useState(false);
     function search(query: string) {
       setPending(true);
       window.setTimeout(() => {
         const q = query.trim().toLowerCase();
-        setResults(PROVIDER_DIRECTORY.filter((name) => name.toLowerCase().includes(q)));
+        setResults(PROVIDER_DIRECTORY.filter((p) => p.name.toLowerCase().includes(q)));
         setPending(false);
       }, 300);
     }
@@ -773,9 +777,9 @@ export const CallerFilteredSearch: Story = {
             </SelectTrigger>
             <SelectContent>
               <SelectSearch placeholder="Provider name" filter={false} onQueryChange={search} />
-              {results.map((name) => (
-                <SelectItem key={name} value={name}>
-                  {name}
+              {results.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
                 </SelectItem>
               ))}
               <SelectEmpty>{pending ? "Searching…" : "No provider by that name"}</SelectEmpty>
@@ -897,5 +901,95 @@ export const SearchableInsideADrawer: Story = {
         </MoreDetailDrawer>
       </>
     );
+  },
+};
+
+/**
+ * **Searchable, inside a `Dialog`, where picking closes the dialog.** The
+ * regression this story exists for: the combobox engine's own modality
+ * used to snapshot the page state the dialog had already set and write it
+ * back on close — and when a pick closed the select *and* the dialog in
+ * one commit, the page was left `inert` and unscrollable until a reload.
+ * Pick a country: the dialog closes and "Open dialog" must still work.
+ *
+ * It also carries an option whose value is `""` ("Any country" — pickable,
+ * as it is in a plain select), and a "Done" written inside the list: there
+ * it is a pointer-only affordance (`aria-hidden`), because a listbox may own
+ * options only.
+ */
+export const SearchableInADialog: Story = {
+  globals: { viewport: { value: "desktop" } },
+  render: function Render() {
+    const [open, setOpen] = useState(false);
+    const [country, setCountry] = useState<string>();
+    return (
+      <div className="flex flex-col items-start gap-3 p-4">
+        <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
+          Open dialog
+        </Button>
+        <p className="font-mono text-caption text-subtle-foreground">
+          value: {country === undefined ? "—" : country === "" ? "(any)" : country}
+        </p>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Choose where to send from</DialogTitle>
+            </DialogHeader>
+            <FormField label="Country" htmlFor="dialog-search-country">
+              <Select
+                value={country}
+                onValueChange={(next) => {
+                  setCountry(next);
+                  setOpen(false);
+                }}
+              >
+                <SelectTrigger id="dialog-search-country">
+                  <SelectValue placeholder="Choose a country" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectSearch placeholder="Search countries" />
+                  <SelectItem value="">Any country</SelectItem>
+                  <CountryItems />
+                  <div className="flex justify-end px-2 pt-2">
+                    <SelectClose className="px-4 py-2 font-medium text-prose">Done</SelectClose>
+                  </div>
+                </SelectContent>
+              </Select>
+            </FormField>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  },
+};
+
+/**
+ * **Searchable `SelectModal` on a desktop**: M3's full-screen search view,
+ * but from 640px up it stops at the sheet's own 640px, centred, with the
+ * sheet's 28px top corners and scrim — the same footprint as a plain
+ * `SelectModal` rather than a blanked-out screen (a maintainer's call).
+ * Below 640px it is full-screen, like `SelectContent`'s phone view.
+ */
+export const SearchableModalOnADesktop: Story = {
+  globals: { viewport: { value: "desktop" } },
+  render: () => (
+    <div className="flex w-full max-w-80 flex-col gap-4 p-4">
+      <FormField label="Country" htmlFor="sb-search-modal">
+        <Select defaultValue="Kenya">
+          <SelectTrigger id="sb-search-modal">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectModal>
+            <SelectSearch placeholder="Search countries" />
+            <CountryItems />
+          </SelectModal>
+        </Select>
+      </FormField>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Country" }));
+    await expect(await canvas.findByRole("combobox")).toHaveFocus();
   },
 };

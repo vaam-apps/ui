@@ -1,4 +1,5 @@
-import { expect, type Page, test } from "@playwright/test";
+import { createRequire } from "node:module";
+import { devices, expect, type Page, test } from "@playwright/test";
 import { box, openStory, settleTransitions, storyRoot } from "./helpers";
 import { STORY } from "./story-ids";
 
@@ -53,7 +54,52 @@ test.describe("searchable, on a phone: M3's full-screen search view", () => {
     await openedByPlay(page);
     await page.keyboard.type("gu");
     await expect(page.getByRole("option")).toHaveCount(3);
-    await expect(page.getByRole("status")).toHaveCount(0);
+    await expect(surface(page).getByText("No match")).toHaveCount(0);
+    await expect(page.getByRole("status")).toHaveText("");
+  });
+
+  test('says "No match" by itself, visibly and in the live region that was already there', async ({
+    page,
+  }) => {
+    await openStory(page, STORY.selectSearchablePhone, PHONE);
+    await openedByPlay(page);
+    // Mounted, empty, before anything is typed: a live region inserted
+    // already holding its message is not reliably announced.
+    await expect(page.getByRole("status")).toHaveText("");
+    await page.keyboard.type("zzzz");
+    await expect(page.getByRole("status")).toHaveText("No match");
+    await expect(surface(page).getByText("No match").first()).toBeVisible();
+  });
+
+  test("Enter with nothing to pick keeps the view and the search", async ({ page }) => {
+    await openStory(page, STORY.selectSearchablePhone, PHONE);
+    await openedByPlay(page);
+    await page.keyboard.type("zzzz");
+    await page.keyboard.press("Enter");
+    await expect(surface(page)).toHaveCount(1);
+    await expect(field(page)).toHaveValue("zzzz");
+  });
+
+  test("the field is named after its select", async ({ page }) => {
+    await openStory(page, STORY.selectSearchablePhone, PHONE);
+    await openedByPlay(page);
+    await expect(page.getByRole("combobox", { name: "Search Country" })).toBeFocused();
+  });
+
+  test("focus moving onto Back or Clear does not close the view", async ({ page }) => {
+    // A screen reader's cursor, or a caller's `.focus()`: the field's blur
+    // used to be the combobox's close, and the view went before the button
+    // could be pressed.
+    await openStory(page, STORY.selectSearchablePhone, PHONE);
+    await openedByPlay(page);
+    await page.keyboard.type("gh");
+    await page.getByRole("button", { name: "Clear search" }).focus();
+    await expect(surface(page)).toHaveCount(1);
+    await page.getByRole("button", { name: "Back" }).focus();
+    await expect(surface(page)).toHaveCount(1);
+    await page.keyboard.press("Enter");
+    await expect(surface(page)).toHaveCount(0);
+    await expect(storyRoot(page).getByRole("button", { name: "Country" })).toBeFocused();
   });
 
   test("the clear button empties the field and keeps the view open", async ({ page }) => {
@@ -112,10 +158,41 @@ test.describe("searchable, on a phone: M3's full-screen search view", () => {
     expect(await value.evaluate((el) => el.closest("[inert]") !== null), "page text is inert").toBe(
       true,
     );
-    expect((await state()).overflow).toBe("hidden");
+    expect(
+      await page.evaluate(() => getComputedStyle(document.documentElement).overflow),
+      "the page is scroll-locked",
+    ).toBe("hidden");
+    // Climbs to `<html>`: body-level siblings — where portals live — too.
+    expect(
+      await page.evaluate(() =>
+        [...document.body.children].some(
+          (child) =>
+            child instanceof HTMLElement && child.inert && !child.contains(document.activeElement),
+        ),
+      ),
+      "a body-level sibling of the story is inert",
+    ).toBe(true);
     await page.keyboard.press("Escape");
     await expect(surface(page)).toHaveCount(0);
     expect(await state()).toEqual({ overflow: "", inert: 0 });
+    expect(
+      await page.evaluate(() => document.documentElement.hasAttribute("data-select-scroll-lock")),
+    ).toBe(false);
+  });
+
+  test("Tab from the field moves on without picking anything", async ({ page }) => {
+    // Headless UI's combobox Tab selects the active option, and it makes
+    // the first option active on open: this used to fill the field with
+    // "Angola".
+    await openStory(page, STORY.selectSearchableDesktop, DESKTOP);
+    await openedByPlay(page);
+    const trigger = storyRoot(page).getByRole("button", { name: "Country" });
+    await page.keyboard.press("Tab");
+    await expect(surface(page)).toHaveCount(0);
+    await expect(storyRoot(page).getByText("value: —")).toBeVisible();
+    await expect(trigger).not.toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(trigger).toBeFocused();
   });
 });
 
@@ -211,4 +288,147 @@ test("SelectModal is a centred 640px sheet on a desktop, and SelectClose closes 
   await storyRoot(page).getByText("Done").click();
   await expect(sheet).toHaveCount(0);
   await expect(storyRoot(page).getByRole("button", { name: "Retry policy" })).toBeFocused();
+});
+
+test.describe("searchable, inside a Dialog", () => {
+  async function openSelect(page: Page) {
+    await openStory(page, STORY.selectSearchableInDialog, DESKTOP);
+    await storyRoot(page).getByRole("button", { name: "Open dialog" }).click();
+    const trigger = page.getByRole("button", { name: "Country" });
+    await expect(trigger).toBeVisible();
+    await settleTransitions(page);
+    await trigger.click();
+    await expect(field(page)).toBeFocused();
+  }
+
+  /**
+   * The blocker: picking closed the select *and* the dialog in one commit,
+   * the dialog's own cleanup ran first, and the select then restored the
+   * inert/overflow it had snapshotted from the dialog — leaving the page
+   * inert and unscrollable until a reload.
+   */
+  for (const how of ["the keyboard", "a click"] as const) {
+    test(`a pick by ${how} that closes the dialog leaves the page alive`, async ({ page }) => {
+      await openSelect(page);
+      if (how === "the keyboard") {
+        await page.keyboard.type("gha");
+        await page.keyboard.press("Enter");
+      } else {
+        await page.getByRole("option", { name: "Ghana" }).click();
+      }
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await expect(storyRoot(page).getByText("value: Ghana")).toBeVisible();
+      await page.waitForTimeout(600);
+      const alive = await page.evaluate(() => ({
+        inert: [...document.querySelectorAll("[inert]")].length,
+        overflow: getComputedStyle(document.documentElement).overflow,
+        lock: document.documentElement.hasAttribute("data-select-scroll-lock"),
+      }));
+      expect(alive).toEqual({ inert: 0, overflow: "visible", lock: false });
+      // And the page answers: the dialog opens again. (Its title, not its
+      // `role="dialog"` element — Headless UI's is a zero-size wrapper
+      // around a fixed panel, which Playwright reports as hidden.)
+      await storyRoot(page).getByRole("button", { name: "Open dialog" }).click();
+      await expect(page.getByRole("heading", { name: "Choose where to send from" })).toBeVisible();
+    });
+  }
+
+  test('an option whose value is "" can be picked', async ({ page }) => {
+    await openSelect(page);
+    await page.getByRole("option", { name: "Any country" }).click();
+    await expect(storyRoot(page).getByText("value: (any)")).toBeVisible();
+  });
+
+  test("a SelectClose written inside the list keeps the listbox valid (axe)", async ({ page }) => {
+    await openSelect(page);
+    const axePath = createRequire(import.meta.url).resolve("axe-core/axe.min.js");
+    await page.addScriptTag({ path: axePath });
+    const violations = await page.evaluate(async () => {
+      const axe = (
+        window as unknown as {
+          axe: { run: (n: Element, o: unknown) => Promise<{ violations: { id: string }[] }> };
+        }
+      ).axe;
+      const node = document.querySelector("[data-select-content]");
+      if (node === null) throw new Error("the popup is not open");
+      const result = await axe.run(node, {
+        runOnly: [
+          "aria-required-children",
+          "presentation-role-conflict",
+          "aria-allowed-role",
+          "aria-hidden-focus",
+        ],
+      });
+      return result.violations.map((violation) => violation.id);
+    });
+    expect(violations).toEqual([]);
+  });
+});
+
+test("a remote search keeps the chosen label when the results no longer include it", async ({
+  page,
+}) => {
+  // `filter={false}` + `onQueryChange`: the caller's results replace the
+  // items, and the trigger used to fall back to the raw value — here an id,
+  // `prv_106`, which is why the story's values are not its names.
+  await openStory(page, STORY.selectCallerFiltered, DESKTOP);
+  const trigger = storyRoot(page).getByRole("button", { name: "Provider" });
+  await trigger.click();
+  await expect(field(page)).toBeFocused();
+  await page.keyboard.type("safari");
+  await expect(page.getByRole("option")).toHaveText(["Safaricom"]);
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(trigger).toHaveText(/Safaricom/);
+  await trigger.click();
+  await page.keyboard.type("orange");
+  await expect(page.getByRole("option")).toHaveText(["Orange Cameroon"]);
+  await expect(trigger).toHaveText(/Safaricom/);
+});
+
+test("a searchable SelectModal on a desktop is the sheet's 640px, centred, full height", async ({
+  page,
+}) => {
+  await openStory(page, STORY.selectSearchableModalOnDesktop, DESKTOP);
+  await openedByPlay(page);
+  const rect = await box(surface(page));
+  expect(rect.width).toBeCloseTo(640, 0);
+  expect(rect.x).toBeCloseTo((DESKTOP.width - 640) / 2, 0);
+  expect(rect.y).toBeCloseTo(0, 0);
+  expect(rect.height).toBeCloseTo(DESKTOP.height, 0);
+  expect(await surface(page).evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe(
+    "28px",
+  );
+});
+
+test("the vertical toolbar steps out of the way while a SelectModal is open", async ({ page }) => {
+  // Its scrim is a shadow, which cannot catch a tap; the toolbar is
+  // portalled to `body`, beyond the plain engine's inert — so it stayed
+  // clickable, and navigable, under the scrim.
+  await openStory(page, STORY.sideNavRailUnderModalSelect, { width: 900, height: 700 });
+  const rail = page.locator("[data-floating-rail]:not([data-floating-rail-axis])");
+  await expect(storyRoot(page).getByRole("listbox")).toBeVisible();
+  expect(await rail.evaluate((el) => getComputedStyle(el).visibility)).toBe("hidden");
+  await page.keyboard.press("Escape");
+  await expect(storyRoot(page).getByRole("listbox")).toHaveCount(0);
+  expect(await rail.evaluate((el) => getComputedStyle(el).visibility)).toBe("visible");
+});
+
+test.describe("on a touch device", () => {
+  test.use({ hasTouch: true, isMobile: true, userAgent: devices["Pixel 5"].userAgent });
+
+  test("taps on the header, the divider and Clear keep the view open", async ({ page }) => {
+    // Headless UI's outside-click listens to `touchend` on a mobile user
+    // agent, and the popup's chrome is "outside" to it: the chrome's taps
+    // are stopped before it. No other test runs this path.
+    await openStory(page, STORY.selectSearchablePhone, PHONE);
+    await openedByPlay(page);
+    await page.keyboard.type("gh");
+    const header = await box(surface(page).locator(":scope > div").first());
+    await page.touchscreen.tap(PHONE.width / 2, header.y + header.height - 1);
+    await expect(surface(page)).toHaveCount(1);
+    await page.getByRole("button", { name: "Clear search" }).tap();
+    await expect(surface(page)).toHaveCount(1);
+    await expect(field(page)).toHaveValue("");
+  });
 });
