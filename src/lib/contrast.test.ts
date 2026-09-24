@@ -157,8 +157,14 @@ function readTheme(name: string): Theme {
     const value = daisy.get(key);
     if (value !== undefined) surfaces[key] = value;
   }
-  const surface3 = custom.get("--surface-3");
-  if (surface3 !== undefined) surfaces["--surface-3"] = surface3;
+  // `--surface-4` is not a ladder step of its own: it is what `surface-3`
+  // becomes inside `.surface-raised` (a `Dialog`'s panel), so every
+  // foreground that can land on a hover or selected fill there has to
+  // clear it too.
+  for (const key of ["--surface-3", "--surface-4"]) {
+    const value = custom.get(key);
+    if (value !== undefined) surfaces[key] = value;
+  }
 
   const foregrounds: Record<string, string> = {};
   const baseContent = daisy.get("--color-base-content");
@@ -197,13 +203,14 @@ describe("every theme declares a full set of surfaces and foregrounds", () => {
     expect(THEMES.map((t) => t.name)).toEqual(["dark", "light"]);
   });
 
-  it.each(THEMES.map((t) => t.name))("%s has all four surfaces", (name) => {
+  it.each(THEMES.map((t) => t.name))("%s has all five surfaces", (name) => {
     const theme = THEMES.find((t) => t.name === name);
     expect(Object.keys(theme?.surfaces ?? {}).sort()).toEqual([
       "--color-base-100",
       "--color-base-200",
       "--color-base-300",
       "--surface-3",
+      "--surface-4",
     ]);
   });
 

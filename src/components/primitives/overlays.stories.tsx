@@ -46,6 +46,7 @@ import { FormField } from "./form-field";
 import { InlineConfirm } from "./inline-confirm";
 import { Input } from "./input";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
+import { RadioGroup } from "./radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
 import { Textarea } from "./textarea";
 import { Toaster, toast } from "./toast";
@@ -240,10 +241,16 @@ export const DialogWithScrollingBody: Story = {
  * it is the same basic dialog as every other. The actions are written
  * once, at the end, in tab order after the fields; only their position
  * moves. "Create" submits the form through `form="…"`, wherever it sits.
+ *
+ * The payload-format radio group is here for the surfaces: on the basic
+ * dialog's `surface-3` panel, the checked option's fill steps up to
+ * `surface-4` (`surface-raised`) so it still reads as the selected one;
+ * full-screen, on the page's own ground, it is the page's fill.
  */
 function EndpointFormDialog() {
   const [open, setOpen] = useState(false);
   const [created, setCreated] = useState<string>();
+  const [format, setFormat] = useState<"json" | "form">("json");
   return (
     <div className="flex flex-col items-start gap-3 p-4">
       <Dialog open={open} onOpenChange={setOpen}>
@@ -270,6 +277,16 @@ function EndpointFormDialog() {
                 id="sb-endpoint-url"
                 name="url"
                 defaultValue="https://hooks.example.com/vaam"
+              />
+            </FormField>
+            <FormField label="Payload format" htmlFor="sb-endpoint-format" control="group">
+              <RadioGroup
+                value={format}
+                onValueChange={setFormat}
+                options={[
+                  { value: "json", label: "JSON" },
+                  { value: "form", label: "Form-encoded" },
+                ]}
               />
             </FormField>
             <FormField label="Retry policy" htmlFor="sb-endpoint-retry">
@@ -357,6 +374,44 @@ export const BasicDialogOnAPhone: Story = {
     await expect(
       await body().findByRole("heading", { name: "Rotate the signing secret?" }),
     ).toBeVisible();
+  },
+};
+
+/**
+ * A bare `<DialogClose />` among the actions — an icon action, not a
+ * second close icon. From 640px up it is a ✕ in the actions row beside
+ * "Save draft", while the dialog's own ✕ stays in its corner; below 640px,
+ * full-screen, it is hidden like any dismiss action, because the bar's
+ * close icon already is one. "Keep for later" is a `DialogClose` in the
+ * body, not among the actions, so it stays at every width.
+ */
+export const CloseIconAmongTheActions: Story = {
+  render: () => (
+    <Dialog>
+      <DialogTrigger as={Button}>Open draft</DialogTrigger>
+      <DialogFullScreen>
+        <DialogHeader>
+          <DialogTitle>Unsent broadcast</DialogTitle>
+          <DialogDescription>Saved drafts stay in the outbox for 30 days.</DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col items-start gap-3">
+          <p className="text-body text-muted-foreground">
+            To 1,204 subscribers: Maintenance window moved to Sunday 02:00 UTC.
+          </p>
+          <DialogClose as={Button} variant="secondary" size="sm">
+            Keep for later
+          </DialogClose>
+        </div>
+        <DialogActions>
+          <DialogClose aria-label="Discard draft" />
+          <Button size="sm">Save draft</Button>
+        </DialogActions>
+      </DialogFullScreen>
+    </Dialog>
+  ),
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByRole("button", { name: "Open draft" }));
+    await expect(await body().findByRole("heading", { name: "Unsent broadcast" })).toBeVisible();
   },
 };
 

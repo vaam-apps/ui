@@ -44,6 +44,7 @@ export const STORY = {
   dialogFullScreenPhone: "primitives-overlays--full-screen-dialog-on-a-phone",
   dialogFullScreenDesktop: "primitives-overlays--full-screen-dialog-on-a-desktop",
   dialogBasicPhone: "primitives-overlays--basic-dialog-on-a-phone",
+  dialogCloseAmongActions: "primitives-overlays--close-icon-among-the-actions",
   datePickerSingle: "primitives-date-pickers--single",
   bareCalendar: "primitives-date-pickers--bare-calendar",
   sideNavInAShell: "primitives-sidenav--in-a-shell",

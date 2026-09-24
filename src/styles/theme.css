@@ -894,6 +894,15 @@
 :root,
 [data-theme="dark"] {
   --surface-3: #1c1f25;
+  /* One step past the top of the ladder, for `.surface-raised` only (see
+     that rule, in `@theme inline` below): a hover or selected fill on a
+     panel that is itself `surface-3` — a `Dialog`, M3's
+     `SurfaceContainerHigh`. Half the ladder's usual step, and not by
+     taste: `contrast.test.ts` measures every foreground on it, and the
+     ladder's own +6/+7/+8 step (`#22262d`) put `--subtle-foreground` at
+     4.36:1. `#1f2228` is the largest +n/+n/+n step that keeps it at AA
+     (4.58:1, the worst case on this ground). */
+  --surface-4: #1f2228;
 
   /* The aurora ramp.
    *
@@ -1149,6 +1158,12 @@
  */
 [data-theme="light"] {
   --surface-3: #e1e5ea;
+  /* Dark's `--surface-4`, mirrored, and bounded the same way: the
+     ladder's own −11 step (`#d6dbe1`) put `--subtle-foreground` at 4.35:1
+     and the loud `progress` and `uncertain` pills under AA over their
+     tints. `#dde1e7` is the largest step that keeps every case at AA
+     (worst: loud `progress`, 4.56:1). */
+  --surface-4: #dde1e7;
 
   /* Cooler and far softer than dark's. A near-black shadow on a light
      ground reads as dirt; the hue-matched slate at low alpha reads as
@@ -1330,6 +1345,48 @@
   --color-state-progress-fg: var(--state-progress-fg);
   --color-state-progress-bg: var(--state-progress-bg);
   --color-state-progress-border: var(--state-progress-border);
+}
+
+/*
+ * `.surface-raised` — every surface a component paints steps up one, for a
+ * subtree that sits on a `surface-3` panel.
+ *
+ * `surface-3` is two things in this library: the top of the surface ladder
+ * *and* the fill for row hover, pressed and selected (the ladder's own
+ * doc). A `Dialog`'s panel is `surface-3` because M3 fills a dialog with
+ * `SurfaceContainerHigh` — and on it, every hover and selection fill
+ * inside vanished or inverted: a `RadioGroup`'s checked row
+ * (`data-checked:bg-surface-3`) matched the panel while the unchecked
+ * ones (`bg-surface-2`) stood out, the selection signal reversed (found in
+ * review, #33; a maintainer's call to keep M3's fill and shift the fills
+ * inside). So inside this class `surface-1` reads as `surface-2`,
+ * `surface-2` as `surface-3` and `surface-3` as `--surface-4`, one step
+ * past the top of the ladder. Relative order — resting, hover, selected —
+ * is what components communicate with, and that is preserved.
+ *
+ * The tokens it moves are the ones the utilities actually read. This
+ * block is `@theme inline`, so `bg-surface-1` compiles to
+ * `var(--color-base-200)`, `bg-surface-2` to `var(--color-base-300)` and
+ * `bg-surface-3` to `var(--surface-3)` — redeclaring `--color-surface-*`
+ * reached nothing (measured: a checked radio inside a dialog still read
+ * `surface-3`). They cannot be redeclared on the element that reads their
+ * old values, either — `--color-base-300: var(--surface-3)` beside
+ * `--surface-3: var(--surface-4)` would read the new one — so the class
+ * captures the three values on its own element and redeclares them on
+ * its children. The element itself keeps the unshifted ladder; a panel
+ * that wants the unshifted `surface-3` for descendants of its own (a
+ * sticky header's fill) captures it on an ancestor first, as `Dialog`
+ * does with `--dialog-fill`.
+ */
+@utility surface-raised {
+  --raised-surface-1: var(--color-base-300);
+  --raised-surface-2: var(--surface-3);
+  --raised-surface-3: var(--surface-4);
+  & > * {
+    --color-base-200: var(--raised-surface-1);
+    --color-base-300: var(--raised-surface-2);
+    --surface-3: var(--raised-surface-3);
+  }
 }
 
 /*

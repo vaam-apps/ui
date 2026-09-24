@@ -70,8 +70,9 @@ The `| undefined` on each is deliberate: this package compiles under
 ### The container — pick one
 
 - **`DialogContent`** — M3's basic dialog at every width: centred, 28px
-  corners, up to 560px wide (the screen less 16px each side on a phone),
-  on `surface-3`. Use it for anything short: a confirmation, a few fields.
+  corners, 560px wide where there is room (the screen less 16px each side
+  on a phone), on `surface-3`. Use it for anything short: a confirmation,
+  a few fields.
 - **`DialogFullScreen`** — M3's full-screen dialog **below 640px**, the
   same basic dialog from 640px up. Use it for a long or form-heavy dialog
   a phone should give the whole screen. Below 640px: a 64px top bar leads
@@ -79,8 +80,18 @@ The `| undefined` on each is deliberate: this package compiles under
   `DialogClose` among the actions is hidden (the close icon is that
   action). Chosen by CSS media query, so it server-renders correctly.
 
-`className` on either lands on the panel. The panel is bounded at
-`max-h-[85vh]` (full height when full-screen) and scrolls internally.
+`className` on either lands on the panel, and it is the only prop they
+take besides `children` — the parts carry nothing DOM-only, so a native
+implementation can share them. The panel is bounded at `max-h-[85vh]`
+(full height when full-screen) and scrolls internally.
+
+**Inside a dialog, surfaces step up one.** The panel is `surface-3`, which
+is also this library's hover and selected fill — so everything inside it
+reads `surface-1` as `surface-2`, `surface-2` as `surface-3`, and
+`surface-3` as a `surface-4` one step lighter. A `RadioGroup`'s checked
+row, a table's hover, a switch track keep their meaning without you doing
+anything. Do not compensate with your own fills. (Full-screen on a phone
+the panel is the page's own ground, and nothing shifts.)
 
 ### The parts
 
@@ -93,13 +104,20 @@ The `| undefined` on each is deliberate: this package compiles under
 - **`DialogActions`** — the dialog's buttons, end-aligned, pinned to the
   bottom of the visible panel (in the full-screen bar below 640px). Put the
   dismissing one in as a `DialogClose`, so the full-screen dialog knows to
-  hide it. **Renamed from `DialogFooter` in 0.3.0** — same place, same
-  children.
+  hide it. Write it as a direct part of the container — inside your own
+  `relative` (or otherwise positioned) wrapper it never reaches the bar.
+  The bar holds **one short confirming action**, as M3's does: at 320px
+  there is room for about one label beside the close icon. **Renamed from
+  `DialogFooter` in 0.3.0** — same place, same children.
 - **`DialogClose`** — closes the dialog, two ways:
   - **Bare** (`<DialogClose />`, no children, no `as`): the close icon.
     Every dialog renders one already — the ✕ in the top-right corner, or
-    the bar's leading close icon when full-screen — so you only write it
-    to change its `aria-label` (default "Close"); it replaces the default.
+    the bar's leading close icon when full-screen. Written as a **direct
+    part** of `DialogContent`/`DialogFullScreen` (or inside a fragment
+    there), it *replaces* that icon — the way to change its `aria-label`
+    (default "Close"). Written anywhere else — inside `DialogActions`, the
+    header, your own element — it is an extra ✕ icon button where you put
+    it, and the corner icon stays.
   - **With children or `as`**: closes on click and renders what you give
     it, e.g. `<DialogClose as={Button} variant="ghost">Cancel</DialogClose>`.
 
@@ -159,13 +177,28 @@ A form a phone should give the whole screen — the same parts inside
 </Dialog>
 ```
 
-**Migrating from 0.2.x:** rename `DialogFooter` to `DialogActions`, and
-write a Cancel button as `<DialogClose as={Button} …>` rather than a
-`Button` whose `onClick` closes the dialog — that is how the full-screen
-dialog knows to hide it. The panel is now M3's: 28px corners, `surface-3`,
-560px wide by default (was 480px), no border, and it fades in without
-scaling. A `className="max-w-[560px]"` you added for width is now the
-default and can go.
+**Migrating from 0.2.x:**
+
+- Rename `DialogFooter` to `DialogActions`.
+- Write a Cancel button as `<DialogClose as={Button} variant="ghost">`
+  rather than a `Button` whose `onClick` closes the dialog — that is how the
+  full-screen dialog knows to hide it. If your Cancel also ran logic, keep
+  it as `onClick` on the `DialogClose`: it runs, then the dialog closes; do
+  not *also* call your close handler there, or it runs twice. A button that
+  must stay visible in the full-screen bar ("I've saved it — close") stays
+  a plain `Button`.
+- The panel is now M3's: 28px corners, `surface-3`, 560px wide by default
+  (was 480px; `ConfirmDialog` was 384px), a 1px ring instead of a border,
+  and it fades in without scaling. A `max-w-*` you pass in `className`
+  still wins over the default: drop `max-w-[560px]` (now the default), and
+  decide for any other width (`max-w-[480px]`, `max-w-sm`) whether you
+  still want it.
+- Type and spacing change: `DialogTitle` is 20px (was 16px), 16px above
+  the description (was 4px); with a mouse the padding is 20px (was 24px)
+  and the buttons sit 16px under the text.
+- The parts take `className` and `children` only; any other attribute you
+  passed to `DialogContent`, `DialogHeader` or `DialogFooter` is dropped.
+- Consider `DialogFullScreen` for your long, form-heavy dialogs.
 
 **You do not have to solve tall content.** `DialogHeader` and
 `DialogActions` are `sticky`, pinned to the visible panel while the body

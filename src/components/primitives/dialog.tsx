@@ -37,9 +37,30 @@ const DialogContext = createContext<DialogContextValue | null>(null);
 type DialogPresentation = "basic" | "fullscreen";
 const PresentationContext = createContext<DialogPresentation>("basic");
 
-/** `true` inside `DialogActions` — where a `DialogClose` with children is a
- * dismiss *action*, which the full-screen dialog's own close icon replaces. */
+/**
+ * The props every layout and presentation part takes: a class and its
+ * children, nothing DOM-only beyond them — AGENTS.md's rule for compound
+ * parts, so a native implementation can share the contract (a maintainer's
+ * call when this component was reworked). Before 0.3.0 these parts passed
+ * every `div` attribute through.
+ */
+interface DialogPartProps {
+  className?: string | undefined;
+  children?: ReactNode;
+}
+
+/** `true` inside `DialogActions` — where a `DialogClose` is a dismiss
+ * *action*, which the full-screen dialog's own close icon replaces. */
 const InActionsContext = createContext(false);
+
+/** `true` only around the close icon the surface places itself — the
+ * default one, or a bare `DialogClose` lifted from among its direct parts.
+ * Only that one is chrome: a bare `DialogClose` written anywhere else is an
+ * icon button where it stands. Without this, one inside `DialogActions`
+ * took the chrome's absolute position too and drew a second close icon on
+ * top of the default — in the basic dialog's corner and in the full-screen
+ * bar alike (found in review). */
+const ChromeSlotContext = createContext(false);
 
 function useDialogContext(component: string): DialogContextValue {
   const ctx = useContext(DialogContext);
@@ -149,7 +170,9 @@ export function DialogTrigger<T extends ElementType = "button">({
  * direct parts to replace it (it is lifted into the same spot). In the
  * basic dialog it is the ✕ in the top-right corner. In the full-screen
  * dialog below `sm` it is the top bar's leading close icon — M3's
- * full-screen dialog leads its bar with one.
+ * full-screen dialog leads its bar with one. Written anywhere else — inside
+ * `DialogActions`, or your own element — a bare `DialogClose` is a plain ✕
+ * icon button where you put it, not a second chrome icon.
  *
  * **As an action** (children, or `as={Button}`): closes the dialog on
  * click and renders whatever you give it, `type="button"` unless you say
@@ -168,6 +191,9 @@ export function DialogClose<T extends ElementType = "button">({
   const { setOpen } = useDialogContext("DialogClose");
   const presentation = useContext(PresentationContext);
   const inActions = useContext(InActionsContext);
+  const inChromeSlot = useContext(ChromeSlotContext);
+  // A dismiss action, which the full-screen bar's own close icon replaces.
+  const hiddenInBar = inActions && presentation === "fullscreen" && "max-sm:hidden";
   const close = (event: MouseEvent) => {
     (onClick as ((e: MouseEvent) => void) | undefined)?.(event);
     setOpen(false);
@@ -180,13 +206,16 @@ export function DialogClose<T extends ElementType = "button">({
         type="button"
         aria-label={ariaLabel}
         onClick={close}
-        className={cn(CLOSE_CHROME[presentation], className as string | undefined)}
+        className={cn(
+          inChromeSlot ? CLOSE_CHROME[presentation] : cn(CLOSE_INLINE, hiddenInBar),
+          className as string | undefined,
+        )}
         {...rest}
       >
         <X
           aria-hidden="true"
           strokeWidth={1.5}
-          className={cn("size-4", presentation === "fullscreen" && "max-sm:size-6")}
+          className={cn("size-4", inChromeSlot && presentation === "fullscreen" && "max-sm:size-6")}
         />
       </button>
     );
@@ -199,7 +228,7 @@ export function DialogClose<T extends ElementType = "button">({
       // that submits the form it sits inside is worse, if anything.
       type={typeof Component === "string" && Component !== "button" ? undefined : "button"}
       onClick={close}
-      className={cn(inActions && presentation === "fullscreen" && "max-sm:hidden", className)}
+      className={cn(hiddenInBar, className)}
       {...props}
     >
       {children}
@@ -241,6 +270,16 @@ export function DialogClose<T extends ElementType = "button">({
  * is its own tap target, so `--tap-size` says 48 and the cover adds
  * nothing.
  */
+/** A bare `DialogClose` anywhere but the chrome slot: the same 16px icon in
+ * the same 24px circle as the drawer's in-flow close button
+ * (`drawer.tsx`), with its in-flow tap target — `[--tap-rest:-4px]` against
+ * `p-1`, `.tap-target` reserving the room in flow (D11). */
+const CLOSE_INLINE = cn(
+  "relative inline-flex shrink-0 items-center justify-center rounded-full p-1 text-subtle-foreground hover:bg-foreground/8 hover:text-foreground",
+  "[--btn-press-radius:calc(24px*0.1)] [--tap-rest:-4px] [--tap-size:24px] tap-target",
+  PRESS_SHAPE_MORPH,
+);
+
 const CLOSE_CHROME: Record<DialogPresentation, string> = {
   basic: cn(
     "-m-1 absolute top-4 right-4 z-20 rounded-full p-1 text-subtle-foreground hover:bg-foreground/8 hover:text-foreground",
@@ -264,17 +303,27 @@ const CLOSE_CHROME: Record<DialogPresentation, string> = {
  * - Corners `CornerExtraLarge`, 28dp: `--radius-sheet`, the same M3 token
  *   the bottom sheets wear (`theme.css` says why one value serves both).
  * - Fill `SurfaceContainerHigh`, which this library maps to `surface-3`
- *   (as the full-screen search view in `select.tsx` does).
- * - Width 280–560dp (`DialogMinWidth`/`DialogMaxWidth`): `max-w-[560px]`
- *   under the container's 16px inset, which on a 320px phone leaves 288.
+ *   (as the full-screen search view in `select.tsx` does). `surface-3` is
+ *   also this library's hover and selected fill, so everything inside
+ *   the panel reads its surfaces one step up (`surface-raised`,
+ *   `theme.css`); the panel's own fill is captured as `--dialog-fill`
+ *   before that shift.
+ * - Width: M3 sizes the dialog to its content between 280dp and 560dp
+ *   (`DialogMinWidth`/`DialogMaxWidth`, `AlertDialog.kt`'s `sizeIn`).
+ *   This panel is `w-full` up to that 560, so it does not change width
+ *   as its content does — a library choice. On a 320px phone the
+ *   container's 16px inset leaves 288.
  * - Padding 24dp, 20dp for a precise pointer
  *   (`AlertDialogDefaults.dialogPadding`, via
  *   `shouldUsePrecisionPointerComponentSizing`), carried as
  *   `--dialog-pad` so the sticky header and actions extend to the same
  *   edge — `pointer-fine:` is the web's reading of the same question.
- * - Elevation `Level3` is the existing `--shadow-dialog`: this panel is the
- *   *floating* register (AGENTS.md), a shadow because it overlaps a ground
- *   it does not know. No border, as M3 has none.
+ * - A shadow, `--shadow-dialog`: this panel is the *floating* register
+ *   (AGENTS.md), a shadow because it overlaps a ground it does not know.
+ *   Not a transcription — `DialogTokens.ContainerElevation` names Level3,
+ *   but Compose's `AlertDialog` draws no shadow at all (tonal elevation
+ *   0). The `border` is gone; the 1px `--edge` ring `--shadow-dialog`
+ *   carries is the one hairline left.
  *
  * It fades in on the effects spring and no longer scales. A `scale` makes
  * the panel a containing block for `position: fixed` descendants for as
@@ -324,8 +373,7 @@ function DialogSurface({
   presentation,
   className,
   children,
-  ...props
-}: ComponentPropsWithoutRef<"div"> & { presentation: DialogPresentation }) {
+}: DialogPartProps & { presentation: DialogPresentation }) {
   const { open, setOpen } = useDialogContext(
     presentation === "basic" ? "DialogContent" : "DialogFullScreen",
   );
@@ -355,22 +403,29 @@ function DialogSurface({
       <div
         className={cn(
           "fixed inset-0 flex w-screen items-center justify-center p-4",
-          fullscreen && "max-sm:p-0",
+          // The panel's own fill, captured *here*: the panel's
+          // `surface-raised` moves every surface token up a step for
+          // everything inside it (see that utility in `theme.css`),
+          // including the sticky header and actions that wear this fill.
+          "[--dialog-fill:var(--color-surface-3)]",
+          fullscreen && "max-sm:p-0 max-sm:[--dialog-fill:var(--color-base-100)]",
         )}
       >
         <PresentationContext.Provider value={presentation}>
           <DialogPanel
             transition
             className={cn(
-              "relative flex max-h-[85vh] w-full max-w-[560px] flex-col overflow-hidden rounded-sheet bg-surface-3 shadow-[var(--shadow-dialog)]",
+              "relative flex max-h-[85vh] w-full max-w-[560px] flex-col overflow-hidden rounded-sheet bg-(--dialog-fill) shadow-[var(--shadow-dialog)]",
+              // Full-screen below `sm`, the panel is the page's own ground,
+              // and what is inside it reads as on a page: no shift there.
+              fullscreen ? "sm:surface-raised" : "surface-raised",
               "[--dialog-pad:24px] pointer-fine:[--dialog-pad:20px]",
               "[--dialog-text-pad:24px] pointer-fine:[--dialog-text-pad:16px]",
               "duration-[var(--dur-effects)] ease-[var(--ease-effects)] data-closed:opacity-0",
               fullscreen &&
-                "max-sm:h-dvh max-sm:max-h-none max-sm:max-w-none max-sm:rounded-none max-sm:bg-base-100 max-sm:shadow-none max-sm:pt-[env(safe-area-inset-top,0px)]",
+                "max-sm:h-dvh max-sm:max-h-none max-sm:max-w-none max-sm:rounded-none max-sm:shadow-none max-sm:pt-[env(safe-area-inset-top,0px)]",
               className,
             )}
-            {...props}
           >
             {fullscreen && <div aria-hidden="true" className="h-16 shrink-0 sm:hidden" />}
             <div
@@ -381,7 +436,9 @@ function DialogSurface({
             >
               {body}
             </div>
-            {ownClose ?? <DialogClose />}
+            <ChromeSlotContext.Provider value={true}>
+              {ownClose ?? <DialogClose />}
+            </ChromeSlotContext.Provider>
           </DialogPanel>
         </PresentationContext.Provider>
       </div>
@@ -394,7 +451,7 @@ function DialogSurface({
  * wide. The default for anything short — a confirmation, a few fields.
  * See `DialogSurface` for the tokens.
  */
-export function DialogContent(props: ComponentPropsWithoutRef<"div">) {
+export function DialogContent(props: DialogPartProps) {
   return <DialogSurface presentation="basic" {...props} />;
 }
 
@@ -407,7 +464,7 @@ export function DialogContent(props: ComponentPropsWithoutRef<"div">) {
  * container changes. Chosen by CSS breakpoint, like `SelectContent`: a
  * native implementation would read a window-size class instead.
  */
-export function DialogFullScreen(props: ComponentPropsWithoutRef<"div">) {
+export function DialogFullScreen(props: DialogPartProps) {
   return <DialogSurface presentation="fullscreen" {...props} />;
 }
 
@@ -420,11 +477,13 @@ export function DialogFullScreen(props: ComponentPropsWithoutRef<"div">) {
  * `mb-4` before the body.
  *
  * The gutter on the right is the room the ✕ needs: it is `absolute` in
- * the top-right corner, from 16px to 32px inset, so `pr-8` keeps a long
- * headline out from under it. D11: the gutter grows with `--density` to
- * 48px at comfortable, where the close button's *tap target* ends
- * (`theme.css`'s `.tap-target-anchored`); `e2e/tap-targets.spec.ts` gates
- * it. Written as one `calc`, not a breakpoint variant, because `--density`
+ * the top-right corner, and with its `-m-1 p-1` its box runs from 12px to
+ * 36px in from the panel's edge. `pr-8` keeps a long headline 32px in —
+ * 4px short of that box at compact, which `e2e/tap-targets.spec.ts`
+ * already calls slightly optimistic; the gap to the icon itself (16–32px
+ * in) is clear. D11: the gutter grows with `--density` to 48px at
+ * comfortable, where the close button's *tap target* ends
+ * (`theme.css`'s `.tap-target-anchored`), and that spec gates it. Written as one `calc`, not a breakpoint variant, because `--density`
  * is a subtree axis.
  *
  * `sticky -top-(--dialog-pad)`, not `top-0`: a sticky offset is measured
@@ -436,23 +495,29 @@ export function DialogFullScreen(props: ComponentPropsWithoutRef<"div">) {
  * content peeks out around it. `DialogActions` mirrors all of it at the
  * bottom.
  *
- * In the full-screen dialog below `sm` the fill is the panel's `base-100`,
- * and the header pins under the 64dp bar, not the bar's own title slot —
- * M3's medium top app bar puts the headline under the bar's row the same
- * way.
+ * Its fill is the panel's own (`--dialog-fill`), the page's `base-100` in
+ * the full-screen dialog below `sm`, where the header pins under the 64dp
+ * bar rather than in the bar's title slot — a library choice that keeps
+ * the headline with its supporting text.
  */
-export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+export function DialogHeader({ className, children }: DialogPartProps) {
   const presentation = useContext(PresentationContext);
   return (
     <div
+      // Marks the header for `DialogActions`, which closes up the header's
+      // own margin when it follows directly (see there).
+      data-dialog-header=""
       className={cn(
-        "sticky -top-(--dialog-pad) z-10 -mx-(--dialog-pad) -mt-(--dialog-pad) mb-4 flex flex-col gap-4 bg-surface-3 px-(--dialog-pad) pt-(--dialog-pad)",
+        "sticky -top-(--dialog-pad) z-10 -mx-(--dialog-pad) -mt-(--dialog-pad) mb-4 flex flex-col gap-4 bg-(--dialog-fill) px-(--dialog-pad) pt-(--dialog-pad)",
         "pr-[calc(2rem+var(--density,0)*1rem)]",
-        presentation === "fullscreen" && "max-sm:bg-base-100",
+        // Full-screen, the close icon is in the bar, not the corner: no
+        // gutter to keep, so a long headline does not wrap early.
+        presentation === "fullscreen" && "max-sm:pr-(--dialog-pad)",
         className,
       )}
-      {...props}
-    />
+    >
+      {children}
+    </div>
   );
 }
 
@@ -463,13 +528,15 @@ export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLD
  * dialog it does not sit at the foot.
  *
  * In the basic dialog: end-aligned, 8dp apart (`ButtonsMainAxisSpacing`),
- * 24dp under the text (`AlertDialogDefaults.textPadding`; 16dp for a
- * precise pointer, as `--dialog-text-pad` on the panel), held at the
- * bottom of the visible panel like `DialogHeader` at the top. A variable
- * rather than a `pointer-fine:mt-4` here: that variant is emitted after
- * `max-sm:`, so on a phone-width window driven by a mouse it pushed the
- * full-screen bar's actions 16px down (measured: "Create" at y 32–64 in a
- * 64px bar).
+ * the buttons 24dp under the text above them
+ * (`AlertDialogDefaults.textPadding`; 16dp for a precise pointer, as
+ * `--dialog-text-pad` on the panel) — the margin is that less this row's
+ * own `pt-2`, and less `DialogHeader`'s `mb-4` too when the actions follow
+ * it directly — held at the bottom of the visible panel like
+ * `DialogHeader` at the top. A variable rather than a `pointer-fine:mt-4`:
+ * that variant is emitted after `max-sm:`, so on a phone-width window
+ * driven by a mouse it pushed the full-screen bar's actions 16px down
+ * (measured: "Create" at y 32–64 in a 64px bar).
  *
  * In the full-screen dialog below `sm`: moved into the top bar, trailing,
  * `TrailingSpace` 4dp from the edge (`AppBarTokens`), by position alone —
@@ -477,27 +544,41 @@ export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLD
  * unchanged. A `DialogClose` among the actions is hidden there, since the
  * bar's close icon is that action.
  */
-export function DialogActions({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+export function DialogActions({ className, children }: DialogPartProps) {
   const presentation = useContext(PresentationContext);
   return (
     <InActionsContext.Provider value={true}>
       <div
         className={cn(
-          "sticky -bottom-(--dialog-pad) z-10 -mx-(--dialog-pad) -mb-(--dialog-pad) mt-(--dialog-text-pad) flex items-center justify-end gap-2 bg-surface-3 px-(--dialog-pad) pt-2 pb-(--dialog-pad)",
+          "sticky -bottom-(--dialog-pad) z-10 -mx-(--dialog-pad) -mb-(--dialog-pad) flex items-center justify-end gap-2 bg-(--dialog-fill) px-(--dialog-pad) pt-2 pb-(--dialog-pad)",
+          // `--dialog-text-pad` from the text to the buttons: less this
+          // row's own `pt-2`, and, straight after `DialogHeader`, less the
+          // header's `mb-4` as well.
+          "mt-[calc(var(--dialog-text-pad)-0.5rem)] [[data-dialog-header]+&]:mt-[calc(var(--dialog-text-pad)-1.5rem)]",
           presentation === "fullscreen" &&
-            "max-sm:absolute max-sm:top-[env(safe-area-inset-top,0px)] max-sm:right-[env(safe-area-inset-right,0px)] max-sm:bottom-auto max-sm:z-20 max-sm:m-0 max-sm:h-16 max-sm:bg-transparent max-sm:p-0 max-sm:pr-1",
+            "max-sm:absolute max-sm:top-[env(safe-area-inset-top,0px)] max-sm:right-[env(safe-area-inset-right,0px)] max-sm:bottom-auto max-sm:z-20 max-sm:m-0 max-sm:h-16 max-sm:bg-transparent max-sm:p-0 max-sm:pr-1 max-sm:[[data-dialog-header]+&]:mt-0",
+          // Clear of the leading close icon: 4dp + 48dp + 4dp. Without it
+          // a long label, or three actions, ran under the close icon at
+          // 320px (found in review: "Preview" from x 35, under Close's
+          // 4–52). M3's bar carries one short confirming action; more
+          // than fits here is the caller's to cut.
+          presentation === "fullscreen" &&
+            "max-sm:left-[calc(env(safe-area-inset-left,0px)+3.5rem)]",
           className,
         )}
-        {...props}
-      />
+      >
+        {children}
+      </div>
     </InActionsContext.Provider>
   );
 }
 
 /**
- * The headline. M3's is `HeadlineSmall`, 24/32 (`DialogTokens.HeadlineFont`);
- * this library's type scale tops out at `text-title`, 20/28, for headings
- * in a dense console — a library choice. `font-display`: `theme.css`'s own
+ * The headline. M3's `AlertDialog` sets it at 20/26 for a precise pointer
+ * and at `HeadlineSmall`, 24/32 (`DialogTokens.HeadlineFont`), otherwise.
+ * This library's type scale tops out at `text-title`, 20/28, for headings
+ * in a dense console, and uses it for both — M3's size with a mouse, a
+ * library choice on touch. `font-display`: `theme.css`'s own
  * doc on `--font-display` names dialog headings; `tracking-normal` undoes
  * the global tracking tuned for the sans face (see `card.tsx`).
  */

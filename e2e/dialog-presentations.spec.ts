@@ -16,7 +16,7 @@ const DESKTOP = { width: 1280, height: 800 };
 const panel = (page: Page) => page.locator('[id^="headlessui-dialog-panel"]');
 
 async function opened(page: Page) {
-  await expect(page.getByRole("heading").first()).toBeVisible();
+  await expect(page.getByRole("heading").first(), "failed: the dialog did not open").toBeVisible();
   await settleTransitions(page);
 }
 
@@ -57,7 +57,7 @@ test.describe("DialogFullScreen below 640px: M3's full-screen dialog", () => {
       "failed: the Cancel action shows beside the close icon that already is it",
     ).toBeHidden();
     const title = await box(page.getByRole("heading", { name: "New webhook endpoint" }));
-    expect(title.y, "failed: the headline sits under the bar").toBeGreaterThanOrEqual(64);
+    expect(title.y, "failed: the headline sits in or above the bar").toBeGreaterThanOrEqual(64);
   });
 
   test("the bar's Create submits the form; the close icon closes and returns focus", async ({
@@ -66,16 +66,20 @@ test.describe("DialogFullScreen below 640px: M3's full-screen dialog", () => {
     await openStory(page, STORY.dialogFullScreenPhone, PHONE);
     await opened(page);
     await page.getByRole("button", { name: "Create" }).click();
-    await expect(panel(page)).toHaveCount(0);
+    await expect(panel(page), "failed: submitting did not close the dialog").toHaveCount(0);
     await expect(
       storyRoot(page).getByText("created: https://hooks.example.com/vaam"),
+      "failed: the bar's Create did not submit the form",
     ).toBeVisible();
 
     await storyRoot(page).getByRole("button", { name: "New endpoint" }).click();
     await opened(page);
     await page.getByRole("button", { name: "Close", exact: true }).click();
-    await expect(panel(page)).toHaveCount(0);
-    await expect(storyRoot(page).getByRole("button", { name: "New endpoint" })).toBeFocused();
+    await expect(panel(page), "failed: the close icon did not close the dialog").toHaveCount(0);
+    await expect(
+      storyRoot(page).getByRole("button", { name: "New endpoint" }),
+      "failed: focus did not return to the trigger",
+    ).toBeFocused();
   });
 });
 
@@ -89,8 +93,14 @@ test("DialogFullScreen from 640px up is the basic dialog, actions at the foot", 
   // `CornerExtraLarge`, 28dp.
   expect(rect.width, "failed: not 560px wide").toBeCloseTo(560, 0);
   expect(rect.x, "failed: not centred").toBeCloseTo((DESKTOP.width - 560) / 2, 0);
-  expect(await panel(page).evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe("28px");
-  await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
+  expect(
+    await panel(page).evaluate((el) => getComputedStyle(el).borderTopLeftRadius),
+    "failed: not M3's 28dp corners",
+  ).toBe("28px");
+  await expect(
+    page.getByRole("button", { name: "Cancel" }),
+    "failed: Cancel is hidden in the basic dialog",
+  ).toBeVisible();
   const create = await box(page.getByRole("button", { name: "Create" }));
   const note = await box(page.getByRole("textbox", { name: "Note for the team" }));
   expect(create.y, "failed: the actions are not below the body").toBeGreaterThan(
@@ -112,7 +122,10 @@ test("DialogContent on a phone stays the basic dialog: centred, 16px from each s
   expect(rect.x, "failed: not 16px from the left").toBeCloseTo(16, 0);
   expect(rect.width, "failed: not the screen less 16px each side").toBeCloseTo(PHONE.width - 32, 0);
   expect(rect.height, "failed: a short dialog went full-screen").toBeLessThan(PHONE.height / 2);
-  expect(await panel(page).evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe("28px");
+  expect(
+    await panel(page).evaluate((el) => getComputedStyle(el).borderTopLeftRadius),
+    "failed: not M3's 28dp corners",
+  ).toBe("28px");
 });
 
 test("M3's fill and type: SurfaceContainerHigh is surface-3, the headline 20px display", async ({
@@ -134,7 +147,7 @@ test("M3's fill and type: SurfaceContainerHigh is surface-3, the headline 20px d
     };
   });
   expect(style.fill, "failed: the panel is not surface-3").toBe(style.surface3);
-  expect(style.headlineSize).toBe("20px");
+  expect(style.headlineSize, "failed: the headline is not text-title's 20px").toBe("20px");
 });
 
 test.describe("padding follows the pointer: 20dp for a precise one, 24dp for touch", () => {
@@ -169,7 +182,7 @@ test("opened from the keyboard, the dialog draws no focus ring on its own contai
   await openStory(page, STORY.dialogBasicPhone, PHONE);
   await opened(page);
   await page.keyboard.press("Escape");
-  await expect(panel(page)).toHaveCount(0);
+  await expect(panel(page), "failed: Escape did not close the dialog").toHaveCount(0);
   const trigger = storyRoot(page).getByRole("button", { name: "Open dialog" });
   await trigger.focus();
   await page.keyboard.press("Enter");
@@ -225,7 +238,7 @@ test("a Select in the full-screen dialog opens its phone sheet over the dialog",
   await opened(page);
   await page.getByRole("button", { name: "Retry policy" }).click();
   const sheet = page.getByRole("listbox");
-  await expect(sheet).toBeVisible();
+  await expect(sheet, "failed: the Select did not open").toBeVisible();
   await settleTransitions(page);
   const rect = await box(sheet);
   expect(rect.y + rect.height, "failed: the sheet is not on the bottom edge").toBeCloseTo(
@@ -239,4 +252,206 @@ test("a Select in the full-screen dialog opens its phone sheet over the dialog",
     return hit !== null && element.contains(hit);
   });
   expect(onTop, "failed: the sheet is drawn under the dialog").toBe(true);
+});
+
+test.describe("a bare DialogClose among the actions is an icon action, not a second close icon", () => {
+  test("below 640px, full-screen: hidden, one close icon in the bar", async ({ page }) => {
+    await openStory(page, STORY.dialogCloseAmongActions, PHONE);
+    await opened(page);
+    await expect(
+      page.getByRole("button", { name: "Discard draft" }),
+      "failed: a second close icon shows in the full-screen dialog",
+    ).toBeHidden();
+    const close = await box(page.getByRole("button", { name: "Close", exact: true }));
+    expect(
+      [close.x, close.y, close.width, close.height],
+      "failed: not the bar's close icon",
+    ).toEqual([4, 8, 48, 48]);
+  });
+
+  test("from 640px up: a ✕ in the actions row, the dialog's own ✕ still in its corner", async ({
+    page,
+  }) => {
+    await openStory(page, STORY.dialogCloseAmongActions, DESKTOP);
+    await opened(page);
+    const discard = await box(page.getByRole("button", { name: "Discard draft" }));
+    const save = await box(page.getByRole("button", { name: "Save draft" }));
+    expect(
+      discard.y + discard.height / 2,
+      "failed: the icon action is not in the actions row",
+    ).toBeCloseTo(save.y + save.height / 2, 0);
+    // In flow, before "Save draft" as written — a chrome-positioned ✕ would
+    // sit on top of the button instead.
+    expect(
+      discard.x + discard.width,
+      "failed: the icon action overlaps Save draft instead of standing beside it",
+    ).toBeLessThanOrEqual(save.x);
+    const close = await box(page.getByRole("button", { name: "Close", exact: true }));
+    expect(close.y, "failed: the dialog's own ✕ left its corner").toBeLessThan(save.y - 40);
+  });
+});
+
+/** Computed background of an element, and of a probe painted with a token,
+ * so a fill is compared as the browser resolves it. */
+async function fills(page: Page) {
+  return page.evaluate(() => {
+    const probe = (token: string) => {
+      const el = document.createElement("div");
+      el.style.background = `var(${token})`;
+      document.body.append(el);
+      const value = getComputedStyle(el).backgroundColor;
+      el.remove();
+      return value;
+    };
+    const radio = (name: string) => {
+      const el = [...document.querySelectorAll('[role="radio"]')].find((r) =>
+        r.textContent?.includes(name),
+      );
+      return el === undefined ? "missing" : getComputedStyle(el).backgroundColor;
+    };
+    const panel = document.querySelector('[id^="headlessui-dialog-panel"]') as HTMLElement;
+    const header = panel.querySelector("[data-dialog-header]") as HTMLElement;
+    return {
+      panel: getComputedStyle(panel).backgroundColor,
+      header: getComputedStyle(header).backgroundColor,
+      checked: radio("JSON"),
+      unchecked: radio("Form-encoded"),
+      surface2: probe("--color-surface-2"),
+      surface3: probe("--color-surface-3"),
+      surface4: probe("--surface-4"),
+      base100: probe("--color-base-100"),
+    };
+  });
+}
+
+test.describe("inside the dialog, surfaces step up one, so a selected fill still shows", () => {
+  test("the basic dialog: the panel surface-3, a checked option surface-4 over unchecked surface-3", async ({
+    page,
+  }) => {
+    await openStory(page, STORY.dialogFullScreenDesktop, DESKTOP);
+    await opened(page);
+    const f = await fills(page);
+    expect(f.panel, "failed: the panel's own fill moved with the step-up").toBe(f.surface3);
+    expect(f.header, "failed: the sticky header's fill does not match the panel").toBe(f.panel);
+    expect(
+      f.checked,
+      "failed: the checked option's fill is not surface-4 — the selection does not show on the panel",
+    ).toBe(f.surface4);
+    expect(f.unchecked, "failed: an unchecked option is not a step under the checked one").toBe(
+      f.surface3,
+    );
+  });
+
+  test("full-screen on a phone: the page's own ground, no step-up", async ({ page }) => {
+    await openStory(page, STORY.dialogFullScreenPhone, PHONE);
+    await opened(page);
+    const f = await fills(page);
+    expect(f.panel, "failed: the full-screen panel is not the page's ground").toBe(f.base100);
+    expect(f.checked, "failed: a checked option on the page ground is not surface-3").toBe(
+      f.surface3,
+    );
+    expect(f.unchecked, "failed: an unchecked option on the page ground is not surface-2").toBe(
+      f.surface2,
+    );
+  });
+});
+
+test.describe("the buttons sit M3's textPadding under the text: 16dp for a mouse", () => {
+  test("straight after the header", async ({ page }) => {
+    await openStory(page, STORY.dialogBasicPhone, PHONE);
+    await opened(page);
+    const description = await box(page.getByText("The current secret keeps verifying"));
+    const button = await box(page.getByRole("button", { name: "Rotate" }));
+    expect(
+      button.y - (description.y + description.height),
+      "failed: not 16px from the text to the buttons",
+    ).toBeCloseTo(16, 0);
+  });
+
+  test("after a body", async ({ page }) => {
+    await openStory(page, STORY.dialogFullScreenDesktop, DESKTOP);
+    await opened(page);
+    const form = await box(page.locator("#sb-endpoint-form"));
+    const button = await box(page.getByRole("button", { name: "Create" }));
+    expect(
+      button.y - (form.y + form.height),
+      "failed: not 16px from the body to the buttons",
+    ).toBeCloseTo(16, 0);
+  });
+});
+
+test("a basic dialog on a phone keeps its Cancel — only the full-screen bar hides it", async ({
+  page,
+}) => {
+  await openStory(page, STORY.dialogBasicPhone, PHONE);
+  await opened(page);
+  await expect(
+    page.getByRole("button", { name: "Cancel" }),
+    "failed: the basic dialog hid its dismiss action",
+  ).toBeVisible();
+});
+
+test("full-screen: a DialogClose in the body stays; only the actions' one goes", async ({
+  page,
+}) => {
+  await openStory(page, STORY.dialogCloseAmongActions, PHONE);
+  await opened(page);
+  await expect(
+    page.getByRole("button", { name: "Keep for later" }),
+    "failed: a DialogClose outside the actions was hidden too",
+  ).toBeVisible();
+});
+
+test.describe("the full-screen dialog's layout below 640px", () => {
+  test("the bar's actions start clear of the close icon; the header keeps no ✕ gutter", async ({
+    page,
+  }) => {
+    await openStory(page, STORY.dialogFullScreenPhone, PHONE);
+    await opened(page);
+    const style = await page.evaluate(() => {
+      const panel = document.querySelector('[id^="headlessui-dialog-panel"]') as HTMLElement;
+      const actions = (panel.querySelector('button[form="sb-endpoint-form"]') as HTMLElement)
+        .parentElement as HTMLElement;
+      const header = panel.querySelector("[data-dialog-header]") as HTMLElement;
+      return {
+        actionsLeft: getComputedStyle(actions).left,
+        headerRight: getComputedStyle(header).paddingRight,
+        headerLeft: getComputedStyle(header).paddingLeft,
+      };
+    });
+    // 4dp + 48dp + 4dp: the close icon's leading space, its box, a gap.
+    expect(style.actionsLeft, "failed: the bar's actions can run under the close icon").toBe(
+      "56px",
+    );
+    expect(
+      style.headerRight,
+      "failed: the header keeps the corner ✕'s gutter although the close is in the bar",
+    ).toBe(style.headerLeft);
+  });
+
+  test("scrolled to the end, the last field clears the bottom edge by the padding", async ({
+    page,
+  }) => {
+    await openStory(page, STORY.dialogFullScreenPhone, PHONE);
+    await opened(page);
+    await page.evaluate(() => {
+      const panel = document.querySelector('[id^="headlessui-dialog-panel"]') as HTMLElement;
+      const scroller = [...panel.children].find(
+        (child) => getComputedStyle(child).overflowY === "auto",
+      ) as HTMLElement;
+      // The story's form fits an 812px screen; a spacer ahead of it makes
+      // the body scroll, or this would measure a gap nothing produced.
+      const spacer = document.createElement("div");
+      spacer.style.height = "1200px";
+      scroller.prepend(spacer);
+      scroller.scrollTop = scroller.scrollHeight;
+      if (scroller.scrollTop === 0) throw new Error("the dialog body did not scroll");
+    });
+    const note = await box(page.getByRole("textbox", { name: "Note for the team" }));
+    // 20px: a mouse's `--dialog-pad`; the safe-area inset is 0 here.
+    expect(
+      PHONE.height - (note.y + note.height),
+      "failed: the last field is not clear of the bottom edge",
+    ).toBeGreaterThanOrEqual(20 - 1);
+  });
 });
