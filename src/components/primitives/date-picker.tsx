@@ -508,7 +508,8 @@ export function DatePickerClose({
   "aria-label"?: string | undefined;
 }) {
   const picker = usePicker("DatePickerClose");
-  const icon = children == null || ariaLabel !== undefined;
+  const icon = children == null;
+  const labelled = !icon && ariaLabel !== undefined;
   return (
     <button
       type="button"
@@ -516,7 +517,7 @@ export function DatePickerClose({
       onClick={() => picker.closePicker(false)}
       className={cn(
         "flex shrink-0 items-center justify-center rounded-full text-foreground hover:bg-foreground/8",
-        icon ? "size-12" : "h-10 px-3 font-medium text-prose",
+        icon ? "size-12" : labelled ? "h-12 min-w-12" : "h-10 px-3 font-medium text-prose",
       )}
     >
       {children ?? <X aria-hidden="true" className="size-6" strokeWidth={1.5} />}
@@ -1040,15 +1041,25 @@ function RangePicker({
   // one month with no selectable day in it.
   const [{ first, stackedCount, anchorIndex, focusAnchor }] = useState(() => {
     const span = stackedWindow(selected?.from ?? selected?.to ?? new Date(), min, max);
-    // With nothing picked and today outside the window (a bound more than
-    // a year away), react-day-picker's autofocus falls back to the
-    // window's first day, and scrolling to focus it put the list 12 months
-    // before a past `max` (found in review). Then the anchor month's first
-    // selectable day takes focus instead, without scrolling.
-    const today = new Date();
-    const todayShown =
-      monthsBetween(span.first, today) >= 0 && monthsBetween(span.first, today) < span.stackedCount;
-    return { ...span, focusAnchor: selected === undefined && !todayShown };
+    // react-day-picker's autofocus goes to a selected day, else today —
+    // each only if it is in the list and selectable — else the list's first
+    // day, and scrolling to that put the list 12 months before a past
+    // `max` (found in review; and with `max` earlier this month, today was
+    // in the list but not selectable, found in the next). When neither a
+    // picked day nor today can take focus, the anchor month's first
+    // selectable day takes it instead, without scrolling.
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const selectable = (day: Date | undefined) =>
+      day !== undefined &&
+      (min === undefined || day >= min) &&
+      (max === undefined || day <= max) &&
+      monthsBetween(span.first, day) >= 0 &&
+      monthsBetween(span.first, day) < span.stackedCount;
+    return {
+      ...span,
+      focusAnchor: !selectable(selected?.from) && !selectable(selected?.to) && !selectable(today),
+    };
   });
 
   // Scroll the stacked list to the anchor month when it is the one shown.
@@ -1182,7 +1193,8 @@ function RangePicker({
  * Marks the rest of the current press handled (`useDismissal`'s doc has
  * why). Ends at the press's click, or — for a press that makes no click (a
  * handled touch-end, a drag) — at the next press or key, or half a second
- * after the press ends.
+ * after the press ends (its pointer-up or touch-end, however long it was
+ * held).
  *
  * Where each part is caught is the point:
  *
@@ -1208,6 +1220,11 @@ function spendRestOfPress() {
   const html = document.documentElement;
   const handled = (event: Event) => {
     if (event.cancelable) event.preventDefault();
+    // The half second runs from the press's *end*: counted from its
+    // mouse-down, a press held longer ended the spending before its own
+    // pointer-up, and that pointer-up and click closed a dialog around the
+    // picker (found in review, at 800ms).
+    if (event.type === "mousedown") return;
     clearTimeout(timer);
     timer = setTimeout(done, 500);
   };
@@ -1266,12 +1283,14 @@ function useDismissal(picker: PickerContextValue, surfaceRef: RefObject<HTMLDivE
         const firstEl = focusable[0];
         const lastEl = focusable[focusable.length - 1];
         if (firstEl === undefined || lastEl === undefined) return;
-        // Focus on no stop at all — the surface itself, after a press on
-        // its own background — has no neighbour inside for the browser to
-        // move to, and Shift+Tab walked out to the trigger (found in
-        // review). From there, Tab goes to the first stop and Shift+Tab to
-        // the last.
-        if (!focusable.includes(document.activeElement as HTMLElement)) {
+        // Focus on the surface itself — after a press on its own background
+        // — has no neighbour inside for the browser to move to, and
+        // Shift+Tab walked out to the trigger (found in review). From there,
+        // Tab goes to the first stop and Shift+Tab to the last. Only the
+        // surface: a caller's own `<select>` or `<textarea>` is focusable
+        // without being in the list above, and the browser moves on from it
+        // in page order.
+        if (document.activeElement === surface) {
           event.preventDefault();
           (event.shiftKey ? lastEl : firstEl).focus();
         } else if (event.shiftKey && document.activeElement === firstEl) {

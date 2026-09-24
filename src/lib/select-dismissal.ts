@@ -23,9 +23,43 @@
  */
 const underOpenSelect = new WeakSet<Event>();
 
+/**
+ * The same answer for any Radix dismissable layer, not only this library's
+ * drawer — a consumer's own Radix dialog, say. Radix decides an outside
+ * press in a custom event, `dismissableLayer.pointerDownOutside`,
+ * dispatched on the pressed element and cancelable, and dismisses only if
+ * nothing prevented it. The event does not bubble, but its capture phase
+ * still passes the window, so one listener there declines every event whose
+ * original pointer-down a popup noted. Without it, found in review: a
+ * Radix overlay that wraps its content (Radix's own "scrollable overlay"
+ * layout) is a surface Radix never counts as intercepted, so the press that
+ * closed a date picker closed the dialog too; and after a *tap*, whose
+ * click is spent, Radix stayed armed and the next click — Enter on the
+ * trigger — closed the dialog.
+ *
+ * The event name is Radix's, not a documented API. If a Radix release
+ * renames it, this goes quiet and `e2e/date-picker.spec.ts`'s Radix-dialog
+ * tests fail. Installed once, on the first note, and never removed: it acts
+ * only on noted events, which live in a `WeakSet`.
+ */
+let guardingRadix = false;
+function guardRadixLayers(): void {
+  if (guardingRadix || typeof window === "undefined") return;
+  guardingRadix = true;
+  window.addEventListener(
+    "dismissableLayer.pointerDownOutside",
+    (event) => {
+      const original = (event as CustomEvent<{ originalEvent?: Event }>).detail?.originalEvent;
+      if (wasPointerDownUnderOpenSelect(original)) event.preventDefault();
+    },
+    true,
+  );
+}
+
 /** Called by `SelectContent` for every pointer-down outside its open
  * options, and by an open date picker for every one outside it. */
 export function notePointerDownUnderOpenSelect(event: Event): void {
+  guardRadixLayers();
   underOpenSelect.add(event);
 }
 

@@ -140,7 +140,31 @@ test.describe("inside a drawer — the failure this rework fixes", () => {
   });
 });
 
+/** A mouse press at (x, y) held for `ms` before release. */
+async function longPress(page: Page, x: number, y: number, ms: number) {
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.waitForTimeout(ms);
+  await page.mouse.up();
+}
+
 test.describe("inside a Dialog, a press outside closes the picker alone", () => {
+  test("held for 800ms, too", async ({ page }) => {
+    // The rest of the press is spent for half a second from its end. When
+    // that was counted from the mouse-down, a press held longer ended the
+    // spending before its own pointer-up, which closed the dialog.
+    await openStory(page, STORY.datePickerInDialog, DESKTOP);
+    await storyRoot(page).getByRole("button", { name: "Open dialog" }).click();
+    const dialog = page.getByRole("heading", { name: "Schedule the export" });
+    await expect(dialog).toBeVisible();
+    await settleTransitions(page);
+    await open(page, page.getByRole("button", { name: "Export on" }));
+    await longPress(page, 5, 5, 800);
+    await expect(picker(page), "failed: the press did not close the picker").toHaveCount(0);
+    await page.waitForTimeout(400);
+    await expect(dialog, "failed: the long press closed the dialog too").toBeVisible();
+  });
+
   for (const size of [PHONE, DESKTOP]) {
     test(`at ${size.width}px`, async ({ page }) => {
       await openStory(page, STORY.datePickerInDialog, size);
@@ -181,6 +205,44 @@ test.describe("inside a consumer's own Radix dialog", () => {
     await page.waitForTimeout(300);
     await expect(dialog, "failed: the next click closed the dialog").toBeVisible();
     await expect(picker(page), "failed: Enter did not reopen the picker").toBeVisible();
+  });
+});
+
+test.describe("inside a consumer's own Radix dialog, the rest", () => {
+  async function openRadix(page: Page, story: string) {
+    await openStory(page, story, DESKTOP);
+    await storyRoot(page).getByRole("button", { name: "Open Radix dialog" }).click();
+    const dialog = page.getByRole("dialog", { name: "Pick a cut-off" });
+    await expect(dialog).toBeVisible();
+    await settleTransitions(page);
+    const trigger = dialog.getByRole("button", { name: "Cut-off" });
+    await open(page, trigger);
+    return { dialog, trigger };
+  }
+
+  test("a press held for 800ms closes the picker alone", async ({ page }) => {
+    const { dialog } = await openRadix(page, STORY.datePickerInRadixDialog);
+    await longPress(page, 20, 20, 800);
+    await expect(picker(page)).toHaveCount(0);
+    await page.waitForTimeout(400);
+    await expect(dialog, "failed: the long press closed the dialog").toBeVisible();
+  });
+
+  test("with the overlay wrapping the content, a press on it closes the picker alone", async ({
+    page,
+  }) => {
+    // The overlay is the picker's ancestor here, so it is not inert and
+    // takes the press itself — a surface Radix never counts as intercepted.
+    const { dialog, trigger } = await openRadix(page, STORY.datePickerInScrollableRadixDialog);
+    await page.mouse.click(20, 20);
+    await expect(picker(page), "failed: the press did not close the picker").toHaveCount(0);
+    await page.waitForTimeout(400);
+    await expect(dialog, "failed: the press closed the dialog").toBeVisible();
+    await expect(trigger).toBeFocused();
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(300);
+    await expect(dialog, "failed: the next click closed the dialog").toBeVisible();
+    await expect(picker(page)).toBeVisible();
   });
 });
 
@@ -563,6 +625,22 @@ test.describe("the full-screen range list holds still", () => {
   });
 });
 
+test.describe("a range whose bound excludes today", () => {
+  test("with today in the list but past max, focus still goes to max's month", async ({ page }) => {
+    // Today in December 2024, after `max` (the 15th): in the list but not
+    // selectable, so react-day-picker's autofocus fell to the list's first
+    // day, December 2023.
+    await page.clock.setFixedTime(new Date(2024, 11, 20, 12));
+    await openStory(page, STORY.datePickerRangeBoundedPast, PHONE);
+    await expect(picker(page)).toBeVisible();
+    await settleTransitions(page);
+    expect(
+      await page.evaluate(() => document.activeElement?.closest("td")?.getAttribute("data-day")),
+      "failed: focus is not in max's month",
+    ).toMatch(/^2024-12-/);
+  });
+});
+
 test.describe("a range bounded more than a year away", () => {
   test("opens the phone list on the bound's month, focused there", async ({ page }) => {
     await openStory(page, STORY.datePickerRangeBoundedPast, PHONE);
@@ -721,6 +799,30 @@ test.describe("names, descriptions and focus", () => {
       expect(await inside(), `failed: ${key} from the surface left the picker`).toBe(true);
       expect(await surfaceFocused(), `failed: ${key} from the surface stayed on it`).toBe(false);
     }
+  });
+
+  test("a caller's own control inside the picker keeps its place in the tab order", async ({
+    page,
+  }) => {
+    // Written among the container's children, it renders between the
+    // calendar and the actions. The trap wraps only at the ends and from
+    // the surface itself; a wider branch sent Tab from this `<select>` to
+    // the first stop and Shift+Tab to OK (found in review).
+    await openStory(page, STORY.datePickerWithExtraContent, DESKTOP);
+    await expect(picker(page)).toBeVisible();
+    const time = picker(page).getByRole("combobox", { name: "Time" });
+    await time.focus();
+    await page.keyboard.press("Tab");
+    await expect(
+      picker(page).getByRole("button", { name: "Now" }),
+      "failed: Tab left page order",
+    ).toBeFocused();
+    await time.focus();
+    await page.keyboard.press("Shift+Tab");
+    expect(
+      await page.evaluate(() => document.activeElement?.closest("td") !== null),
+      "failed: Shift+Tab left page order (expected the calendar's day)",
+    ).toBe(true);
   });
 
   test("Tab stays inside where days and a bound's arrows are out of the tab order", async ({
@@ -919,6 +1021,31 @@ test.describe("on a touch screen, a tap outside is spent on closing", () => {
       page.locator("#scripted"),
       "failed: a script's click was eaten as part of the tap",
     ).toHaveAttribute("data-presses", "1");
+  });
+
+  test("inside a consumer's Radix dialog, a tap outside and then Enter leave the dialog open", async ({
+    page,
+  }) => {
+    // Radix defers a touch dismissal to the click, which a spent tap never
+    // makes, so it stayed armed and the next click — Enter on the trigger —
+    // closed the dialog.
+    await openStory(page, STORY.datePickerInRadixDialog, PHONE);
+    await storyRoot(page).getByRole("button", { name: "Open Radix dialog" }).tap();
+    const dialog = page.getByRole("dialog", { name: "Pick a cut-off" });
+    await expect(dialog).toBeVisible();
+    await settleTransitions(page);
+    const trigger = dialog.getByRole("button", { name: "Cut-off" });
+    await trigger.tap();
+    await expect(picker(page)).toBeVisible();
+    await settleTransitions(page);
+    await page.touchscreen.tap(5, 5);
+    await expect(picker(page)).toHaveCount(0);
+    await page.waitForTimeout(400);
+    await expect(dialog, "failed: the tap closed the dialog").toBeVisible();
+    await trigger.focus();
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(300);
+    await expect(dialog, "failed: the next click closed the dialog").toBeVisible();
   });
 
   test("inside a Dialog, a tap outside closes the picker, not the dialog", async ({ page }) => {

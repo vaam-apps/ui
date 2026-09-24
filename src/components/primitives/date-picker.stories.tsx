@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { expect, userEvent, within } from "storybook/test";
+import { cn } from "../../lib/cn";
 import { Button } from "./button";
 import { Calendar } from "./calendar";
 import {
@@ -212,7 +213,8 @@ export const RangeRelabelledOnAPhone: Story = {
 /**
  * A range bounded more than a year before today, on a phone: the stacked
  * list is the twelve months up to `max`, and it opens on `max`'s month,
- * not twelve months earlier.
+ * not twelve months earlier. `max` is mid-month, so a test can also put
+ * today in that month but past `max`, in the list and not selectable.
  */
 export const RangeBoundedInThePastOnAPhone: Story = {
   globals: { viewport: { value: "phone" } },
@@ -220,7 +222,7 @@ export const RangeBoundedInThePastOnAPhone: Story = {
     const [value, setValue] = useState<IsoDateRange | undefined>();
     return (
       <div className="w-full max-w-80 p-4">
-        <DateRangePicker value={value} onValueChange={setValue} max="2024-12-31">
+        <DateRangePicker value={value} onValueChange={setValue} max="2024-12-15">
           <DatePickerTrigger aria-label="Archived between">
             <DatePickerValue placeholder="Any time before 2025" />
           </DatePickerTrigger>
@@ -381,49 +383,110 @@ export const InsideADialog: Story = {
   },
 };
 
+function RadixDialogField({ wrapped }: { wrapped: boolean }) {
+  const [value, setValue] = useState<IsoDate | undefined>();
+  const content = (
+    <RadixDialog.Content
+      aria-describedby={undefined}
+      className={cn(
+        "z-40 mx-auto flex max-w-md flex-col gap-4 rounded-sheet bg-surface-2 p-6",
+        wrapped ? "relative my-24 w-[calc(100%-2rem)]" : "fixed inset-x-4 top-24",
+      )}
+    >
+      <RadixDialog.Title className="font-medium text-title">Pick a cut-off</RadixDialog.Title>
+      <FormField label="Cut-off" htmlFor={wrapped ? "radix-wrapped-cut-off" : "radix-cut-off"}>
+        <DatePicker value={value} onValueChange={setValue}>
+          <DatePickerTrigger id={wrapped ? "radix-wrapped-cut-off" : "radix-cut-off"}>
+            <DatePickerValue placeholder="Pick a date" />
+          </DatePickerTrigger>
+          <DatePickerContent />
+        </DatePicker>
+      </FormField>
+    </RadixDialog.Content>
+  );
+  return (
+    <div className="flex flex-col items-start gap-3 p-4">
+      <RadixDialog.Root>
+        <RadixDialog.Trigger asChild>
+          <Button variant="secondary" size="sm">
+            Open Radix dialog
+          </Button>
+        </RadixDialog.Trigger>
+        <p className="font-mono text-caption text-subtle-foreground">value: {value ?? "—"}</p>
+        <RadixDialog.Portal>
+          {wrapped ? (
+            <RadixDialog.Overlay className="fixed inset-0 z-40 overflow-y-auto bg-[var(--scrim)]">
+              {content}
+            </RadixDialog.Overlay>
+          ) : (
+            <>
+              <RadixDialog.Overlay className="fixed inset-0 z-40 bg-[var(--scrim)]" />
+              {content}
+            </>
+          )}
+        </RadixDialog.Portal>
+      </RadixDialog.Root>
+    </div>
+  );
+}
+
 /**
  * **Inside a consumer's own Radix dialog** — not this library's `Dialog`
- * or `Drawer`, and without the handshake those two share. A press outside
- * the picker closes it and leaves the dialog open, and so does the click
- * after it: Radix defers an outside dismissal to the click, and a click
- * hidden from it left the dismissal armed for the next one.
+ * or `Drawer`. A press outside the picker closes it and leaves the dialog
+ * open, and so does the click after it: Radix defers an outside dismissal
+ * to the click, and a click hidden from it left the dismissal armed for
+ * the next one.
  */
 export const InsideARadixDialog: Story = {
   globals: { viewport: { value: "desktop" } },
+  render: () => <RadixDialogField wrapped={false} />,
+};
+
+/**
+ * The same, with the overlay wrapping the content — Radix's own
+ * "scrollable overlay" layout. The overlay is then the picker's ancestor,
+ * so it is not made inert and takes the press itself, and Radix never
+ * counts a press on it as intercepted.
+ */
+export const InsideAScrollableRadixDialog: Story = {
+  globals: { viewport: { value: "desktop" } },
+  render: () => <RadixDialogField wrapped />,
+};
+
+/**
+ * Anything else written in the container renders once, between the
+ * calendar and the actions, and keeps its own place in the tab order —
+ * here a time and a "Now" shortcut.
+ */
+export const WithExtraContent: Story = {
+  globals: { viewport: { value: "desktop" } },
   render: function Render() {
-    const [value, setValue] = useState<IsoDate | undefined>();
+    const [value, setValue] = useState<IsoDate | undefined>("2026-09-11");
     return (
-      <div className="flex flex-col items-start gap-3 p-4">
-        <RadixDialog.Root>
-          <RadixDialog.Trigger asChild>
-            <Button variant="secondary" size="sm">
-              Open Radix dialog
-            </Button>
-          </RadixDialog.Trigger>
-          <p className="font-mono text-caption text-subtle-foreground">value: {value ?? "—"}</p>
-          <RadixDialog.Portal>
-            <RadixDialog.Overlay className="fixed inset-0 z-40 bg-[var(--scrim)]" />
-            <RadixDialog.Content
-              aria-describedby={undefined}
-              className="fixed inset-x-4 top-24 z-40 mx-auto flex max-w-md flex-col gap-4 rounded-sheet bg-surface-2 p-6"
-            >
-              <RadixDialog.Title className="font-medium text-title">
-                Pick a cut-off
-              </RadixDialog.Title>
-              <FormField label="Cut-off" htmlFor="radix-cut-off">
-                <DatePicker value={value} onValueChange={setValue}>
-                  <DatePickerTrigger id="radix-cut-off">
-                    <DatePickerValue placeholder="Pick a date" />
-                  </DatePickerTrigger>
-                  <DatePickerContent />
-                </DatePicker>
-              </FormField>
-            </RadixDialog.Content>
-          </RadixDialog.Portal>
-        </RadixDialog.Root>
+      <div className="w-full max-w-72 p-4">
+        <FormField label="Send at" htmlFor="sb-send-at">
+          <DatePicker value={value} onValueChange={setValue}>
+            <DatePickerTrigger id="sb-send-at">
+              <DatePickerValue />
+            </DatePickerTrigger>
+            <DatePickerContent>
+              <div className="flex items-center gap-2 px-6 pb-2">
+                <select aria-label="Time" className="select select-sm w-28">
+                  <option>09:00</option>
+                  <option>13:00</option>
+                  <option>17:00</option>
+                </select>
+                <Button type="button" variant="ghost" size="sm">
+                  Now
+                </Button>
+              </div>
+            </DatePickerContent>
+          </DatePicker>
+        </FormField>
       </div>
     );
   },
+  play: openPicker("Send at"),
 };
 
 /**

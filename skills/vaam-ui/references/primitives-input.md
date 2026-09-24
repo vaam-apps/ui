@@ -627,8 +627,9 @@ back to the trigger on close.
 it lands on: the page is inert while the picker is open, and the rest of
 that press (its click included) is spent on closing. So a button beside
 an open picker takes two presses: one to close the picker, one to press
-it. Inside a `Dialog`, a `Drawer` or your own Radix dialog, the same
-press closes the picker and leaves the dialog open.
+it. Inside a `Dialog`, a `Drawer` or your own Radix dialog (its overlay
+wrapping the content or not), the same press, by mouse or touch and however
+long it is held, closes the picker and leaves the dialog open.
 
 #### The parts
 
