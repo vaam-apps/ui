@@ -194,9 +194,10 @@ function isActive(href: string, currentPath: string): boolean {
  * this fix. One cause, two symptoms.
  *
  * There is no CSS-only way out: any flyout anchored inside a scroll
- * container is clipped by it, and escaping needs either a portal or CSS
- * anchor positioning — a floating-element dependency this package
- * deliberately does not have (D5), or a feature not yet safe to require.
+ * container is clipped by it, and escaping needs a portal, `position:
+ * fixed` placed by script (Floating UI, a dependency since #32 for
+ * `Select`'s dropdown), or CSS anchor positioning, a feature not yet safe
+ * to require — each more machinery than a label needs.
  * A native `title` is painted by the browser *outside* the page entirely,
  * so it cannot be clipped by anything, costs no CSS and no JS, and is the
  * one mechanism that actually delivers the label the rail is missing.

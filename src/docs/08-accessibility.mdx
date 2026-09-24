@@ -234,9 +234,11 @@ reads as mildly redundant but never as broken.
 That is a real degradation, not a fix to reach for on purpose. When a
 scroller is unavoidable, prefer a plain `title` attribute directly on the
 trigger, so the fallback is the *only* thing that renders rather than a
-bubble nobody sees plus a late plain one. The proper fix needs a portal
-or CSS anchor positioning — a floating-element dependency this package
-deliberately does not have, or a feature not yet safe to require.
+bubble nobody sees plus a late plain one. The proper fix is to place the
+bubble the way `Select`'s dropdown now is: `position: fixed`, positioned
+by Floating UI, still rendered inline. That dependency is in the package
+since #32 (it was the maintainer's call, for the dropdown a
+`Dialog` clipped); the tooltip has not been moved onto it yet.
 
 ### A `FormField` hint cannot reach a `Select`
 

@@ -923,6 +923,12 @@ export const SearchableInsideADrawer: Story = {
  * as it is in a plain select), and a "Done" written inside the list: there
  * it is a pointer-only affordance (`aria-hidden`), because a listbox may own
  * options only.
+ *
+ * From `sm` up both selects here are dropdowns that reach well past the
+ * dialog's bottom edge. The searchable one used to be clipped to one row
+ * by the dialog's scrolling body, and the plain one would have been cut
+ * off the same way. Now they float over it, under the trigger — or above
+ * it, on a window too short to fit one below.
  */
 export const SearchableInADialog: Story = {
   globals: { viewport: { value: "desktop" } },
@@ -942,27 +948,44 @@ export const SearchableInADialog: Story = {
             <DialogHeader>
               <DialogTitle>Choose where to send from</DialogTitle>
             </DialogHeader>
-            <FormField label="Country" htmlFor="dialog-search-country">
-              <Select
-                value={country}
-                onValueChange={(next) => {
-                  setCountry(next);
-                  setOpen(false);
-                }}
-              >
-                <SelectTrigger id="dialog-search-country">
-                  <SelectValue placeholder="Choose a country" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectSearch placeholder="Search countries" />
-                  <SelectItem value="">Any country</SelectItem>
-                  <CountryItems />
-                  <div className="flex justify-end px-2 pt-2">
-                    <SelectClose className="px-4 py-2 font-medium text-prose">Done</SelectClose>
-                  </div>
-                </SelectContent>
-              </Select>
-            </FormField>
+            <div className="flex flex-col gap-4">
+              <FormField label="Country" htmlFor="dialog-search-country">
+                <Select
+                  value={country}
+                  onValueChange={(next) => {
+                    setCountry(next);
+                    setOpen(false);
+                  }}
+                >
+                  <SelectTrigger id="dialog-search-country">
+                    <SelectValue placeholder="Choose a country" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectSearch placeholder="Search countries" />
+                    <SelectItem value="">Any country</SelectItem>
+                    <CountryItems />
+                    <div className="flex justify-end px-2 pt-2">
+                      <SelectClose className="px-4 py-2 font-medium text-prose">Done</SelectClose>
+                    </div>
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Channel" htmlFor="dialog-channel">
+                <Select defaultValue="sms">
+                  <SelectTrigger id="dialog-channel">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sms">SMS</SelectItem>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                    <SelectItem value="voice">Voice call</SelectItem>
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="push">Push notification</SelectItem>
+                    <SelectItem value="ussd">USSD</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormField>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

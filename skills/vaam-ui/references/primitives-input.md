@@ -244,7 +244,24 @@ switch from a plain picker to a searchable one.
 All three render **inline, not portalled** — a correctness fix, not a
 preference: Headless UI's portalled options land outside a vaul drawer's
 focus trap, where they never become usable. So they all work inside a
-`Drawer`. Do not put a `Select` inside something that re-anchors
+`Drawer`. The dropdown (and the docked search view) is nonetheless
+`position: fixed`, placed under its trigger by Floating UI, so a scrolling
+or clipping ancestor — a `Dialog`'s body, a drawer's, a card with
+`overflow-hidden` — no longer cuts it off. The exception is a container
+that clips *and* has a `transform`, `filter`, `backdrop-filter`,
+`contain` or `will-change: transform`: that one still clips it, so do not
+put a `Select` in one. When its trigger scrolls out of its container's
+view, the dropdown fades out and ignores the pointer until the trigger
+scrolls back; while faded it still answers the keyboard, and Escape
+closes it. It matches the trigger's width,
+shrinks to the room below it, and opens *above* the trigger only when it
+does not fit below and less than 200px is left there (a short list that
+fits never flips); with too little room either side it keeps the better
+side, shorter. Near the right edge of the window a docked search view
+aligns to its trigger's right edge instead of its left. Its placement is
+the library's: do not pass `top-*`, `left-*`, `inset-*` or `mt-*` in
+`className` (they replace or add to it), and know that a `max-h-*` there
+replaces the cap that keeps it inside the window. Do not put a `Select` inside something that re-anchors
 `position: fixed` children at phone width (a `transform`ed or
 `will-change`d ancestor that is *not* pinned to the bottom edge — the
 sheet anchors to that ancestor instead of the screen). A width you pass

@@ -1,5 +1,6 @@
 "use client";
 
+import { autoUpdate, flip, hide, offset, shift, size, useFloating } from "@floating-ui/react-dom";
 import {
   Combobox,
   ComboboxButton,
@@ -14,6 +15,7 @@ import {
 import { ArrowLeft, Check, ChevronDown, Search, X } from "lucide-react";
 import {
   Children,
+  type CSSProperties,
   cloneElement,
   createContext,
   Fragment,
@@ -331,7 +333,6 @@ export function Select({
     return (
       <Combobox
         as="div"
-        className="relative"
         // `null`, not `""`, for "nothing picked": `""` can be a real
         // option's value, and Headless UI would mark that option selected
         // before anyone picked it.
@@ -368,15 +369,12 @@ export function Select({
   }
 
   return (
-    // `as="div"` + `relative`: with `SelectContent` no longer portaled
-    // (see its own comment), the options position themselves against this
-    // element. Headless UI's `Listbox` renders a fragment by default, which
-    // would leave `absolute` resolving against whatever ancestor happened
-    // to be positioned — usually the drawer, putting the dropdown in the
-    // wrong place entirely.
+    // `as="div"`: one element for the select in the caller's layout, rather
+    // than Headless UI's default fragment. It used to be `relative` too, to
+    // anchor an `absolute` dropdown; the dropdown is `fixed` now, placed by
+    // `useDropdownPlacement`, and nothing positions against this element.
     <Listbox
       as="div"
-      className="relative"
       // `null` for "nothing picked" — see the same line on `Combobox` above.
       value={currentValue ?? null}
       onChange={(next: string | null) => {
@@ -853,6 +851,110 @@ function flattenParts(node: ReactNode, prefix = ""): ReactNode[] {
   });
 }
 
+/** The shortest a dropdown shrinks to before it flips to the other side
+ * of its trigger instead — a library choice: a docked search view's 56px
+ * header, four of its 32px rows and the list's 8px of padding (192px,
+ * measured), rounded up. */
+const DROPDOWN_MIN_HEIGHT = 200;
+
+/**
+ * Where the dropdown goes: under its trigger, by Floating UI, in
+ * `position: fixed`, while staying rendered inline.
+ *
+ * It used to be `absolute` under the trigger, which any scrolling or
+ * clipping ancestor cut off — inside a `Dialog` the dropdown lived in the
+ * dialog's own scrolling body, measured at 1280px: one row showing of a
+ * 346px-tall search view, the rest clipped by a 156px dialog. `fixed`
+ * escapes every ancestor that clips, and Floating UI resolves it against
+ * the right box when an ancestor *is* a containing block — vaul stamps
+ * `will-change: transform` on every drawer (AGENTS.md's trap), so inside
+ * one the coordinates are the drawer's, not the viewport's. What `fixed`
+ * cannot escape is an ancestor that is both: a containing block that also
+ * clips (`transform`, `filter`, `backdrop-filter` or `contain`, with
+ * `overflow: hidden`) clips it as it clipped `absolute` — measured, one
+ * row left in a 120px `backdrop-filter` card. Nothing in this library is
+ * built that way at rest — a `Dialog`'s panel is, for the length of its
+ * enter transition, while `scale-95` applies — and a caller's container
+ * can be. The popup
+ * still renders inline, not portalled: the reason is `SelectContent`'s
+ * `portal={false}` comment, and it has not changed.
+ *
+ * `size` hands the trigger's width and the height available to CSS, so
+ * the dropdown shrinks to fit. `flip` opens it upward when it does not fit
+ * below and less than `DROPDOWN_MIN_HEIGHT` is left there — a short list
+ * that fits never flips — and, checking the horizontal edges too, aligns
+ * it to the trigger's right edge instead of its left when a docked search
+ * view's 16rem would run off the right of the window. `shift` only acts
+ * when neither alignment fits, on a window narrower than the view.
+ *
+ * The result goes out as custom properties, never as inline `top`/`left`:
+ * below `sm` a `SelectContent` is a sheet or a full-screen view whose
+ * `max-sm:` classes must win, and an inline style would beat them. The
+ * classes decide whether to use the numbers; no breakpoint is read here.
+ */
+function useDropdownPlacement(
+  presentation: SelectPresentation,
+  triggerRef: RefObject<HTMLButtonElement | null>,
+) {
+  const { refs, x, y, middlewareData } = useFloating({
+    strategy: "fixed",
+    placement: "bottom-start",
+    elements: { reference: triggerRef.current },
+    middleware: [
+      offset(4),
+      // `size` before `flip`, holding the dropdown at no less than
+      // `DROPDOWN_MIN_HEIGHT`: it shrinks to the room under its trigger
+      // when that room is reasonable, and flips only when it is not. With
+      // `flip` first, a 346px search view flipped above a trigger that had
+      // 335px under it — measured in a `Dialog` at 1280×800 — a jump for
+      // 11px.
+      size({
+        padding: 8,
+        apply({ availableHeight, elements }) {
+          const floor = Math.max(DROPDOWN_MIN_HEIGHT, Math.floor(availableHeight));
+          elements.floating.style.setProperty("--select-float-max-h", `${floor}px`);
+        },
+      }),
+      flip({ padding: 8 }),
+      shift({ padding: 8 }),
+      // …and again once the side is settled, without the floor: when
+      // neither side has `DROPDOWN_MIN_HEIGHT`, `flip` keeps the side that
+      // overflows least, and the floor would then push it off the window
+      // (measured: 6px past the bottom of a 420px-tall one).
+      size({
+        padding: 8,
+        apply({ rects, availableHeight, elements }) {
+          const height = Math.max(0, Math.floor(availableHeight));
+          elements.floating.style.setProperty("--select-float-w", `${rects.reference.width}px`);
+          elements.floating.style.setProperty("--select-float-max-h", `${height}px`);
+        },
+      }),
+      // A trigger scrolled out of its container's view takes the dropdown
+      // with it. `absolute`, the scroller used to clip the dropdown too;
+      // `fixed`, it floated on over the container's own chrome — measured
+      // in a drawer: the dropdown drawn over the drawer's header at y 68,
+      // its trigger 100px scrolled up under it. The surface goes
+      // transparent and stops taking the pointer instead (its classes,
+      // on `data-reference-hidden`), and comes back when the trigger
+      // does. Not `visibility: hidden`: Chromium blurs a focused element
+      // that stops being rendered, and focus lands on `<body>` while the
+      // popup stays open — measured in both engines, after which the next
+      // Escape closed the drawer and left the popup open. Transparent, the
+      // list keeps focus and still answers the keyboard, which is also what
+      // a list the scroller clipped used to do.
+      hide({ strategy: "referenceHidden" }),
+    ],
+    whileElementsMounted: autoUpdate,
+  });
+  // A modal is placed by its own classes at every width.
+  if (presentation === "modal") {
+    return { setFloating: undefined, style: undefined, referenceHidden: undefined };
+  }
+  const style = { "--select-float-x": `${x}px`, "--select-float-y": `${y}px` } as CSSProperties;
+  const referenceHidden = middlewareData.hide?.referenceHidden === true ? "" : undefined;
+  return { setFloating: refs.setFloating, style, referenceHidden };
+}
+
 /**
  * The options' container, in whichever engine and presentation — shared by
  * `SelectContent`, `SelectDropdown` and `SelectModal`, whose docs say what
@@ -871,6 +973,7 @@ function SelectPopup({
 }) {
   const { engine, open, triggerRef, matchCount } = useSelectContext(component);
   const surfaceRef = useRef<HTMLElement | null>(null);
+  const placement = useDropdownPlacement(presentation, triggerRef);
   const matchCountRef = useRef(matchCount);
   matchCountRef.current = matchCount;
 
@@ -1009,7 +1112,12 @@ function SelectPopup({
     return (
       <PopupContext.Provider value={{ presentation }}>
         <ListboxOptions
-          ref={surfaceRef}
+          ref={(element: HTMLElement | null) => {
+            surfaceRef.current = element;
+            placement.setFloating?.(element);
+          }}
+          style={placement.style}
+          data-reference-hidden={placement.referenceHidden}
           // `portal={false}` is a correctness fix, not a preference.
           //
           // Headless UI's `anchor` prop portals the options into
@@ -1034,10 +1142,10 @@ function SelectPopup({
           // every select inside a drawer has been silently unusable since.
           //
           // Rendering inline keeps the options inside the drawer's own subtree,
-          // so the focus trap contains them instead of fighting them. The cost
-          // is losing `anchor`'s collision detection; `top-full` + `w-full`
-          // below reproduces the same "directly under the trigger, matching its
-          // width" placement, which is what every call site here wants anyway.
+          // so the focus trap contains them instead of fighting them. What
+          // `anchor` would have positioned, `useDropdownPlacement` does —
+          // Floating UI in `position: fixed`, so no scrolling ancestor (a
+          // dialog's body, a drawer's) clips the dropdown either.
           portal={false}
           // Marks an open `Select` for `side-nav.tsx`, whose bottom toolbar
           // hides while one is open below `sm` — see `SelectContent`'s doc.
@@ -1095,7 +1203,10 @@ function SelectPopup({
       <div
         ref={(element) => {
           surfaceRef.current = element;
+          placement.setFloating?.(element);
         }}
+        style={placement.style}
+        data-reference-hidden={placement.referenceHidden}
         // Focusable only so `closeComboboxPopup` can move focus onto it.
         tabIndex={-1}
         data-select-content=""
@@ -1140,13 +1251,22 @@ function SelectPopup({
 // can find *literally* in the source.
 // ---------------------------------------------------------------------------
 
+// Placed by `useDropdownPlacement`: the `--select-float-*` properties are
+// Floating UI's numbers, the 20rem cap is this library's (`max-h-80`, as
+// before), and the available height below or above the trigger caps it
+// further.
 const LISTBOX_DROPDOWN =
-  "absolute top-full left-0 z-50 mt-1 max-h-80 w-full min-w-[8rem] overflow-y-auto rounded-md border border-edge bg-surface-2 p-1 shadow-[var(--shadow-popover)] focus:outline-none";
+  "fixed top-(--select-float-y) left-(--select-float-x) z-50 max-h-[min(20rem,var(--select-float-max-h))] w-(--select-float-w) min-w-[8rem] overflow-y-auto rounded-md border border-edge bg-surface-2 p-1 shadow-[var(--shadow-popover)] focus:outline-none";
 
 const LISTBOX_SURFACE: Record<SelectPresentation, string> = {
-  dropdown: LISTBOX_DROPDOWN,
+  dropdown: cn(
+    LISTBOX_DROPDOWN,
+    "data-reference-hidden:pointer-events-none data-reference-hidden:opacity-0",
+  ),
   auto: cn(
     LISTBOX_DROPDOWN,
+    // Only where it is a dropdown: the sheet does not hang off its trigger.
+    "sm:data-reference-hidden:pointer-events-none sm:data-reference-hidden:opacity-0",
     // Below `sm`: the M3 modal bottom sheet (`SelectContent`'s doc).
     // The top corners are `SheetBottomTokens.DockedContainerShape`,
     // `CornerExtraLargeTop` (`--radius-sheet`, 28dp), the bottom edge
@@ -1158,10 +1278,10 @@ const LISTBOX_SURFACE: Record<SelectPresentation, string> = {
     // library's number, not M3's — a modal sheet may grow to the top
     // inset, and a strip of scrim left above it is what says "this is a
     // sheet over the page", not a new page.
-    // `max-sm:w-full` restates what `w-full` already says, on purpose:
-    // a caller's `className="w-64"` is a *dropdown* width, and without
-    // this it would replace `w-full` at every width and leave the
-    // phone sheet 256px wide, pinned to the left edge.
+    // `max-sm:w-full` is there on purpose even though the sheet is
+    // pinned edge to edge: a caller's `className="w-64"` is a *dropdown*
+    // width, and without this it would replace the width at every width
+    // and leave the phone sheet 256px wide, pinned to the left edge.
     "max-sm:fixed max-sm:inset-x-0 max-sm:top-auto max-sm:bottom-0 max-sm:mt-0 max-sm:w-full max-sm:max-h-[85dvh]",
     "max-sm:overscroll-contain max-sm:rounded-t-sheet max-sm:rounded-b-none max-sm:border-0",
     // `scroll-pt-12` reserves the sticky handle's 48px when Headless
@@ -1228,14 +1348,22 @@ const LISTBOX_SURFACE: Record<SelectPresentation, string> = {
  * in, on the spatial and effects springs — a library choice: M3 expands the
  * search bar into the view, and there is no bar here to expand.
  */
+// Placed like `LISTBOX_DROPDOWN`; the available height caps the whole
+// view, and `COMBOBOX_SCROLL`'s `min-h-0 flex-1` lets the list give way.
 const COMBOBOX_DOCKED =
-  "absolute top-full left-0 z-50 mt-1 flex w-full min-w-[16rem] flex-col overflow-hidden rounded-md border border-edge bg-surface-2 shadow-[var(--shadow-popover)] outline-none";
+  "fixed top-(--select-float-y) left-(--select-float-x) z-50 flex max-h-(--select-float-max-h) w-(--select-float-w) min-w-[16rem] flex-col overflow-hidden rounded-md border border-edge bg-surface-2 shadow-[var(--shadow-popover)] outline-none";
 
 const COMBOBOX_SURFACE: Record<SelectPresentation, string> = {
-  dropdown: COMBOBOX_DOCKED,
+  dropdown: cn(
+    COMBOBOX_DOCKED,
+    "data-reference-hidden:pointer-events-none data-reference-hidden:opacity-0",
+  ),
   auto: cn(
     COMBOBOX_DOCKED,
-    "max-sm:fixed max-sm:inset-x-0 max-sm:top-auto max-sm:bottom-0 max-sm:h-dvh max-sm:mt-0 max-sm:w-full max-sm:min-w-0 max-sm:rounded-none max-sm:border-0",
+    // Only where it is the docked view: the full-screen one covers its
+    // trigger by design.
+    "sm:data-reference-hidden:pointer-events-none sm:data-reference-hidden:opacity-0",
+    "max-sm:fixed max-sm:inset-x-0 max-sm:top-auto max-sm:bottom-0 max-sm:h-dvh max-sm:max-h-none max-sm:mt-0 max-sm:w-full max-sm:min-w-0 max-sm:rounded-none max-sm:border-0",
     "max-sm:bg-surface-3 max-sm:shadow-none max-sm:pt-[env(safe-area-inset-top,0px)]",
     "max-sm:starting:translate-y-4 max-sm:starting:opacity-0",
     "max-sm:[transition-property:translate,opacity]",
