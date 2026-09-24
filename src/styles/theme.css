@@ -192,11 +192,17 @@
 
      1. The extra Google steps above `--radius-box` (large-increased,
         extra-large, extra-large-increased, extra-extra-large) exist for
-        surfaces this library doesn't have at all — phone-scale bottom
-        sheets and extended FABs at 28dp+ — and this file's own D8
+        surfaces a desktop console mostly doesn't have — phone-scale
+        bottom sheets and extended FABs at 28dp+ — and this file's own D8
         reasoning already rejects that register for the surfaces it *does*
         have: a data table's row/cell chrome "would look novelty-bubbly at
-        pill radius", the same objection at a smaller number. A desktop
+        pill radius", the same objection at a smaller number. (The "doesn't
+        have" half was wrong when it was written: `DetailDrawerContent`
+        had been a phone bottom sheet below `md` since D14, and `Select`
+        is a second one below `sm` now. Both take M3's own 28dp as
+        `--radius-sheet`, declared beside `--radius-xs` below as a
+        single-purpose corner rather than a fourth step. The objection
+        here is to *console* surfaces at that radius, and it stands.) A desktop
         operator console grounded in Polar's/Column's drawer and card
         corners has no reference screen calling for a fourth, larger step,
         and "one register, no fourth" (this comment's own opening line) is
@@ -222,7 +228,8 @@
         polygons rather than a rounded rectangle, so there is no register
         gap to fill for it either.
 
-     So: three tiers plus the checkbox-only `--radius-xs` outlier already
+     So: three tiers plus two single-purpose outliers — the checkbox-only
+     `--radius-xs` and the phone-sheet-only `--radius-sheet` — already
      say everything this component set needs said. Widening the register
      "to match the spec" without a reference screen or a real interaction
      calling for the extra step would be exactly the unargued change this
@@ -941,6 +948,15 @@
      layers (popover, dropdown, dialog, tooltip, sheet/drawer) get one. */
   --shadow-popover: 0 8px 24px -6px rgb(0 0 0 / 0.65), 0 0 0 1px var(--edge);
   --shadow-dialog: 0 24px 56px -12px rgb(0 0 0 / 0.75), 0 0 0 1px var(--edge);
+  /* `SideNav`'s floating toolbars: `--shadow-popover`'s own drop shadow
+     with its `0 0 0 1px var(--edge)` ring removed. The ring is a border
+     in all but name, and M3's floating toolbar has no outline
+     (`FloatingToolbarTokens.kt` declares none) — `side-nav.tsx`'s
+     `TOOLBAR_CONTAINER` doc has why a shadow survives at all when
+     androidx ships the toolbar at `Level0`. Not a new number: the same
+     blur, offset and alpha this theme already uses for a layer
+     floating over unknown content. */
+  --shadow-toolbar: 0 8px 24px -6px rgb(0 0 0 / 0.65);
 
   --edge-subtle: #1f232a;
   --edge: #2a2f37;
@@ -1143,6 +1159,7 @@
      depth. */
   --shadow-popover: 0 8px 24px -6px rgb(20 23 28 / 0.14), 0 0 0 1px var(--edge);
   --shadow-dialog: 0 24px 56px -12px rgb(20 23 28 / 0.2), 0 0 0 1px var(--edge);
+  --shadow-toolbar: 0 8px 24px -6px rgb(20 23 28 / 0.14);
 
   --edge-subtle: #e6e9ee;
   --edge: #d5dae2;
@@ -1352,6 +1369,20 @@
   --radius-xs: 4px;
   --radius-sm: 12px;
   --radius-md: 20px;
+  /*
+   * `--radius-sheet` is not a fourth step of the register — it is the one
+   * corner a *phone bottom sheet* wears, and nothing else may use it.
+   * M3's `SheetBottomTokens.DockedContainerShape` is `CornerExtraLargeTop`,
+   * 28dp on the top two corners only (`ShapeTokens.kt`). The shape-scale
+   * audit in the daisyUI theme block above kept this value out on the
+   * belief that the library had no phone sheets — mistaken then, since
+   * `DetailDrawerContent` has been one below 768px since D14, and more so
+   * now that `SelectContent` is one below 640px. Two sheets, one corner:
+   * two literals would drift. Read as `rounded-t-sheet`; `cn.ts`
+   * registers the name so `tailwind-merge` resolves it against any other
+   * `rounded-t-*` a caller passes.
+   */
+  --radius-sheet: 28px;
   /* --radius-full (9999px) is already Tailwind's default; not redeclared. */
 
   /*

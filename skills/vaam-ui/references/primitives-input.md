@@ -208,6 +208,27 @@ The composition is the Radix shape kept deliberately intact:
   enter transition stalls and the listbox is measurably never usable
   (`opacity: 0`, `pointer-events: none`, a collapsed rect). Every select
   inside a drawer was broken that way until it was rendered inline.
+  **Below 640px it is an M3 modal bottom sheet instead of a dropdown** —
+  pinned to the bottom edge, full width, 28px top corners, a scrim over
+  the page, capped at 85dvh and scrolling, with a drag handle that
+  dismisses past 56px or on a flick, and 56px rows where the current
+  value is a filled row with 16px corners. It is the same element
+  restyled by a `max-sm:` media query, so there is nothing to opt into
+  and nothing to wire: it still renders inline, still works inside a
+  drawer, and Escape, a tap on the dimmed page, or picking a row all close
+  it. **There is no opt-out** — no prop keeps the dropdown on a phone. A
+  width you pass to `SelectContent`'s `className` (`w-64`) applies to the
+  dropdown only; the sheet stays full-width unless you pass a `max-sm:`
+  width yourself. Do not build your own phone picker around a `Select`,
+  and do not put a `Select` inside something that re-anchors
+  `position: fixed` children at phone width (a `transform`ed or
+  `will-change`d ancestor that is *not* pinned to the bottom edge — the
+  sheet anchors to that ancestor's bottom instead of the screen's).
+  `SideNav`'s bottom toolbar hides itself while a sheet is open. Inside
+  a drawer, Escape, a drag of the handle or a tap on the dimmed page
+  closes the `Select` alone and returns focus to its trigger; the next
+  Escape closes the drawer. (It used to close both at once — on desktop
+  too, for Escape.)
 - **`SelectItem`** takes a `value` and its label as children. Labels clamp
   to two lines.
 - **`SelectGroup`** is semantic grouping only — a `contents` fieldset with

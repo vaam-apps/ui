@@ -38,10 +38,12 @@ grid rather than forty objects.
 **Reach for floating** only when the surface genuinely overlaps content
 it cannot know about. A shadow is how a layer says "I am in front", and
 a border cannot do that job for something that sits *over* rather than
-*beside*. The rule's edge case is `SideNav`'s floating rail, which is
-permanent chrome rather than a transient overlay, and which still earns
-`--shadow-popover` because the reasoning did not change: it floats
-unanchored over arbitrary, unknown-contrast page content.
+*beside*. The rule's edge case is `SideNav`'s floating rail — M3's
+floating toolbar — which is permanent chrome rather than a transient
+overlay, and which still earns a shadow because the reasoning did not
+change: it floats unanchored over arbitrary, unknown-contrast page
+content. It is `--shadow-toolbar`, `--shadow-popover` without its 1px
+edge ring, because M3's toolbar has no outline and that ring is one.
 
 **Reach for instrument** when the surface is a single readable
 instrument — a row of metrics, a chart, a headline figure and its

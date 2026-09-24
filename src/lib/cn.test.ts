@@ -34,6 +34,9 @@ describe("cn — custom theme scales", () => {
     expect(cn("rounded-sm", "rounded-field")).toBe("rounded-field");
     expect(cn("rounded-field", "rounded-box")).toBe("rounded-box");
     expect(cn("rounded-box", "rounded-none")).toBe("rounded-none");
+    // `sheet` is registered too (`--radius-sheet`, the phone bottom sheet's
+    // corner) — unregistered, both of these survived the merge.
+    expect(cn("rounded-t-box", "rounded-t-sheet")).toBe("rounded-t-sheet");
   });
 });
 

@@ -25,6 +25,7 @@ interface Target {
   name: string;
   story: string;
   width?: number;
+  theme?: "dark" | "light";
   locate: (page: import("@playwright/test").Page) => import("@playwright/test").Locator;
 }
 
@@ -45,6 +46,30 @@ const TARGETS: Target[] = [
     width: 900,
     locate: (page) => page.locator("[data-floating-rail]:not([data-floating-rail-axis]) a").first(),
   },
+  // The vibrant toolbar is the one ground in the library that is
+  // `primary` itself — near-white on the dark theme — and the theme's
+  // blue `--ring` measured 2.68:1 against it. Both themes, both axes.
+  {
+    name: "a link in the vibrant bottom toolbar, dark theme",
+    story: STORY.sideNavToolbarVibrant,
+    width: 375,
+    theme: "dark",
+    locate: (page) => page.locator('[data-floating-rail-axis="horizontal"] a').first(),
+  },
+  {
+    name: "a link in the vibrant bottom toolbar, light theme",
+    story: STORY.sideNavToolbarVibrant,
+    width: 375,
+    theme: "light",
+    locate: (page) => page.locator('[data-floating-rail-axis="horizontal"] a').first(),
+  },
+  {
+    name: "the current page in the vibrant bottom toolbar",
+    story: STORY.sideNavToolbarVibrant,
+    width: 375,
+    theme: "dark",
+    locate: (page) => page.locator('[data-floating-rail-axis="horizontal"] a[aria-current="page"]'),
+  },
   {
     name: "a tab in the horizontally scrolling strip",
     story: STORY.tabsManyScrolling,
@@ -54,7 +79,10 @@ const TARGETS: Target[] = [
 
 for (const target of TARGETS) {
   test(`focus paints a visible indicator around ${target.name}`, async ({ page }) => {
-    await openStory(page, target.story, target.width ? { width: target.width, height: 700 } : {});
+    await openStory(page, target.story, {
+      ...(target.width ? { width: target.width, height: 700 } : {}),
+      ...(target.theme ? { theme: target.theme } : {}),
+    });
     const control = target.locate(page);
     await expect(control).toBeVisible();
 
@@ -77,7 +105,10 @@ for (const target of TARGETS) {
   test(`the focus indicator on ${target.name} is a declared outline, not a leftover`, async ({
     page,
   }) => {
-    await openStory(page, target.story, target.width ? { width: target.width, height: 700 } : {});
+    await openStory(page, target.story, {
+      ...(target.width ? { width: target.width, height: 700 } : {}),
+      ...(target.theme ? { theme: target.theme } : {}),
+    });
     const control = target.locate(page);
     await expect(control).toBeVisible();
 

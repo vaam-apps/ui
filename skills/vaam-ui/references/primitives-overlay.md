@@ -209,6 +209,15 @@ interface DetailDrawerProps {
   panel survives a refresh and can be linked to; the component owns the
   weight, never the routing.
 
+Below 768px both are a phone bottom sheet with M3's own shape: 28px top
+corners (`rounded-t-sheet`, the `--radius-sheet` token — reserved for
+phone sheets, do not put it on a card) and M3's 32×4 drag handle, with
+22px above it and 22px below. That handle used to be a 5px bar 8px from
+the top, so the title row now sits about 19px lower than it did — worth
+knowing if a screenshot test pins it. Below 640px a `Select` inside one
+opens as a second sheet over it with the same corner and handle; between
+640 and 767px the drawer is a sheet but the `Select` is still a dropdown.
+
 One limitation to know before you pick the quick one for a background
 task: `modal={false}` in vaul 1.1.2 removes the dim and the pointer
 blocking, but Radix's focus trap and `aria-modal="true"` underneath it are

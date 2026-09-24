@@ -1,7 +1,7 @@
 "use client";
 
 import { Disclosure, DisclosureButton, DisclosurePanel } from "@headlessui/react";
-import { ChevronDown, MoreHorizontal } from "lucide-react";
+import { ChevronDown, MoreVertical } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -46,9 +46,9 @@ export interface SideNavProps {
    * <email> · Sign out" row) — rendered as-is, never built here, so this
    * component stays free of any auth-specific knowledge.
    *
-   * Not rendered below `lg` in `"floating"` mode: ~52px has no room for
-   * an email address, the same reason the `1024–1279px` icon rail has
-   * always hidden it. */
+   * Not rendered below `lg` in `"floating"` mode: a 64px toolbar has no
+   * room for an email address, the same reason the `1024–1279px` icon
+   * rail has always hidden it. */
   accountSlot?: ReactNode;
   /**
    * How the nav behaves below `lg`. Defaults to `"floating"`.
@@ -113,8 +113,36 @@ export interface SideNavProps {
    * in-flow tree at every width and ignores it.
    */
   collapsed?: boolean | undefined;
+  /**
+   * Which of M3 Expressive's two floating-toolbar colour schemes the
+   * floating rails wear. Defaults to `"standard"`. Nothing else in the
+   * nav reads it — the in-flow sidebar is not a toolbar.
+   *
+   * Both are androidx's own (`FloatingToolbarTokens.kt`), mapped onto this
+   * library's neutral roles rather than onto hues, because §1.3's "one
+   * accent, never a hue" still holds and a tinted bar would read as a
+   * status:
+   *
+   * - `"standard"` — a `SurfaceContainer` bar (`surface-2` here); the
+   *   current page is a filled `Primary` pill (`FilledIconButtonTokens`).
+   *   androidx draws the other icons in `OnSurface` (the toolbar's
+   *   content colour is `contentColorFor(SurfaceContainer)`); here they
+   *   are `muted-foreground`, so the current page's pill is the one
+   *   full-contrast mark on the bar. Quiet until you look for it.
+   * - `"vibrant"` — a `PrimaryContainer` bar (`primary` here, so the bar
+   *   is the inverse of the page: near-white on the dark theme,
+   *   near-black on the light one) with the current page cut back out of
+   *   it in `SurfaceContainer` (`VibrantButtonSelectedContainerColor`).
+   *   It is the one that stays legible over *any* content, because it is
+   *   the only one whose contrast against the page does not depend on
+   *   what happens to be scrolling underneath it.
+   */
+  railColors?: RailColors | undefined;
   className?: string;
 }
+
+/** See `SideNavProps.railColors`. */
+export type RailColors = "standard" | "vibrant";
 
 function isActive(href: string, currentPath: string): boolean {
   if (href === "/") return currentPath === "/";
@@ -262,7 +290,9 @@ function NavLink({
  * variant is this row's off-canvas appearance, so it only renders (via
  * `flex` rather than `hidden`) when `smallScreen === "off-canvas"`; in
  * `"floating"` mode there is no off-canvas tree at all — the equivalent
- * row appears instead in `FloatingRail`, as its `"rail"` shape.
+ * row appears instead in `FloatingRail` or `HorizontalRail`, as a
+ * `ToolbarLink` (the `"rail"` variant above is off-canvas mode's in-flow
+ * icon rail only).
  */
 function NavRow({
   item,
@@ -401,79 +431,238 @@ function GroupSection({
 }
 
 /**
+ * The two colour schemes of M3 Expressive's floating toolbar, as class
+ * strings. See `SideNavProps.railColors` for where each role comes from.
+ *
+ * `idle` is a *state layer*, not a fill: M3 draws hover as the content
+ * colour laid over the container at 8% (`StateTokens.HoverStateLayerOpacity`),
+ * so a hover moves each bar toward its own content colour — lighter on a
+ * dark bar, darker on a light one, whichever scheme and theme that is —
+ * from the same rule, without a second token for either.
+ */
+const RAIL_PALETTES: Record<
+  RailColors,
+  { container: string; idle: string; selected: string; divider: string; ring: string }
+> = {
+  standard: {
+    container: "bg-surface-2 text-muted-foreground",
+    idle: "hover:bg-foreground/8 hover:text-foreground",
+    selected: "bg-primary text-primary-content",
+    divider: "bg-edge",
+    ring: "",
+  },
+  vibrant: {
+    container: "bg-primary text-primary-content",
+    idle: "hover:bg-primary-content/8",
+    selected: "bg-surface-2 text-foreground",
+    divider: "bg-primary-content/20",
+    // The theme's `--ring` is a mid blue chosen against the dark page;
+    // on a `primary` bar — near-white on the dark theme — it measured
+    // 2.68:1, under WCAG 1.4.11's 3:1 (`e2e/focus.spec.ts`). The bar's
+    // own content colour is the one colour guaranteed to stand off it in
+    // both themes.
+    ring: "focus-visible:outline-primary-content",
+  },
+};
+
+/**
+ * Every toolbar item animates four things at two speeds: its colours on
+ * the effects clock, and its size and corner radius on the spatial spring
+ * — the current page's pill widening (`toolbarItemClasses`' doc) and the press
+ * morph both move *shape*, which is what M3 Expressive's spatial springs
+ * are for. One `transition-property` list, position-matched, for the
+ * reason `PRESS_SHAPE_MORPH`'s own header gives: two transition utilities
+ * on one element clobber each other outright.
+ */
+const TOOLBAR_ITEM_MOTION =
+  "[transition-property:color,background-color,border-radius,width,height] " +
+  "[transition-duration:var(--dur-fast),var(--dur-fast),var(--dur-spatial-fast),var(--dur-spatial-fast),var(--dur-spatial-fast)] " +
+  "[transition-timing-function:var(--ease-out),var(--ease-out),var(--ease-spatial-fast),var(--ease-spatial-fast),var(--ease-spatial-fast)]";
+
+/**
+ * The geometry of one toolbar item, split into the two boxes M3 draws:
+ * the **target** (what a finger or pointer hits) and the **container**
+ * (what is painted). Every number is androidx's:
+ *
+ * - the target is 48×48 — `FloatingToolbarDefaults.ContentPadding`'s own
+ *   doc names "the minimum touch target (48.dp)" as the thing its 8dp
+ *   padding is sized around, and 8 + 48 + 8 is exactly the toolbar's
+ *   64dp `ContainerHeight`;
+ * - the container is 40×40, round — `SmallIconButtonTokens.ContainerHeight`
+ *   and `ContainerShapeRound`, the icon button that sits in a toolbar;
+ * - the icon is 24px — the same file's `IconSize`.
+ *
+ * The **current page** is the one thing drawn differently: a filled pill
+ * 64 long on the toolbar's own axis, not a 40px disc. That is the M3
+ * floating-toolbar sample's own emphasised item (`FloatingToolbarSamples.kt`
+ * renders its one important action as `FilledIconButton(Modifier.width(64.dp))`
+ * among plain `IconButton`s) applied to the one thing a navigation bar
+ * has to emphasise. Its target grows with it, 64×48, so the pill is never
+ * bigger than what answers a tap.
+ *
+ * The container's resting radius is `20px` — half its 40px short side,
+ * which draws the same disc and the same stadium as `rounded-full` — and
+ * not `rounded-full` itself, because `rounded-full` is
+ * `calc(infinity * 1px)`, and a spring that overshoots between infinity
+ * and 4px strobes: measured on this toolbar before the change, the
+ * radius went round → square → round again → settled over ~400ms. A
+ * finite radius interpolates as a radius.
+ *
+ * Pressed, the container's corners pull in to `--btn-press-radius` —
+ * `calc(40px * 0.1)`, the circular ratio `PRESS_SHAPE_MORPH`'s own doc
+ * sets for every bare icon control in this library, applied to this
+ * control's own 40px box. androidx's `PressedContainerShape` is 8dp
+ * (a fifth); `.btn-circle`'s gentler tenth is the house rule for a
+ * circle, and a toolbar full of discs is a row of circles.
+ */
+function toolbarItemClasses(
+  axis: "horizontal" | "vertical",
+  active: boolean,
+  palette: (typeof RAIL_PALETTES)[RailColors],
+) {
+  const along = axis === "horizontal";
+  return {
+    target: cn(
+      "group flex shrink-0 items-center justify-center rounded-full",
+      TOOLBAR_ITEM_MOTION,
+      active ? (along ? "h-12 w-16" : "h-16 w-12") : "size-12",
+      palette.ring,
+    ),
+    container: cn(
+      "flex items-center justify-center rounded-[20px]",
+      "[--btn-press-radius:calc(40px*0.1)] group-active:[border-radius:var(--btn-press-radius)]",
+      TOOLBAR_ITEM_MOTION,
+      active ? (along ? "h-10 w-16" : "h-16 w-10") : "size-10",
+      active ? palette.selected : palette.idle,
+    ),
+  };
+}
+
+/**
+ * One destination in a floating toolbar. Its own component rather than
+ * `NavLink`'s `"rail"` variant, because the two no longer share a shape:
+ * `"rail"` is still the in-flow `1024–1279px` icon rail of `"off-canvas"`
+ * mode, a list row, and this is an M3 icon button.
+ *
+ * The label is still a native `title` on an `aria-hidden` wrapper and an
+ * `sr-only` span on the anchor — `NavLink`'s own doc has the measurements
+ * behind that, and they apply unchanged: the vertical toolbar is still a
+ * scroll container, so anything drawn beside it would still be clipped.
+ */
+function ToolbarLink({
+  item,
+  active,
+  axis,
+  palette,
+}: {
+  item: NavItem;
+  active: boolean;
+  axis: "horizontal" | "vertical";
+  palette: (typeof RAIL_PALETTES)[RailColors];
+}) {
+  const Icon = item.icon;
+  const classes = toolbarItemClasses(axis, active, palette);
+  return (
+    <a href={item.href} aria-current={active ? "page" : undefined} className={classes.target}>
+      {/* The `title` sits on a wrapper that fills the whole 48px target,
+          not on the 40px container inside it — `NavLink`'s rail variant
+          does the same, so a hover anywhere a tap would land answers with
+          the label. */}
+      <span
+        title={item.label}
+        aria-hidden="true"
+        className="flex size-full items-center justify-center"
+      >
+        <span data-toolbar-item="" className={classes.container}>
+          <Icon size={24} className="shrink-0" aria-hidden="true" />
+        </span>
+      </span>
+      <span className="sr-only">{item.label}</span>
+    </a>
+  );
+}
+
+/**
+ * The container both floating toolbars share: M3 Expressive's
+ * `FloatingToolbar`, transcribed from `FloatingToolbarTokens.kt`
+ * (`compose/material3/material3/…/tokens/`, token set `12_0_0`).
+ *
+ * - **64px across its short axis, fully round.** `ContainerHeight` 64dp,
+ *   `ContainerShape` `CornerFull`.
+ * - **8px of padding, 4px between items.** `ContainerLeadingSpace` /
+ *   `ContainerTrailingSpace` 8dp, `ContainerBetweenSpace` 4dp.
+ * - **16px from the screen edge.** `ContainerExternalPadding`, exposed as
+ *   `FloatingToolbarDefaults.ScreenOffset`. The bottom offset adds
+ *   `env(safe-area-inset-bottom)` on top, because on a phone with a home
+ *   indicator 16px from the *viewport* edge lands on the gesture bar.
+ * - **Opaque, no outline, no blur.** The bar used to be `surface-2/90`
+ *   with `backdrop-blur-md` and a hairline border; M3 has none of the
+ *   three. The container colour is the separation.
+ *
+ * # The one deliberate departure: a shadow
+ *
+ * androidx ships this toolbar at `ElevationTokens.Level0` — no shadow at
+ * all — and has since the component was introduced (checked against the
+ * history of `FloatingToolbar.kt`: the value has been `Level0` in every
+ * revision, first as `ContainerElevation` and, since the expanded/
+ * collapsed split, as `ContainerExpandedElevation` with a
+ * `// TODO read from token`). Only the with-FAB variant lifts to `Level1`.
+ *
+ * That is not carried over, for the reason this rail has always given for
+ * being the one piece of permanent chrome in the library with a shadow
+ * (`theme.css`: "borders, not shadows, for cards/tables/panels — only
+ * floating layers get one"): it floats *unanchored* over content it knows
+ * nothing about. On Android a Level0 toolbar sits over a `Surface` that
+ * the same theme painted one tonal step darker; here it sits over
+ * whatever a consumer's page happens to scroll under it, and on the dark
+ * theme `surface-2` over a `surface-2` card is the same colour. With no
+ * outline left to fall back on, the shadow is what remains of the edge.
+ * `"vibrant"` does not need it — that is its whole case — and keeps it
+ * only so the two schemes differ in exactly one thing.
+ */
+const TOOLBAR_CONTAINER = "fixed z-40 flex rounded-full p-2 gap-1 shadow-[var(--shadow-toolbar)]";
+
+/**
  * `smallScreen="floating"`'s replacement for the off-canvas accordion
- * below `lg`: a detached pill, `fixed`, vertically centred, inset from the
- * left edge, layered *over* the page content instead of hidden behind a
- * hamburger the caller has to build and the reader has to find first.
- * `lg:hidden` is the only thing that ever removes it — same CSS-toggle
- * technique as every other band in this file, still no JS viewport read;
- * it is simply a `fixed` element rather than one sized by its parent.
- *
- * # Why this is the one floating thing in the library with a shadow
- *
- * `theme.css` states the rule directly: "borders, not shadows, for
- * cards/tables/panels — only floating layers (popover, dropdown, dialog,
- * tooltip, sheet/drawer) get one." Every layer on that list is transient,
- * anchored to a trigger, and gone the moment the interaction ends. This
- * rail is new territory even inside that exception: it is permanent
- * chrome, not an overlay, and it floats *unanchored* — nothing on the
- * page points to it. It still earns `--shadow-popover` because the reason
- * behind the rule hasn't changed: a layer sitting on top of arbitrary,
- * unknown-contrast page content needs a shadow to read as a separate
- * surface, and a border alone — the treatment every non-floating surface
- * in this system gets — cannot do that job for something that overlaps
- * content rather than sitting beside it. `backdrop-blur-md` is the same
- * argument taken one step further: content can scroll *under* the pill,
- * not just behind it.
+ * below `lg`, and the whole nav when `collapsed`: M3 Expressive's
+ * *vertical* floating toolbar, `fixed`, vertically centred, 16px from the
+ * left edge, layered over the page instead of hidden behind a hamburger
+ * the caller has to build and the reader has to find first. `TOOLBAR_CONTAINER`'s
+ * doc has the geometry and the one departure from androidx; the
+ * orientation is the only thing this function adds.
  *
  * # Why every group's items are flattened
  *
- * A pill ~52px wide has no room for a small-caps group header — in the
+ * A 64px toolbar has no room for a small-caps group header — in the
  * off-canvas tree, "Messaging" costs a whole row before "Composer" ever
  * appears; here that row would cost as much as an icon and deliver
- * nothing a hover/`title` doesn't already (`NavLink`'s own comment covers
- * why the label is a native `title`, not rendered text). So every group's
- * `items` are concatenated in group order into one icon list with no
- * divider between groups — the same trade-off the `1024–1279px` icon rail
- * already makes, one level narrower.
+ * nothing a hover/`title` doesn't already. So every group's `items` are
+ * concatenated in group order into one icon list with no divider between
+ * groups. The footer keeps its divider: it is the one grouping that
+ * carries meaning here ("administrivia, not content").
  *
  * # Why `accountSlot` never appears here
  *
- * Same reasoning the `1024–1279px` icon rail already applies to hide it:
- * there is no room for an email address and a sign-out button at ~52px.
- * Unlike that band, there is no wider sibling column below `lg` to defer
- * to, so this is a permanent omission for `"floating"` mode rather than a
- * per-breakpoint hide — a caller whose small-screen users need the
- * account block keeps `smallScreen="off-canvas"`, where it already works.
+ * There is no room for an email address and a sign-out button at 64px.
+ * A caller whose small-screen users need the account block keeps
+ * `smallScreen="off-canvas"`, where it already works.
  *
  * # Why it scrolls, and why the label survives that
  *
- * `max-h-[80vh] overflow-y-auto` caps the pill at something that always
- * leaves room above and below it, for a nav with enough groups to outgrow
- * 80% of even a short phone viewport. `overflow-x-hidden` is the same
- * guard the outer `<nav>` carries and for the same reason (see that
- * class's own comment on `SideNav`): once one axis scrolls, the other is
- * forced to `auto`, and any future stray child would silently reopen the
- * horizontal-scrollbar bug this file exists to keep closed. And clipping
- * an overflow axis is exactly the situation that broke daisyUI's
- * `.tooltip` in the first place (`NavLink`'s comment has the measurements)
- * — which a native `title` does not care about, because the browser
- * paints it outside the page entirely, immune to any ancestor's
- * `overflow`. That is the whole reason this rail is still usable once it
- * starts scrolling.
+ * `max-h-[80vh] overflow-y-auto` caps the toolbar at something that
+ * always leaves room above and below it. `overflow-x-hidden` pins the
+ * other axis, which `overflow-y: auto` would otherwise force to `auto`
+ * too — the stray-scrollbar class of bug this file exists to keep closed.
+ * Clipping an overflow axis is exactly what broke daisyUI's `.tooltip`
+ * here once (`NavLink`'s comment has the measurements), and a native
+ * `title` does not care, because the browser paints it outside the page.
  *
  * # Why this component is never mounted directly
  *
- * This function renders the pill itself — the classes above are exactly
- * what ends up in the DOM — but `SideNav` never mounts it in place. It
- * always goes through `FloatingRailPortal`, which moves this markup to
- * `document.body` via `createPortal` so the `fixed` positioning above
- * resolves against the viewport regardless of what the caller wrapped
- * `SideNav` in (`SideNavProps.smallScreen`'s doc has the full reasoning).
- * Splitting the two apart — one function that knows how to draw the
- * rail, one that knows where to put it — keeps this function testable
- * and readable as plain JSX with no portal or lifecycle concerns mixed
- * into it.
+ * `SideNav` always goes through `FloatingRailPortal`, which moves this
+ * markup to `document.body` so `fixed` resolves against the viewport
+ * regardless of what the caller wrapped `SideNav` in
+ * (`SideNavProps.smallScreen`'s doc has the full reasoning).
  */
 function FloatingRail({
   topItem,
@@ -481,22 +670,22 @@ function FloatingRail({
   footerItems,
   currentPath,
   collapsed,
+  railColors,
 }: {
   topItem: NavItem;
   groups: NavGroup[];
   footerItems: NavItem[];
   currentPath: string;
   collapsed: boolean;
+  railColors: RailColors;
 }) {
-  // No group headers survive at this width (see doc comment above), so
-  // there is nothing left to group by — every group's rows become one
-  // flat, ordered list of icons.
-  const flatGroupItems = groups.flatMap((group) => group.items);
+  const palette = RAIL_PALETTES[railColors];
+  const destinations = [topItem, ...groups.flatMap((group) => group.items)];
 
   return (
     // A `<nav>` for the same reason `HorizontalRail` is one: between
-    // `sm` and the sidebar, this pill is the navigation and the in-flow
-    // `<nav>` is `display: none`.
+    // `sm` and the sidebar, this toolbar is the navigation and the
+    // in-flow `<nav>` is `display: none`.
     <nav
       aria-label="Primary"
       // A stable hook, not a test-only wart. This subtree is portalled to
@@ -507,43 +696,51 @@ function FloatingRail({
       // `body > [data-floating-rail]` override). Selecting on the layout
       // classes instead would make a styling change silently break both.
       data-floating-rail=""
+      data-rail-colors={railColors}
       className={cn(
-        "fixed top-1/2 left-3 z-40 flex w-[52px] -translate-y-1/2 flex-col items-stretch gap-1",
+        TOOLBAR_CONTAINER,
+        palette.container,
+        "-translate-y-1/2 top-1/2 left-4 w-16 flex-col items-center",
         "max-h-[80vh] overflow-y-auto overflow-x-hidden",
-        "rounded-full border border-edge bg-surface-2/90 p-1.5 backdrop-blur-md",
-        // The one deliberate exception to "borders, not shadows" — see
-        // this function's own doc comment for why.
-        "shadow-[var(--shadow-popover)]",
-        // Vertical rail band: `640px` up to wherever the sidebar takes
-        // over. Below `sm` the horizontal rail replaces it — a 52px
-        // column down the side of a 375px phone spends 14% of the
-        // width on chrome, and does it in the thumb's dead zone.
+        // No visible scrollbar. With classic (non-overlay) scrollbars —
+        // Windows, or macOS set to "always" — the 48px items and the 16px
+        // of padding leave nowhere for one: measured at 900×500 with the
+        // nav taller than 80vh, `clientWidth` 49 against `scrollWidth` 57,
+        // the items pushed off-centre and the first one's focus ring
+        // clipped under the bar. It still scrolls by wheel, touch and
+        // keyboard; headless Chromium hides scrollbars, which is why no
+        // e2e run ever showed this.
+        "[scrollbar-width:none]",
+        // Vertical band: `640px` up to wherever the sidebar takes over.
+        // Below `sm` the horizontal toolbar replaces it — a 64px column
+        // down the side of a 375px phone spends 17% of the width on
+        // chrome, and does it in the thumb's dead zone.
         "hidden sm:flex",
-        // Collapsed, the sidebar never renders, so this rail is the
+        // Collapsed, the sidebar never renders, so this toolbar is the
         // navigation at every width above `sm` — including `≥1280px`,
         // where it would otherwise hand over.
         collapsed ? "sm:flex" : "xl:hidden",
       )}
     >
-      <NavLink item={topItem} active={isActive(topItem.href, currentPath)} variant="rail" />
-      {flatGroupItems.map((item) => (
-        <NavLink
+      {destinations.map((item) => (
+        <ToolbarLink
           key={item.href}
           item={item}
           active={isActive(item.href, currentPath)}
-          variant="rail"
+          axis="vertical"
+          palette={palette}
         />
       ))}
       {footerItems.length > 0 && (
         <>
-          <div className="my-1 border-edge-subtle border-t" aria-hidden="true" />
+          <div className={cn("my-1 h-px w-6 shrink-0", palette.divider)} aria-hidden="true" />
           {footerItems.map((item) => (
-            <NavLink
+            <ToolbarLink
               key={item.href}
               item={item}
               active={isActive(item.href, currentPath)}
-              variant="rail"
-              dim
+              axis="vertical"
+              palette={palette}
             />
           ))}
         </>
@@ -552,83 +749,84 @@ function FloatingRail({
   );
 }
 
-/** How many destinations the horizontal rail shows before the rest go
- * behind the overflow menu. Four, and the number is a thumb measurement
- * rather than a taste one: five 44px targets (four slots plus the menu
- * button), four 4px gaps and the pill's own 12px of padding come to
- * 248px. At 375px — the narrowest phone this library targets — that
- * leaves the rail visibly detached from both edges. Five slots would be
- * 292px, which still fits but reads as a bar rather than a pill, and six
- * only fits by shrinking the targets below 44px, which is the one
- * dimension not available to trade. */
+/** How many destinations the horizontal toolbar shows before the rest go
+ * behind the overflow menu. Four, and the number is a width measurement
+ * rather than a taste one. At M3's geometry (`toolbarItemClasses`) the
+ * current page's 64px pill, four 48px targets (three slots plus the menu
+ * button), four 4px gaps and the bar's own 16px of padding come to 288px.
+ * At 375px — the narrowest phone this library targets — that leaves the
+ * toolbar 43px clear of each edge, which reads as a floating toolbar.
+ * Five slots would be 340px, leaving 17px — barely more than the 16px
+ * screen offset M3 asks for, so the bar reads as a docked one that lost
+ * its corners — and six does not fit at all without shrinking targets
+ * below 48px, which is the one dimension not available to trade. */
 const HORIZONTAL_RAIL_SLOTS = 4;
 
 /**
- * The tiny-screen shape: a horizontal pill along the bottom, four
- * destinations and a menu for the rest.
+ * The tiny-screen shape: M3 Expressive's *horizontal* floating toolbar,
+ * along the bottom, four destinations and an overflow menu for the rest.
+ * `TOOLBAR_CONTAINER`'s doc has the geometry.
  *
- * # Why the vertical rail could not simply get narrower
+ * # Why the vertical toolbar could not simply get narrower
  *
- * A 52px column is 14% of a 375px viewport, permanently, down the side
+ * A 64px column is 17% of a 375px viewport, permanently, down the side
  * the writing starts on — and it sits where a thumb cannot comfortably
  * reach on a phone held one-handed. Both problems are about the *axis*,
- * not the width, so the fix is to turn the rail rather than shrink it.
+ * not the width, so the fix is to turn the toolbar rather than shrink it.
  * Along the bottom it costs height in the region every mobile OS already
  * reserves for chrome, and it lands under the thumb.
  *
  * # Why four, and why a menu rather than scrolling
  *
- * The vertical rail scrolls once it outgrows `max-h-[80vh]`, and that
- * works because a vertical list that scrolls vertically is a thing
- * people recognise. The horizontal equivalent — a strip of icons that
- * scrolls sideways with no scrollbar and no affordance — is the pattern
- * where destinations simply go unfound, and it is also the exact class
- * of unwanted horizontal scroll this library has spent two rounds
- * removing. A menu is the honest version: everything past the fourth
- * slot sits *visibly* behind one control rather than invisibly past an
- * edge.
+ * A strip of icons that scrolls sideways with no scrollbar and no
+ * affordance is the pattern where destinations simply go unfound, and it
+ * is also the exact class of unwanted horizontal scroll this library has
+ * spent two rounds removing. A menu is the honest version: everything
+ * past the fourth slot sits *visibly* behind one control rather than
+ * invisibly past an edge — the same overflow androidx's own toolbar
+ * samples use (`AppBarRow`'s overflow indicator, a vertical ellipsis).
  *
- * The menu's rows are real anchors (`DropdownMenuLinkItem`, added for
- * this), not buttons that navigate — a destination behind a menu must
- * still support middle-click, cmd-click and "copy link address", or the
- * overflow items become second-class links purely because of where they
- * landed in the order.
+ * The menu's rows are real anchors (`DropdownMenuLinkItem`), not buttons
+ * that navigate — a destination behind a menu must still support
+ * middle-click, cmd-click and "copy link address".
  *
  * # What goes where
  *
- * Order is `topItem`, then every group's items flattened — the same
- * flattening the vertical rail does, for the same reason (no group
- * headers survive at this size, so there is nothing left to group by).
- * The first four are slots; the remainder and **all** footer items go to
- * the menu. Footer items are "administrivia, not content" per this
- * file's own doc, so they lose to any destination for a slot, and they
- * keep their labels in the menu where there is room for them.
+ * Order is `topItem`, then every group's items flattened. The first four
+ * are slots; the remainder and **all** footer items go to the menu.
+ * Footer items are "administrivia, not content" per this file's own doc,
+ * so they lose to any destination for a slot, and they keep their labels
+ * in the menu where there is room for them.
  */
 function HorizontalRail({
   topItem,
   groups,
   footerItems,
   currentPath,
+  railColors,
 }: {
   topItem: NavItem;
   groups: NavGroup[];
   footerItems: NavItem[];
   currentPath: string;
+  railColors: RailColors;
 }) {
+  const palette = RAIL_PALETTES[railColors];
   const destinations = [topItem, ...groups.flatMap((group) => group.items)];
   const slots = destinations.slice(0, HORIZONTAL_RAIL_SLOTS);
   const overflow = [...destinations.slice(HORIZONTAL_RAIL_SLOTS), ...footerItems];
   // If the current page is behind the menu, the menu button is what is
-  // "current" as far as anyone scanning the rail can tell — so it takes
-  // the active treatment rather than leaving nothing marked at all.
+  // "current" as far as anyone scanning the toolbar can tell — so it
+  // takes the current page's pill rather than leaving nothing marked.
   const activeIsHidden = overflow.some((item) => isActive(item.href, currentPath));
+  const more = toolbarItemClasses("horizontal", activeIsHidden, palette);
 
   return (
-    // A `<nav>`, not a `<div>`. Below `sm` this pill *is* the navigation
-    // — the in-flow `<nav>` is `display: none` at that width, so a plain
-    // div here left a phone with no navigation landmark at all and every
-    // rail link sitting outside any landmark (axe `region`, caught by
-    // `a11y.test.tsx`'s `SideNav` block, which audits `document.body`
+    // A `<nav>`, not a `<div>`. Below `sm` this toolbar *is* the
+    // navigation — the in-flow `<nav>` is `display: none` at that width,
+    // so a plain div here left a phone with no navigation landmark at all
+    // and every link sitting outside any landmark (axe `region`, caught
+    // by `a11y.test.tsx`'s `SideNav` block, which audits `document.body`
     // precisely because these rails portal out of the component).
     //
     // All three shapes carry the same `aria-label="Primary"`, and exactly
@@ -638,56 +836,58 @@ function HorizontalRail({
       aria-label="Primary"
       data-floating-rail=""
       data-floating-rail-axis="horizontal"
+      data-rail-colors={railColors}
       className={cn(
-        // `left-1/2 -translate-x-1/2` rather than `inset-x-3`: the pill is
-        // content-width, so stretching it edge to edge would make a
+        TOOLBAR_CONTAINER,
+        palette.container,
+        // `left-1/2 -translate-x-1/2` rather than `inset-x-4`: the toolbar
+        // is content-width, so stretching it edge to edge would make a
         // three-item nav look like a broken five-item one.
-        "-translate-x-1/2 fixed bottom-3 left-1/2 z-40 flex items-center gap-1",
-        "max-w-[calc(100vw-1.5rem)]",
-        "rounded-full border border-edge bg-surface-2/90 p-1.5 backdrop-blur-md",
-        "shadow-[var(--shadow-popover)]",
-        // Below `sm` only — above it the vertical rail takes over.
+        "-translate-x-1/2 left-1/2 h-16 items-center",
+        "bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] max-w-[calc(100vw-2rem)]",
+        // Below `sm` only — above it the vertical toolbar takes over.
         "sm:hidden",
+        // Gone while a `Select` is open below `sm` — i.e. while its
+        // phone sheet is (`SelectContent` marks its options with
+        // `data-select-content`, and unmounts them on close). The sheet
+        // is full-width on the bottom edge, so it normally covers this
+        // toolbar anyway — but it is not portalled, so its `z-50` only
+        // counts inside whatever stacking context the `Select` sits in,
+        // and inside a `sticky`, `isolate`d (every `InstrumentPanel`) or
+        // transformed ancestor this `fixed z-40` bar, portalled to `body`,
+        // paints over the sheet's bottom 80px, above its scrim — seen:
+        // the last option drawn under the bar. Nor is the bar `inert`
+        // then: Headless UI's `useInertOthers` stops climbing at `body`,
+        // so body-level portals stay live, and a tap on the option drawn
+        // underneath navigated instead. `invisible` removes it from both
+        // painting and hit-testing.
+        "max-sm:[body:has([data-select-content])_&]:invisible",
       )}
     >
-      {/* `size-11` (44px), explicitly, on every slot.
-          `NavLink`'s `"rail"` variant is `px-0` and takes its width from
-          the parent — which works in the vertical rail, whose
-          `items-stretch` hands it the full 52px column. In a horizontal
-          row with `items-center` there is nothing to stretch to, so the
-          anchor collapses to its own content: a **16×32px** tap target,
-          measured, on the one form factor where that is least
-          acceptable. Sized here rather than in `NavLink` so the vertical
-          rail keeps behaving exactly as it did. */}
       {slots.map((item) => (
-        <NavLink
+        <ToolbarLink
           key={item.href}
           item={item}
           active={isActive(item.href, currentPath)}
-          variant="rail"
-          className="size-11 shrink-0 justify-center rounded-full"
+          axis="horizontal"
+          palette={palette}
         />
       ))}
       {overflow.length > 0 && (
         <DropdownMenu>
-          <DropdownMenuTrigger
-            aria-label="More destinations"
-            className={cn(
-              // Matches the slots at 44px, not the 40px it started at —
-              // a row of equal-weight controls with one odd one out reads
-              // as a mistake before it reads as a distinction.
-              "flex size-11 shrink-0 items-center justify-center rounded-full transition-colors",
-              activeIsHidden
-                ? "bg-base-300 text-foreground"
-                : "text-muted-foreground hover:bg-base-300/60 hover:text-foreground",
-            )}
-          >
-            <MoreHorizontal size={16} aria-hidden="true" />
+          <DropdownMenuTrigger aria-label="More destinations" className={more.target}>
+            <span aria-hidden="true" data-toolbar-item="" className={more.container}>
+              <MoreVertical size={24} aria-hidden="true" />
+            </span>
           </DropdownMenuTrigger>
-          {/* `anchor="top end"`: this rail is pinned to the bottom of the
-              viewport, so `DropdownMenuContent`'s own `bottom start`
-              default would open the menu off-screen. */}
-          <DropdownMenuContent anchor="top end">
+          {/* `anchor="top end"`: this toolbar is pinned to the bottom of
+              the viewport, so `DropdownMenuContent`'s own `bottom start`
+              default would open the menu off-screen.
+              `[--anchor-gap:12px]` rather than the menu's own 4px: the
+              gap is measured from the trigger, and the trigger sits 8px
+              inside the toolbar's padding, so 4px left the menu's bottom
+              edge overlapping the bar by 4px. */}
+          <DropdownMenuContent anchor="top end" className="[--anchor-gap:12px]">
             {overflow.map((item) => (
               <DropdownMenuLinkItem
                 key={item.href}
@@ -770,6 +970,7 @@ function FloatingRailPortal({
   footerItems: NavItem[];
   currentPath: string;
   collapsed: boolean;
+  railColors: RailColors;
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -818,12 +1019,12 @@ function FloatingRailPortal({
  * `"off-canvas"`, where every band is in flow anyway.
  *
  * Default (`smallScreen="floating"`):
- *   - `<640px`: a horizontal pill along the bottom — four destinations
- *     and an overflow menu (`HorizontalRail`). A 52px column is 14% of a
- *     375px screen and sits where a thumb cannot reach, so the rail turns
- *     rather than shrinks.
- *   - `640–1279px`: the vertical floating rail, detached from the edge
- *     (`FloatingRail`), label on hover via a native tooltip — hover only,
+ *   - `<640px`: M3's horizontal floating toolbar along the bottom — four
+ *     destinations and an overflow menu (`HorizontalRail`). A 64px column
+ *     is 17% of a 375px screen and sits where a thumb cannot reach, so
+ *     the toolbar turns rather than shrinks.
+ *   - `640–1279px`: M3's vertical floating toolbar, 16px off the left
+ *     edge (`FloatingRail`), label on hover via a native tooltip — hover only,
  *     and a keyboard user gets the same label from the row's `sr-only`
  *     text, which is what a screen reader reads and what focus announces.
  *   - `≥1280px`: the full sidebar with labels, in flow — the one shape
@@ -883,6 +1084,7 @@ export function SideNav({
   accountSlot,
   smallScreen = "floating",
   collapsed,
+  railColors = "standard",
   className,
 }: SideNavProps) {
   // In floating mode the in-flow tree exists only at `xl`. The `<nav>`
@@ -949,6 +1151,7 @@ export function SideNav({
           footerItems={footerItems}
           currentPath={currentPath}
           collapsed={collapsed === true}
+          railColors={railColors}
         />
       )}
 
@@ -993,7 +1196,7 @@ export function SideNav({
           ))}
         </div>
         {/* Hidden in the icon rail band (no room for the account block at
-            64px) and, in floating mode, below `lg` too (no room at ~52px
+            64px) and, in floating mode, below `lg` too (no room in a 64px toolbar
             either, and floating mode has no off-canvas tree for it to
             live in) — shown off-canvas (in `"off-canvas"` mode only) and
             at the full-label desktop width, by the same `lg:hidden

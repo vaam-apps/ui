@@ -1,6 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ReactNode } from "react";
 import { expect, userEvent, waitFor, within } from "storybook/test";
+import { cn } from "../../lib/cn";
+import { InstrumentPanel } from "../data/instrument-panel";
+import { StatTile } from "../data/stat-tile";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
 import { SideNav } from "./side-nav";
 
 /** Minimal stand-in icons — the real ones come from the consuming app, so
@@ -150,10 +154,11 @@ const meta = {
           "**Only one shape takes space out of the page: the sidebar.** Everything narrower " +
           "floats over the content, which is what lets a caller build one layout instead of " +
           "one per band.\n\n" +
-          "- **Below 640px** — a horizontal pill along the bottom: four destinations and a menu " +
-          "for the rest. A 52px column costs 14% of a 375px screen and sits where a thumb " +
-          "cannot reach, so the rail turns rather than shrinks.\n" +
-          "- **640–1279px** — the vertical floating rail, detached from the edge.\n" +
+          "- **Below 640px** — M3 Expressive's horizontal floating toolbar along the bottom: " +
+          "four destinations and a menu for the rest. A 64px column costs 17% of a 375px " +
+          "screen and sits where a thumb cannot reach, so the toolbar turns rather than " +
+          "shrinks.\n" +
+          "- **640–1279px** — the vertical floating toolbar, 16px off the left edge.\n" +
           "- **1280px and up** — a 256px sidebar with labels, in flow. Pass `collapsed` and " +
           "this band uses the vertical rail too, which is the only way to actually give the " +
           "content its width back.\n\n" +
@@ -166,6 +171,10 @@ const meta = {
           'The opt-in `smallScreen="off-canvas"` is unchanged and keeps the original ' +
           "full-label accordion tree, plus that icon-rail band, for a caller who already owns " +
           "a drawer and wants every band in flow.\n\n" +
+          "Both toolbars are M3's own geometry, transcribed from androidx: 64px across, fully " +
+          "round, 8px padding, 4px between 48px targets, 24px icons, and the current page drawn " +
+          "as a wide filled pill. `railColors` picks M3's `standard` or `vibrant` scheme — the " +
+          "two “Toolbar colours” stories render each over the same real content.\n\n" +
           "All of it is plain CSS — no `useMediaQuery`, no viewport read — so the bands are " +
           "server-rendered. The one exception is the floating rails themselves, which are " +
           "portalled to `document.body` and therefore appear only after hydration.",
@@ -254,16 +263,20 @@ export const OffCanvasDrawer: Story = {
  * exists: nothing between 640px and 1280px takes space out of the page
  * any more.
  *
- * The content column's padding is `p-6 pb-24 sm:pb-6 sm:pl-20 xl:pl-6`,
+ * The content column's padding is `p-6 pb-24 sm:pb-6 sm:pl-24 xl:pl-6`,
  * and every part of it is doing something — because the rail is `fixed`
  * and portalled, so it **cannot reserve its own space**. That padding is
  * the caller's job in a real application too, which is the single thing
  * an integrator is most likely to miss.
  *
- * Reading it: below `sm` the rail is the bottom pill, so the clearance is
- * `pb-24` and there is no left gutter to leave. From `sm` the vertical
- * rail takes the leftmost 64px (`left-3` plus `w-[52px]`), so `pl-20`
- * gives it 80px and a 16px margin, and the bottom clearance goes away.
+ * Reading it: below `sm` the rail is the bottom toolbar — 64px tall,
+ * 16px off the bottom edge, so 80px — and `pb-24` clears it with 16px to
+ * spare; there is no left gutter to leave. From `sm` the vertical toolbar
+ * takes the leftmost 80px (`left-4` plus `w-16`), so `pl-24` gives it
+ * 96px and a 16px margin, and the bottom clearance goes away. (It was
+ * `pl-20` while the rail was a 52px pill 12px in; M3's 64px toolbar at
+ * its 16px screen offset ends exactly where `pl-20` did, so a caller
+ * still on `pl-20` gets content touching the toolbar's edge.)
  * At `xl` the sidebar is in flow and takes its own lane, so the gutter
  * returns to `p-6`.
  *
@@ -281,7 +294,7 @@ export const FloatingRail: Story = {
   render: (args) => (
     <div className="flex h-[32rem] overflow-hidden rounded-md border border-edge">
       <SideNav {...args} />
-      <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto bg-base-100 p-6 pb-24 sm:pb-6 sm:pl-20 xl:pl-6">
+      <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto bg-base-100 p-6 pb-24 sm:pb-6 sm:pl-24 xl:pl-6">
         <div className="h-7 w-48 rounded-sm bg-surface-3" />
         <div className="h-4 w-full max-w-xs rounded-sm bg-surface-2" />
         <div className="mt-2 h-40 rounded-md bg-surface-2" />
@@ -360,12 +373,19 @@ export const TinyScreenRail: Story = {
     const menuButton = body.getByRole("button", { name: "More destinations" });
 
     await step("`/routes` is behind the menu, so the menu button reads as current", async () => {
-      // A class, deliberately: the trigger's "current" state is *only* a
-      // visual treatment today — there is no ARIA on it to assert (see
-      // the report accompanying this story). The painted result is the
-      // Playwright suite's business; that this branch was taken at all is
-      // this one's.
-      await expect(menuButton).toHaveClass("bg-base-300");
+      // The trigger's "current" state is *only* a visual treatment — there
+      // is no ARIA on it to assert — so this reads what is painted rather
+      // than a class name: the menu button's pill is filled, and an idle
+      // slot's is not. A computed colour, because a class string is what
+      // this assertion used to be, and the class it named stopped
+      // existing the day the rail became an M3 toolbar.
+      const pill = (el: Element) =>
+        getComputedStyle(el.querySelector("[data-toolbar-item]") as Element).backgroundColor;
+      const idle = within(document.body.querySelector(railSelector) as HTMLElement).getAllByRole(
+        "link",
+      )[0] as HTMLElement;
+      await expect(pill(menuButton)).not.toBe("rgba(0, 0, 0, 0)");
+      await expect(pill(idle)).toBe("rgba(0, 0, 0, 0)");
     });
 
     await step("Opening it shows the three destinations that did not fit", async () => {
@@ -421,7 +441,7 @@ export const CollapsedOnDesktop: Story = {
   render: (args) => (
     <div className="flex h-[32rem] overflow-hidden rounded-md border border-edge">
       <SideNav {...args} />
-      <div className="flex min-w-0 flex-1 flex-col gap-4 bg-base-100 p-6 pl-20">
+      <div className="flex min-w-0 flex-1 flex-col gap-4 bg-base-100 p-6 pl-24">
         <div className="h-7 w-64 rounded-sm bg-surface-3" />
         <div className="h-4 w-96 rounded-sm bg-surface-2" />
         <div className="mt-2 h-40 rounded-md bg-surface-2" />
@@ -553,4 +573,137 @@ export const LongLabelsAndOverflow: Story = {
       />
     </Shell>
   ),
+};
+
+/**
+ * A realistic page to put a floating toolbar over: an instrument panel
+ * (the aurora mesh, the busiest surface in the library), stat tiles, and
+ * enough text to scroll under the bar. The toolbar stories below use it
+ * so its two colour schemes are judged where they will actually live,
+ * not on an empty page where anything reads.
+ */
+function BusyPage({ bottomPad }: { bottomPad: string }) {
+  return (
+    // `space-y-4` on a block, not `flex flex-col gap-4`: the instrument
+    // panel clips its own mesh, and a flex item with `overflow` set has a
+    // zero automatic minimum height, so a flex column squashed it to a
+    // 40px sliver the first time this rendered.
+    <div className={cn("h-[50rem] space-y-4 overflow-y-auto bg-base-100 p-4", bottomPad)}>
+      <div className="h-7 w-40 rounded-sm bg-surface-3" />
+      <InstrumentPanel title="Delivery, last 24h" caption="Across every provider">
+        <div className="grid grid-cols-2 gap-3">
+          <StatTile label="Delivered" value="18,204" emphasized />
+          <StatTile label="Unresolved" value="37" />
+        </div>
+      </InstrumentPanel>
+      {Array.from({ length: 6 }, (_, index) => (
+        <div
+          // biome-ignore lint/suspicious/noArrayIndexKey: static filler rows
+          key={index}
+          className="flex flex-col gap-2 rounded-box border border-edge bg-surface-1 p-4"
+        >
+          <div className="h-4 w-1/2 rounded-sm bg-surface-3" />
+          <p className="text-body text-muted-foreground">
+            Content scrolls under the toolbar. Its fill is the only thing that separates it from
+            this card, which is the whole question these stories ask.
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * **Toolbar colours — standard.** M3's default floating-toolbar scheme:
+ * a `SurfaceContainer` bar (`surface-2`) with muted icons, and the current
+ * page as a filled `primary` pill. Scroll the page: the bar's own fill is
+ * close to the cards', and what keeps it readable is the shadow — the
+ * one place this toolbar departs from androidx, which ships it at
+ * elevation `Level0`. Compare with the vibrant story beside this one.
+ */
+export const ToolbarColorsStandard: Story = {
+  globals: { viewport: { value: "tiny" } },
+  args: { currentPath: "/messages", railColors: "standard" },
+  render: (args) => (
+    <>
+      <SideNav {...args} />
+      <BusyPage bottomPad="pb-24" />
+    </>
+  ),
+};
+
+/**
+ * **Toolbar colours — vibrant.** M3's other scheme: a `PrimaryContainer`
+ * bar — `primary` here, so near-white on the dark theme and near-black on
+ * the light one — with the current page cut back out of it in
+ * `SurfaceContainer`. Loud, and legible over anything, because its
+ * contrast with the page does not depend on what is scrolling under it.
+ * Switch the theme toolbar to light to see it invert.
+ */
+export const ToolbarColorsVibrant: Story = {
+  globals: { viewport: { value: "tiny" } },
+  args: { currentPath: "/messages", railColors: "vibrant" },
+  render: (args) => (
+    <>
+      <SideNav {...args} />
+      <BusyPage bottomPad="pb-24" />
+    </>
+  ),
+};
+
+/** The vertical toolbar (640–1279px) in the vibrant scheme. The current
+ * page's pill runs along the toolbar's own axis — 40 wide, 64 tall —
+ * which is androidx's vertical toolbar sample, turned. */
+export const VerticalToolbarVibrant: Story = {
+  globals: { viewport: { value: "medium" } },
+  args: { currentPath: "/providers", railColors: "vibrant" },
+  render: (args) => (
+    <div className="flex">
+      <SideNav {...args} />
+      <div className="min-w-0 flex-1 pl-24">
+        <BusyPage bottomPad="pb-6" />
+      </div>
+    </div>
+  ),
+};
+
+/**
+ * A phone-width `Select` inside a **`sticky` header**, with the toolbar on
+ * screen. `sticky` with a `z-index` is a stacking context, so the select's
+ * sheet — not portalled, `z-50` only inside that context — would paint
+ * *under* the toolbar, which is portalled to `body` at `z-40`: an
+ * undimmed bar sitting over the bottom 80px of the sheet, above its
+ * scrim. The toolbar hides itself while a sheet is open instead
+ * (`HorizontalRail`'s `body:has([data-sheet-handle])` rule), which is
+ * what the play function leaves you looking at. Close the sheet and the
+ * toolbar comes back.
+ */
+export const ToolbarUnderAPhoneSheet: Story = {
+  globals: { viewport: { value: "tiny" } },
+  args: { currentPath: "/messages" },
+  render: (args) => (
+    <>
+      <SideNav {...args} />
+      <div className="h-[50rem] overflow-y-auto bg-base-100 pb-24">
+        <div className="sticky top-0 z-10 border-edge border-b bg-base-100 p-4">
+          <Select defaultValue="24h">
+            <SelectTrigger aria-label="Window">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1h">Last hour</SelectItem>
+              <SelectItem value="24h">Last 24 hours</SelectItem>
+              <SelectItem value="7d">Last 7 days</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <BusyPage bottomPad="pb-6" />
+      </div>
+    </>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Window" }));
+    await expect(await canvas.findByRole("listbox")).toBeInTheDocument();
+  },
 };

@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, userEvent, waitFor, within } from "storybook/test";
 import { Button } from "./button";
-import { MoreDetailDrawer } from "./drawer";
+import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger, MoreDetailDrawer } from "./drawer";
 import { FormField } from "./form-field";
 import {
   Select,
@@ -19,6 +19,17 @@ const meta = {
   tags: ["autodocs"],
   args: { children: null },
   parameters: {
+    // A named phone viewport, so the bottom-sheet stories can pin the band
+    // they exist for rather than asking the reader to drag the window
+    // under 640px — the same reason `side-nav.stories.tsx` names its own.
+    viewport: {
+      options: {
+        phone: {
+          name: "Phone — bottom sheet (375px)",
+          styles: { width: "375px", height: "812px" },
+        },
+      },
+    },
     docs: {
       description: {
         component:
@@ -26,7 +37,13 @@ const meta = {
           "prefer `RadioGroup` or `ChipSelect`: a select makes the reader click once to " +
           "discover the choices and again to pick. The options render *inline*, not " +
           "portaled — `portal={false}` is a correctness fix, not a preference, and the " +
-          "“Inside a drawer” story below is the case it exists for.",
+          "“Inside a drawer” story below is the case it exists for.\n\n" +
+          "**Below 640px the options open as an M3 modal bottom sheet** instead of a " +
+          "dropdown: pinned to the bottom edge, 28px top corners, a drag handle that really " +
+          "drags (pull it down past 56px, or flick it, to dismiss), a scrim over the page, and " +
+          "56px rows with the current value as a filled pill. It is the same element restyled " +
+          "by a media query — no second component, no viewport read — so it works inside a " +
+          "drawer exactly as the dropdown does. The “Phone” stories below open it for you.",
       },
     },
   },
@@ -356,4 +373,187 @@ export const InsideADrawer: Story = {
       </>
     );
   },
+};
+
+const COUNTRIES = [
+  "Angola",
+  "Benin",
+  "Botswana",
+  "Burkina Faso",
+  "Burundi",
+  "Cameroon",
+  "Cape Verde",
+  "Central African Republic",
+  "Chad",
+  "Comoros",
+  "Congo",
+  "Côte d’Ivoire",
+  "Democratic Republic of the Congo",
+  "Djibouti",
+  "Equatorial Guinea",
+  "Eritrea",
+  "Eswatini",
+  "Ethiopia",
+  "Gabon",
+  "Gambia",
+  "Ghana",
+  "Guinea",
+  "Guinea-Bissau",
+  "Kenya",
+  "Lesotho",
+  "Liberia",
+  "Madagascar",
+  "Malawi",
+  "Mali",
+  "Mauritania",
+];
+
+/**
+ * **The phone shape**: below 640px the options are an M3 modal bottom
+ * sheet, not a dropdown. Thirty countries, so the sheet reaches its
+ * `85dvh` cap and scrolls under a drag handle that stays put.
+ *
+ * The play function opens it and leaves it open, so what you see is the
+ * sheet. Things worth trying by hand:
+ *
+ * - **Drag the handle down.** Let go before 56px and it springs back on
+ *   the spatial spring; past 56px (or with a flick) it dismisses and
+ *   focus returns to the trigger, exactly as Escape does.
+ * - **Tap the dimmed page.** It closes the sheet and activates nothing
+ *   underneath — the page is `inert` while the listbox is open.
+ * - **Scroll the list.** The page behind does not move.
+ *
+ * At 640px and up the same markup is the ordinary dropdown; widen the
+ * viewport to see it change back.
+ */
+export const PhoneBottomSheet: Story = {
+  globals: { viewport: { value: "phone" } },
+  render: function Render() {
+    const [country, setCountry] = useState<string>("Cameroon");
+    const [taps, setTaps] = useState(0);
+    return (
+      <div className="flex w-full max-w-[32rem] flex-col gap-4 p-4">
+        {/* Above the sheet's 85dvh on purpose: a real control under the
+            scrim, so "a tap on the dimmed page activates nothing" is a
+            claim `e2e/select-sheet.spec.ts` can falsify. Tap it while the
+            sheet is open — the sheet closes and the count stays put. */}
+        <div className="flex items-center gap-3">
+          <Button size="sm" variant="secondary" onClick={() => setTaps((n) => n + 1)}>
+            Behind the scrim
+          </Button>
+          <span className="font-mono text-caption text-subtle-foreground">taps: {taps}</span>
+        </div>
+        <FormField label="Country" htmlFor="sb-country">
+          <Select value={country} onValueChange={setCountry}>
+            <SelectTrigger id="sb-country">
+              <SelectValue placeholder="Choose a country" />
+            </SelectTrigger>
+            <SelectContent>
+              {COUNTRIES.map((name) => (
+                <SelectItem key={name} value={name}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FormField>
+        <p className="font-mono text-caption text-subtle-foreground">value: {country}</p>
+        <p className="text-body text-muted-foreground">
+          Content behind the sheet. It stays where it is while the list scrolls, and a tap on it
+          only closes the sheet.
+        </p>
+      </div>
+    );
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByRole("button", { name: "Country" });
+
+    await step("Opening the select opens the sheet", async () => {
+      await userEvent.click(trigger);
+      await expect(await canvas.findByRole("listbox")).toBeInTheDocument();
+    });
+
+    // Geometry only means something in the band the sheet exists for; in
+    // the docs page or a wide canvas this is the dropdown, and asserting
+    // sheet geometry there would be asserting the wrong component.
+    if (window.innerWidth >= 640) return;
+
+    await step("…pinned to the bottom edge, full width, and scrolling", async () => {
+      const sheet = canvas.getByRole("listbox");
+      const style = getComputedStyle(sheet);
+      await expect(style.position).toBe("fixed");
+      await expect(style.borderTopLeftRadius).toBe("28px");
+      await expect(sheet.scrollHeight).toBeGreaterThan(sheet.clientHeight);
+    });
+  },
+};
+
+/**
+ * A short vocabulary on a phone: the sheet is only as tall as its rows,
+ * so three options are a small sheet at the bottom edge rather than a
+ * tall one with empty space. Open it to see — the current value is the
+ * filled, 16px-rounded row; the others are flat.
+ */
+export const PhoneBottomSheetShortList: Story = {
+  globals: { viewport: { value: "phone" } },
+  render: () => (
+    <div className="flex w-full max-w-[32rem] flex-col gap-4 p-4">
+      <FormField label="Priority" htmlFor="sb-priority">
+        <Select defaultValue="normal">
+          <SelectTrigger id="sb-priority">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="low">Low</SelectItem>
+            <SelectItem value="normal">Normal</SelectItem>
+            <SelectItem value="high">High — page the on-call operator</SelectItem>
+          </SelectContent>
+        </Select>
+      </FormField>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Priority" }));
+    await expect(await canvas.findByRole("listbox")).toBeInTheDocument();
+  },
+};
+
+/**
+ * A `Select` in the **generic** `Drawer` — which, unlike the two detail
+ * drawers, is not `handleOnly`: vaul lets a drag start anywhere in it.
+ * At phone width, dragging the select sheet's handle (or scrolling its
+ * list) used to drag the drawer underneath as well — a 30px drag moved
+ * the drawer 40px and the sheet 60px, and a long one closed the drawer.
+ * `SelectContent`'s `data-vaul-no-drag` is what stops that; drag the
+ * handle here to see only the sheet move.
+ */
+export const InsideAPlainDrawer: Story = {
+  render: () => (
+    <Drawer>
+      <DrawerTrigger asChild>
+        <Button size="sm" variant="secondary">
+          Open plain drawer
+        </Button>
+      </DrawerTrigger>
+      <DrawerContent className="gap-4 p-5">
+        <DrawerTitle>Filter messages</DrawerTitle>
+        <FormField label="Country" htmlFor="plain-drawer-country">
+          <Select defaultValue="Cameroon">
+            <SelectTrigger id="plain-drawer-country">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {COUNTRIES.map((name) => (
+                <SelectItem key={name} value={name}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FormField>
+      </DrawerContent>
+    </Drawer>
+  ),
 };

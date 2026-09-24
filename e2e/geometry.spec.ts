@@ -56,8 +56,9 @@ async function pressAndSettle(page: Page, target: Locator): Promise<number[]> {
  * class string was right while the render was wrong — `button.tsx`'s own
  * comment records `rounded-field` (12px) silently defeating
  * `.btn-circle`'s radius on a control whose class list said `btn-circle`,
- * and `side-nav.tsx`'s records a 16×32px tap target under a comment
- * claiming 40px. So nothing below reads `className`.
+ * and `src/docs/07-navigation.mdx` records the nav rail shipping a 16×32px
+ * tap target under a comment claiming 40px. So nothing below reads
+ * `className`.
  */
 
 test.describe('Button size="icon" is a circle', () => {
@@ -101,7 +102,7 @@ test.describe('Button size="icon" is a circle', () => {
 });
 
 test.describe("tap targets on the phone-width nav", () => {
-  test("every control in the bottom rail is at least 44×44", async ({ page }) => {
+  test("every control in the bottom rail is at least 48×48", async ({ page }) => {
     await openStory(page, STORY.sideNavInAShell, { width: 375, height: 720 });
     const rail = page.locator('[data-floating-rail-axis="horizontal"]');
     await expect(rail).toBeVisible();
@@ -114,8 +115,12 @@ test.describe("tap targets on the phone-width nav", () => {
 
     for (let index = 0; index < count; index += 1) {
       const rect = await box(controls.nth(index));
-      expect(rect.width, `control ${index} width`).toBeGreaterThanOrEqual(44);
-      expect(rect.height, `control ${index} height`).toBeGreaterThanOrEqual(44);
+      // 48, not the 44 this started at: the rail is M3's floating toolbar
+      // now, and `FloatingToolbarDefaults.ContentPadding` is sized around
+      // "the minimum touch target (48.dp)". `floating-toolbar.spec.ts`
+      // pins the rest of its geometry.
+      expect(rect.width, `control ${index} width`).toBeGreaterThanOrEqual(48);
+      expect(rect.height, `control ${index} height`).toBeGreaterThanOrEqual(48);
     }
   });
 

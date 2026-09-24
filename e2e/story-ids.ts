@@ -56,6 +56,18 @@ export const STORY = {
   // `SelectTrigger` carries no `id` at all (a bare, unlabelled `Select`).
   selectDisabledAndScrolling: "primitives-select--disabled-and-scrolling",
   selectInsideADrawer: "primitives-select--inside-a-drawer",
+  // Below 640px `SelectContent` is an M3 modal bottom sheet; both stories
+  // open it from their play function (`e2e/select-sheet.spec.ts`).
+  selectPhoneSheet: "primitives-select--phone-bottom-sheet",
+  selectPhoneSheetShort: "primitives-select--phone-bottom-sheet-short-list",
+  selectInsideAPlainDrawer: "primitives-select--inside-a-plain-drawer",
+  // `SideNav`'s floating toolbars, one per M3 colour scheme, over real
+  // content (`e2e/floating-toolbar.spec.ts`).
+  sideNavToolbarStandard: "primitives-sidenav--toolbar-colors-standard",
+  sideNavToolbarVibrant: "primitives-sidenav--toolbar-colors-vibrant",
+  // A phone `Select` in a `sticky` header with the toolbar on screen; its
+  // play function opens the sheet.
+  sideNavToolbarUnderASheet: "primitives-sidenav--toolbar-under-a-phone-sheet",
   statusPillQuietVersusLoud: "status-statuspill--quiet-versus-loud",
   tokensSprings: "foundations-tokens--springs",
 } as const;

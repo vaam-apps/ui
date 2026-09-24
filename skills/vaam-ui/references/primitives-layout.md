@@ -232,18 +232,20 @@ interface NavGroup { label: string; items: NavItem[] }
 | `accountSlot` | `React.ReactNode` | Rendered as-is; never built here. Shown only where there is room for it (the sidebar, and the off-canvas tree). |
 | `smallScreen` | `"floating" \| "off-canvas" \| undefined` | Default `"floating"`. |
 | `collapsed` | `boolean \| undefined` | Turns the sidebar back into the rail. |
+| `railColors` | `"standard" \| "vibrant" \| undefined` (the two values are exported as `RailColors`) | Default `"standard"`. Which M3 floating-toolbar colour scheme the rails wear; the sidebar ignores it. |
 
 ### The three shapes
 
-- **Below 640px** — a horizontal pill along the bottom: four destinations
-  and an overflow menu for the rest. Four is a thumb measurement, not a
-  taste one: five 44px targets, four 4px gaps and 12px of pill padding
-  come to 248px, which still reads as a pill on a 375px phone. A 52px
-  column down the side of that phone would be 14% of the width,
-  permanently, in the thumb's dead zone — so the rail turns rather than
-  shrinks. The overflow rows are real anchors, so middle-click and
-  ⌘-click still work on them.
-- **640–1279px** — a vertical floating rail, 52px wide, inset 12px from
+- **Below 640px** — M3 Expressive's horizontal floating toolbar along the
+  bottom, 64px tall and 16px off the edge: four destinations and an
+  overflow menu for the rest. Four is a width measurement, not a taste
+  one: the current page's 64px pill, four 48px targets, four 4px gaps and
+  16px of padding come to 288px, about 43px clear of each edge on a 375px
+  phone. A 64px column down the side of that phone would be 17% of the
+  width, permanently, in the thumb's dead zone — so the toolbar turns
+  rather than shrinks. The overflow rows are real anchors, so
+  middle-click and ⌘-click still work on them.
+- **640–1279px** — M3's vertical floating toolbar, 64px wide, 16px from
   the left edge, vertically centred. Labels come from a native `title` on
   hover, and from `sr-only` text for a screen reader. (A CSS tooltip
   cannot work here: the rail is a scroll container and clips its own
@@ -251,6 +253,45 @@ interface NavGroup { label: string; items: NavItem[] }
   inside a 40px-wide clip box, so no label ever appeared.)
 - **1280px and up** — the full sidebar, with labels and group headers, in
   flow. With `collapsed`, this band uses the floating rail instead.
+
+### The rails are M3's floating toolbar
+
+Both rails are Material 3 Expressive's floating toolbar, with androidx's
+own numbers (`FloatingToolbarTokens.kt`): 64px across, fully round, 8px
+padding, 4px between items, 16px from the screen edge (plus the safe
+area at the bottom). Every item is a 48×48 target around a 40px round
+container with a 24px icon, and the **current page is a filled pill 64px
+long** on the toolbar's own axis. No border, no blur; the one departure
+from androidx is a soft shadow (`--shadow-toolbar`), because the bar
+floats over content it knows nothing about.
+
+`railColors` picks M3's two schemes:
+
+- `"standard"` (default) — a `surface-2` bar, muted icons, the current
+  page as a filled `primary` pill. Quiet.
+- `"vibrant"` — a `primary` bar, i.e. the inverse of the page (near-white
+  on dark, near-black on light), with the current page cut out in
+  `surface-2`. Loud, and legible over any content.
+
+The bottom toolbar hides itself while a `Select` is open as a phone
+sheet, so the sheet is never drawn under it whatever stacking context the
+`Select` sits in.
+
+Neither is a hue, on purpose — a tinted bar would read as a status. Do
+not restyle the rails with a status colour to make them "pop"; use
+`railColors="vibrant"`.
+
+Icons are rendered at `size={24}` in the rails (16 in the sidebar), so a
+`NavItem.icon` must honour its `size` prop — every lucide icon does.
+Footer items are no longer dimmed in the rails; the divider above them is
+what separates them now.
+
+**Anything you pin beside the bottom toolbar must clear its new width.**
+With four slots and the menu it is 288px wide, centred — at 375px it
+starts 43.5px from the left, at 360px 36px. A `fixed bottom-3 left-3`
+button of your own that sat beside the old, narrower pill will now touch
+or overlap it. Put such an action in the overflow menu's destinations,
+or move it above the toolbar (`bottom-24`).
 
 ### Only the sidebar takes space out of the page
 
@@ -268,12 +309,20 @@ yours to set.** Nothing errors when you forget. The screen just has a rail
 sitting on top of its first column of text, or a last table row hidden
 under the bottom pill.
 
-What to reserve, from the rail's own geometry: the vertical rail occupies
-the leftmost 64px (12px inset plus 52px wide), so a left pad of 80px
-(`pl-20`) leaves a 16px gutter. The bottom pill is 44px targets plus 6px
-of padding, 12px off the bottom — about 68px, so `pb-24` clears it. Below
+What to reserve, from the toolbar's own geometry: the vertical toolbar
+occupies the leftmost 80px (16px inset plus 64px wide), so a left pad of
+96px (`pl-24`) leaves a 16px gutter. The bottom toolbar is 64px tall, 16px
+off the bottom — 80px, so `pb-24` clears it with 16px to spare. The
+bottom offset also adds `env(safe-area-inset-bottom)`: that is 0 unless
+your page opts into `viewport-fit=cover`, and if it does (an iPhone with a
+home indicator adds about 34px), use
+`pb-[calc(6rem+env(safe-area-inset-bottom))]` instead. Below
 640px there is no rail on the left at all, and above 1279px (uncollapsed)
-the sidebar is in flow and needs no gutter:
+the sidebar is in flow and needs no gutter.
+
+**If your screen still says `sm:pl-20`, change it to `sm:pl-24`.** That
+was right for the old 52px rail; the M3 toolbar ends at exactly 80px, so
+`pl-20` now puts your content flush against it.
 
 ```tsx
 import { SideNav, ScreenStack, ScreenHeader } from "@vaam-apps/ui";
@@ -296,7 +345,7 @@ import { SideNav, ScreenStack, ScreenHeader } from "@vaam-apps/ui";
   />
 
   {/* The rails float over this column. These paddings are the caller's job. */}
-  <main className="min-w-0 flex-1 overflow-y-auto p-6 pb-24 sm:pb-6 sm:pl-20 xl:pl-6">
+  <main className="min-w-0 flex-1 overflow-y-auto p-6 pb-24 sm:pb-6 sm:pl-24 xl:pl-6">
     <ScreenStack>{children}</ScreenStack>
   </main>
 </div>
@@ -304,7 +353,7 @@ import { SideNav, ScreenStack, ScreenHeader } from "@vaam-apps/ui";
 
 If you pass `collapsed`, the sidebar never renders and the rail is the
 navigation at every width from 640px up — so keep the left gutter at `xl`
-too (`sm:pl-20` with no `xl:pl-6` override) for as long as the preference
+too (`sm:pl-24` with no `xl:pl-6` override) for as long as the preference
 is on. `collapsed` is a JS boolean rather than a breakpoint because it is
 a preference the caller owns, persists, and usually puts a toggle beside.
 
