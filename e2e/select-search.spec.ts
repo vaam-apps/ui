@@ -313,7 +313,14 @@ test("SelectDropdown keeps the dropdown on a phone", async ({ page }) => {
   await openStory(page, STORY.selectDropdownOnPhone, PHONE);
   const list = storyRoot(page).getByRole("listbox");
   await expect(list).toBeVisible();
-  expect(await list.evaluate((el) => getComputedStyle(el).position)).toBe("absolute");
+  // Geometry, not `position`: the dropdown and the sheet are both `fixed`
+  // now (`useDropdownPlacement`). A dropdown sits 4px under its own
+  // trigger at the trigger's width; the sheet is full-width on the
+  // bottom edge.
+  const t = await box(storyRoot(page).getByRole("button", { name: "Sort by" }));
+  const l = await box(list);
+  expect(l.y - (t.y + t.height), "4px under its trigger, not a sheet").toBeCloseTo(4, 0);
+  expect(l.width, "the trigger's width, not the window's").toBeCloseTo(t.width, 0);
   await expect(list.locator("[data-sheet-handle]")).toHaveCount(0);
 });
 

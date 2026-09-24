@@ -9,6 +9,12 @@ import { cn } from "../../lib/cn";
  * `@floating-ui/react`) just to replace one Radix package with another
  * contradicts constraints 6–7.
  *
+ * Since 2026-09-24 `@floating-ui/react-dom` *is* a direct dependency — a
+ * maintainer's call, for `Select`'s dropdown, which a `Dialog` clipped
+ * (`useDropdownPlacement` in `select.tsx`). It positions; it is not a
+ * behaviour library. This tooltip has not been moved onto it, so the
+ * limitation below still holds; moving it is now possible, not done.
+ *
  * **Accepted limitation (named explicitly in the design doc, D5):** `data-tip`
  * is a plain HTML attribute rendered via CSS `content: attr(data-tip)`, so
  * the label must be a string — no rich/interactive tooltip content anywhere

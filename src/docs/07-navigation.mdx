@@ -338,8 +338,9 @@ was the stray horizontal scrollbar under the rail. One cause, two
 symptoms.
 
 There is no CSS-only way out: any flyout anchored inside a scroll
-container is clipped by it, and escaping needs either a portal or CSS
-anchor positioning. A native `title` is painted by the browser *outside*
+container is clipped by it, and escaping needs a portal, `position: fixed`
+placed by script (as `Select`'s dropdown is), or CSS anchor positioning.
+A native `title` is painted by the browser *outside*
 the page entirely, so nothing can clip it, and it costs no CSS and no JS.
 That is also why the vertical rail stays usable once it outgrows
 `max-h-[80vh]` and starts scrolling.

@@ -419,7 +419,9 @@ test.describe("from 640px up it is still the dropdown", () => {
     expect(l.y, "directly under the trigger").toBeGreaterThan(t.y + t.height - 1);
     expect(l.y - (t.y + t.height), "…with the 4px gap").toBeCloseTo(4, 0);
     expect(l.width, "matching its width").toBeCloseTo(t.width, 0);
-    expect(await list.evaluate((el) => getComputedStyle(el).position)).toBe("absolute");
+    // Not `position`, which is `fixed` for the dropdown too now
+    // (`useDropdownPlacement`): the sheet is pinned to the bottom edge.
+    expect(l.y + l.height, "pinned to the bottom edge, like the sheet").toBeLessThan(800 - 1);
     await expect(list.locator("[data-sheet-handle]")).toBeHidden();
   });
 });
