@@ -6,9 +6,15 @@ import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger, MoreDetailDrawer } f
 import { FormField } from "./form-field";
 import {
   Select,
+  SelectClose,
   SelectContent,
+  SelectDropdown,
+  SelectEmpty,
   SelectGroup,
   SelectItem,
+  SelectModal,
+  SelectModalHandle,
+  SelectSearch,
   SelectTrigger,
   SelectValue,
 } from "./select";
@@ -28,6 +34,10 @@ const meta = {
           name: "Phone — bottom sheet (375px)",
           styles: { width: "375px", height: "812px" },
         },
+        desktop: {
+          name: "Desktop (1280px)",
+          styles: { width: "1280px", height: "800px" },
+        },
       },
     },
     docs: {
@@ -41,9 +51,15 @@ const meta = {
           "**Below 640px the options open as an M3 modal bottom sheet** instead of a " +
           "dropdown: pinned to the bottom edge, 28px top corners, a drag handle that really " +
           "drags (pull it down past 56px, or flick it, to dismiss), a scrim over the page, and " +
-          "56px rows with the current value as a filled pill. It is the same element restyled " +
+          "56px rows with the current value as a filled row. It is the same element restyled " +
           "by a media query — no second component, no viewport read — so it works inside a " +
-          "drawer exactly as the dropdown does. The “Phone” stories below open it for you.",
+          "drawer exactly as the dropdown does. The “Phone” stories below open it for you.\n\n" +
+          "**It is a compound component.** `Select` owns the value; everything visible is a " +
+          "part nested inside it. Add a `SelectSearch` and it becomes searchable — M3's " +
+          "full-screen search view on a phone, the docked one on a desktop. Swap " +
+          "`SelectContent` for `SelectDropdown` to keep the dropdown on phones, or for " +
+          "`SelectModal` to use the sheet everywhere. `SelectClose`, `SelectModalHandle` and " +
+          "`SelectEmpty` are public too, with defaults, so most callers never write them.",
       },
     },
   },
@@ -556,4 +572,330 @@ export const InsideAPlainDrawer: Story = {
       </DrawerContent>
     </Drawer>
   ),
+};
+
+/** Country names with their ISO codes, for the searchable stories: the code
+ * is in `textValue` only, so "CM" finds Cameroon without being shown. */
+const COUNTRY_CODES: Record<string, string> = {
+  Angola: "AO",
+  Benin: "BJ",
+  Botswana: "BW",
+  "Burkina Faso": "BF",
+  Burundi: "BI",
+  Cameroon: "CM",
+  "Cape Verde": "CV",
+  "Central African Republic": "CF",
+  Chad: "TD",
+  Comoros: "KM",
+  Congo: "CG",
+  "Côte d’Ivoire": "CI",
+  "Democratic Republic of the Congo": "CD",
+  Djibouti: "DJ",
+  "Equatorial Guinea": "GQ",
+  Eritrea: "ER",
+  Eswatini: "SZ",
+  Ethiopia: "ET",
+  Gabon: "GA",
+  Gambia: "GM",
+  Ghana: "GH",
+  Guinea: "GN",
+  "Guinea-Bissau": "GW",
+  Kenya: "KE",
+  Lesotho: "LS",
+  Liberia: "LR",
+  Madagascar: "MG",
+  Malawi: "MW",
+  Mali: "ML",
+  Mauritania: "MR",
+};
+
+function CountryItems() {
+  return (
+    <>
+      {COUNTRIES.map((name) => (
+        <SelectItem key={name} value={name} textValue={`${name} ${COUNTRY_CODES[name] ?? ""}`}>
+          {name}
+        </SelectItem>
+      ))}
+    </>
+  );
+}
+
+/**
+ * **Searchable, on a phone: M3's full-screen search view.** Adding a
+ * `<SelectSearch />` among the container's children is the whole switch —
+ * the select becomes a combobox (focus stays in the field while the arrows
+ * move through the options) and, below 640px, opens full-screen: a 72px
+ * header with the back arrow and the field, the results under it. Full
+ * screen rather than a sheet because the on-screen keyboard takes about
+ * half the height.
+ *
+ * Try: type "cote" (accents do not matter) or "CM" (the ISO code, matched
+ * through `textValue` but never shown); arrow down and press Enter; tap the
+ * back arrow; clear the field with the ✕.
+ */
+export const SearchablePhone: Story = {
+  globals: { viewport: { value: "phone" } },
+  render: function Render() {
+    const [country, setCountry] = useState<string>("Cameroon");
+    return (
+      <div className="flex w-full max-w-[32rem] flex-col gap-4 p-4">
+        <FormField label="Country" htmlFor="sb-search-country">
+          <Select value={country} onValueChange={setCountry}>
+            <SelectTrigger id="sb-search-country">
+              <SelectValue placeholder="Choose a country" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectSearch placeholder="Search countries" />
+              <CountryItems />
+            </SelectContent>
+          </Select>
+        </FormField>
+        <p className="font-mono text-caption text-subtle-foreground">value: {country}</p>
+      </div>
+    );
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Country" }));
+    await expect(await canvas.findByRole("combobox")).toHaveFocus();
+  },
+};
+
+/**
+ * **Searchable, on a desktop: M3's docked search view** — the same parts as
+ * the phone story, no change at all; from 640px up the popup is a dropdown
+ * with the field in a 56px header, and no back arrow (the default one is a
+ * phone affordance). Escape, a click outside, or picking an option all close
+ * it and put focus back on the trigger.
+ */
+export const SearchableDesktop: Story = {
+  globals: { viewport: { value: "desktop" } },
+  render: function Render() {
+    const [country, setCountry] = useState<string>();
+    return (
+      <div className="flex w-full max-w-80 flex-col gap-3 p-4">
+        <FormField label="Country" htmlFor="sb-search-country-desk">
+          <Select value={country} onValueChange={setCountry}>
+            <SelectTrigger id="sb-search-country-desk">
+              <SelectValue placeholder="Choose a country" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectSearch placeholder="Search countries" />
+              <CountryItems />
+            </SelectContent>
+          </Select>
+        </FormField>
+        <p className="font-mono text-caption text-subtle-foreground">value: {country ?? "—"}</p>
+      </div>
+    );
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Country" }));
+    await expect(await canvas.findByRole("combobox")).toHaveFocus();
+  },
+};
+
+/**
+ * **`SelectEmpty`, written by the caller.** Every searchable popup says "No
+ * match" on its own when the search empties the list; pass a `SelectEmpty`
+ * to say more. It is announced politely (`role="status"`), so a
+ * screen-reader user typing hears that the list emptied. The play function
+ * types a query nothing matches.
+ */
+export const SearchWithCustomEmpty: Story = {
+  globals: { viewport: { value: "phone" } },
+  render: () => (
+    <div className="flex w-full max-w-[32rem] flex-col gap-4 p-4">
+      <FormField label="Country" htmlFor="sb-search-empty">
+        <Select defaultValue="Kenya">
+          <SelectTrigger id="sb-search-empty">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectSearch placeholder="Search countries" />
+            <CountryItems />
+            <SelectEmpty>No country matches — check the spelling, or try its ISO code.</SelectEmpty>
+          </SelectContent>
+        </Select>
+      </FormField>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Country" }));
+    await userEvent.type(await canvas.findByRole("combobox"), "atlantis");
+    await expect(await canvas.findByRole("status")).toHaveTextContent("No country matches");
+  },
+};
+
+const PROVIDER_DIRECTORY = [
+  "Orange Cameroon",
+  "MTN Cameroon",
+  "Nexttel",
+  "Camtel",
+  "Airtel Kenya",
+  "Safaricom",
+  "Vodacom Tanzania",
+  "Tigo Ghana",
+  "Moov Africa",
+  "Glo Nigeria",
+];
+
+/**
+ * **The caller filters: `filter={false}` and `onQueryChange`.** For a list
+ * the caller fetches per keystroke (a server search), the select must not
+ * filter a second time. With `filter={false}` every `SelectItem` rendered
+ * is shown, and `SelectEmpty` appears when the caller renders none. Here
+ * the "server" is a 300ms timer over a fixed list.
+ */
+export const CallerFilteredSearch: Story = {
+  globals: { viewport: { value: "desktop" } },
+  render: function Render() {
+    const [provider, setProvider] = useState<string>();
+    const [results, setResults] = useState<string[]>(PROVIDER_DIRECTORY);
+    const [pending, setPending] = useState(false);
+    function search(query: string) {
+      setPending(true);
+      window.setTimeout(() => {
+        const q = query.trim().toLowerCase();
+        setResults(PROVIDER_DIRECTORY.filter((name) => name.toLowerCase().includes(q)));
+        setPending(false);
+      }, 300);
+    }
+    return (
+      <div className="flex w-full max-w-80 flex-col gap-3 p-4">
+        <FormField label="Provider" htmlFor="sb-remote">
+          <Select value={provider} onValueChange={setProvider}>
+            <SelectTrigger id="sb-remote">
+              <SelectValue placeholder="Search the provider directory" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectSearch placeholder="Provider name" filter={false} onQueryChange={search} />
+              {results.map((name) => (
+                <SelectItem key={name} value={name}>
+                  {name}
+                </SelectItem>
+              ))}
+              <SelectEmpty>{pending ? "Searching…" : "No provider by that name"}</SelectEmpty>
+            </SelectContent>
+          </Select>
+        </FormField>
+      </div>
+    );
+  },
+};
+
+/**
+ * **`SelectDropdown`: the phone opt-out.** The same select as the phone
+ * sheet stories, but the container is `SelectDropdown`, so even at 375px
+ * the options are the anchored dropdown. For the rare select that really is
+ * better as a short list in place — most should stay on `SelectContent`.
+ */
+export const DropdownOnAPhone: Story = {
+  globals: { viewport: { value: "phone" } },
+  render: () => (
+    <div className="flex w-full max-w-[32rem] flex-col gap-4 p-4">
+      <FormField label="Sort by" htmlFor="sb-sort">
+        <Select defaultValue="newest">
+          <SelectTrigger id="sb-sort">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectDropdown>
+            <SelectItem value="newest">Newest first</SelectItem>
+            <SelectItem value="oldest">Oldest first</SelectItem>
+            <SelectItem value="status">By status</SelectItem>
+          </SelectDropdown>
+        </Select>
+      </FormField>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Sort by" }));
+    await expect(await canvas.findByRole("listbox")).toBeInTheDocument();
+  },
+};
+
+/**
+ * **`SelectModal` on a desktop, with its parts placed by hand.** The sheet
+ * at every width — capped at 640px and centred from 640px up, M3's own
+ * maximum for a modal bottom sheet. The handle and a "Done" button are
+ * written out here to show that they are parts: `SelectModalHandle` is
+ * where the caller put it (a sheet renders one on its own otherwise), and
+ * `SelectClose` takes any children. In a plain select the close button is
+ * a pointer affordance only — keyboard users have Escape.
+ */
+export const ModalOnADesktop: Story = {
+  globals: { viewport: { value: "desktop" } },
+  render: () => (
+    <div className="flex w-full max-w-80 flex-col gap-4 p-4">
+      <FormField label="Retry policy" htmlFor="sb-retry">
+        <Select defaultValue="exponential">
+          <SelectTrigger id="sb-retry">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectModal>
+            <SelectModalHandle />
+            <SelectItem value="none">Never retry</SelectItem>
+            <SelectItem value="linear">Every 5 minutes, 6 times</SelectItem>
+            <SelectItem value="exponential">Exponential backoff, up to 24 hours</SelectItem>
+            <div className="flex justify-end px-2 pt-2">
+              <SelectClose className="px-4 py-2 text-prose font-medium">Done</SelectClose>
+            </div>
+          </SelectModal>
+        </Select>
+      </FormField>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Retry policy" }));
+    await expect(await canvas.findByRole("listbox")).toBeInTheDocument();
+  },
+};
+
+/**
+ * **Searchable, inside a drawer, on a phone.** The full-screen view opens
+ * over the drawer's own sheet; Escape, the back arrow, or picking a country
+ * closes the search alone, focus returns to the trigger, and only the next
+ * Escape closes the drawer.
+ */
+export const SearchableInsideADrawer: Story = {
+  globals: { viewport: { value: "phone" } },
+  render: function Render() {
+    const [open, setOpen] = useState(false);
+    const [country, setCountry] = useState<string>();
+    return (
+      <>
+        <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
+          Open drawer
+        </Button>
+        <MoreDetailDrawer
+          open={open}
+          onOpenChange={setOpen}
+          title="Sender ID country"
+          description="Where the sender ID will be registered."
+          footer={
+            <Button size="sm" disabled={country === undefined}>
+              Save
+            </Button>
+          }
+        >
+          <FormField label="Country" htmlFor="drawer-search-country">
+            <Select value={country} onValueChange={setCountry}>
+              <SelectTrigger id="drawer-search-country">
+                <SelectValue placeholder="Choose a country" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectSearch placeholder="Search countries" />
+                <CountryItems />
+              </SelectContent>
+            </Select>
+          </FormField>
+        </MoreDetailDrawer>
+      </>
+    );
+  },
 };

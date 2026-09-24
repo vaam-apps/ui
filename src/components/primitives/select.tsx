@@ -1,7 +1,17 @@
 "use client";
 
-import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from "@headlessui/react";
-import { Check, ChevronDown } from "lucide-react";
+import {
+  Combobox,
+  ComboboxButton,
+  ComboboxInput,
+  ComboboxOption,
+  ComboboxOptions,
+  Listbox,
+  ListboxButton,
+  ListboxOption,
+  ListboxOptions,
+} from "@headlessui/react";
+import { ArrowLeft, Check, ChevronDown, Search, X } from "lucide-react";
 import {
   Children,
   createContext,
@@ -9,8 +19,11 @@ import {
   type ReactElement,
   type ReactNode,
   type PointerEvent as ReactPointerEvent,
+  type RefObject,
+  useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -38,9 +51,51 @@ import { notePointerDownUnderOpenSelect } from "../../lib/select-dismissal";
  * label. Keyboard behaviour (type-ahead, `Escape`, arrow-key nav) is
  * genuinely Headless UI's own `Listbox`, not reimplemented here — this file
  * only adds the label-lookup Radix's `SelectValue` used to give for free.
+ *
+ * # A compound component, with two engines behind it
+ *
+ * `Select` is a *wrapper*: every visible piece is a nested part the caller
+ * composes — `SelectTrigger`, `SelectValue`, a container (`SelectContent`,
+ * `SelectDropdown` or `SelectModal`), `SelectItem`, and the optional
+ * `SelectSearch`, `SelectClose`, `SelectModalHandle` and `SelectEmpty`.
+ * The parts describe *what* the caller wants; this file decides *how*,
+ * which is what lets it be re-organised behind them — a second engine, a
+ * different presentation per breakpoint, or (later) a React Native
+ * implementation of the same parts, where a window-size class read in JS
+ * replaces the CSS breakpoints the web uses (the web avoids reading the
+ * viewport in JS only because of server rendering and hydration, which
+ * native does not have).
+ *
+ * The engine follows from the parts. Without a `SelectSearch`, it is
+ * Headless UI's `Listbox`, exactly as before. **With one, it is Headless
+ * UI's `Combobox`**: once there is a text field, focus has to stay in the
+ * field while the arrow keys move through the options, which is the WAI-ARIA
+ * combobox pattern, not the listbox one — `Listbox` has no way to put focus
+ * anywhere but its own options. The caller does not choose or see this;
+ * adding a `<SelectSearch />` is the whole switch.
  */
 
+type SelectEngine = "listbox" | "combobox";
+
+/**
+ * How a container presents its options:
+ *
+ * - `"auto"` (`SelectContent`) — a dropdown from `sm` up; below `sm` an M3
+ *   modal bottom sheet, or with a `SelectSearch` M3's full-screen search
+ *   view. Chosen by CSS media query, never by reading the viewport.
+ * - `"dropdown"` (`SelectDropdown`) — the dropdown (or, searchable, M3's
+ *   docked search view) at every width. The phone opt-out.
+ * - `"modal"` (`SelectModal`) — the sheet (or, searchable, the full-screen
+ *   view) at every width.
+ */
+type SelectPresentation = "auto" | "dropdown" | "modal";
+
 interface SelectContextValue {
+  engine: SelectEngine;
+  /** Whether the options are showing — Headless UI's own render-prop
+   * state, handed down so the parts that sit outside its elements (the
+   * combobox's surface and chrome) can follow it. */
+  open: boolean;
   value: string | undefined;
   itemLabel: (value: string) => ReactNode | undefined;
   /**
@@ -74,6 +129,22 @@ interface SelectContextValue {
    * honour.
    */
   invalid: boolean | undefined;
+  /** The search text (combobox engine only; always `""` otherwise). */
+  query: string;
+  setQuery: (query: string) => void;
+  /** Whether `SelectItem`s hide themselves when they do not match
+   * `query` — `SelectSearch`'s `filter`, `true` unless the caller filters
+   * (or fetches) the items itself. */
+  filtering: boolean;
+  /** How many `SelectItem`s are rendered right now — what `SelectEmpty`
+   * reads. Counted by the items themselves (`registerItem`), not by
+   * walking `children`: an option list wrapped in the caller's own
+   * component (`<CountryItems />`) is invisible to a walk of the element
+   * tree, and a walk-based count once showed "No match" under three
+   * matches for exactly that reason. */
+  matchCount: number;
+  registerItem: () => () => void;
+  triggerRef: RefObject<HTMLButtonElement | null>;
 }
 const SelectContext = createContext<SelectContextValue | null>(null);
 
@@ -83,6 +154,31 @@ function useSelectContext(component: string): SelectContextValue {
     throw new Error(`<${component} /> must be rendered inside <Select>.`);
   }
   return ctx;
+}
+
+/** `useLayoutEffect` where there is a DOM, so a count read before paint
+ * never flashes a wrong empty state; `useEffect` on the server, where a
+ * layout effect does nothing and React 18 warns about it. */
+const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+/** Set by a container for the parts inside it. */
+interface PopupContextValue {
+  presentation: SelectPresentation;
+}
+const PopupContext = createContext<PopupContextValue>({ presentation: "auto" });
+
+type AnyElement = ReactElement<Record<string, unknown>>;
+
+/** Visits every element in a `children` tree, depth-first. Returning
+ * `false` from `visit` skips that element's own children. */
+function forEachElement(node: ReactNode, visit: (element: AnyElement) => boolean | undefined) {
+  Children.forEach(node, (child) => {
+    if (!isValidElement(child)) return;
+    const element = child as AnyElement;
+    if (visit(element) === false) return;
+    const nested = element.props?.children as ReactNode;
+    if (nested != null) forEachElement(nested, visit);
+  });
 }
 
 function findItemLabel(node: ReactNode, value: string): ReactNode | undefined {
@@ -99,6 +195,31 @@ function findItemLabel(node: ReactNode, value: string): ReactNode | undefined {
     }
   });
   return found;
+}
+
+/** The plain text of a React node — what a `SelectItem` is searched by
+ * when it has no `textValue`. */
+function textOf(node: ReactNode): string {
+  if (node == null || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(textOf).join("");
+  if (isValidElement(node)) {
+    return textOf((node as ReactElement<{ children?: ReactNode }>).props.children);
+  }
+  return "";
+}
+
+/** Case- and accent-insensitive: "cote" finds "Côte d’Ivoire". */
+function normalise(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+}
+
+function matchesQuery(text: string, query: string): boolean {
+  const wanted = normalise(query.trim());
+  return wanted === "" || normalise(text).includes(wanted);
 }
 
 /**
@@ -137,6 +258,8 @@ export function Select({
   const [internalValue, setInternalValue] = useState(defaultValue);
   const isControlled = value !== undefined;
   const currentValue = isControlled ? value : internalValue;
+  const [query, setQuery] = useState("");
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
 
   function handleChange(next: string) {
     if (!isControlled) setInternalValue(next);
@@ -144,6 +267,71 @@ export function Select({
   }
 
   const itemLabel = useMemo(() => (v: string) => findItemLabel(children, v), [children]);
+
+  // The parts decide the engine: a `SelectSearch` among the parts makes
+  // this a combobox. Read from the element tree rather than registered on
+  // mount, so the very first render already renders the right engine —
+  // which is also why `SelectSearch` has to be written as a part itself,
+  // not from inside a wrapper component of the caller's.
+  const search = useMemo(() => {
+    let found: SelectSearchProps | undefined;
+    forEachElement(children, (element) => {
+      if (element.type === SelectSearch) found = element.props as unknown as SelectSearchProps;
+      return element.type === SelectItem ? false : undefined;
+    });
+    return found;
+  }, [children]);
+
+  const filtering = search !== undefined && search.filter !== false;
+  const [matchCount, setMatchCount] = useState(0);
+  const registerItem = useCallback(() => {
+    setMatchCount((count) => count + 1);
+    return () => setMatchCount((count) => count - 1);
+  }, []);
+
+  const shared = {
+    value: currentValue,
+    itemLabel,
+    invalid,
+    query,
+    setQuery,
+    filtering,
+    matchCount,
+    registerItem,
+    triggerRef,
+  };
+
+  if (search !== undefined) {
+    const onQueryChange = search.onQueryChange;
+    return (
+      <Combobox
+        as="div"
+        className="relative"
+        value={currentValue ?? ""}
+        // Headless UI hands `null` here when the field is cleared — the
+        // combobox pattern's "no value" — but clearing the *search* must
+        // not clear the *selection*, so `null` (and `""`) are ignored.
+        onChange={(next: string | null) => {
+          if (next !== null && next !== "") handleChange(next);
+        }}
+        {...omitUndefined({ disabled })}
+      >
+        {({ open }) => (
+          <SelectContext.Provider value={{ ...shared, engine: "combobox", open }}>
+            <ComboboxLifecycle
+              open={open}
+              triggerRef={triggerRef}
+              onClose={() => {
+                setQuery("");
+                onQueryChange?.("");
+              }}
+            />
+            {children}
+          </SelectContext.Provider>
+        )}
+      </Combobox>
+    );
+  }
 
   return (
     // `as="div"` + `relative`: with `SelectContent` no longer portaled
@@ -159,11 +347,47 @@ export function Select({
       onChange={handleChange}
       {...omitUndefined({ disabled })}
     >
-      <SelectContext.Provider value={{ value: currentValue, itemLabel, invalid }}>
-        {children}
-      </SelectContext.Provider>
+      {({ open }) => (
+        <SelectContext.Provider value={{ ...shared, engine: "listbox", open }}>
+          {children}
+        </SelectContext.Provider>
+      )}
     </Listbox>
   );
+}
+
+/**
+ * What the combobox engine has to do on close that `Listbox` does for
+ * itself. `Listbox` keeps focus on elements that outlive it (its trigger,
+ * its options); the combobox's field lives *inside* the popup and unmounts
+ * with it, so a selection or a tap outside would leave focus on `<body>`.
+ * Focus goes back to the trigger — where `Listbox` would have left it —
+ * unless it already landed somewhere real. The search text resets too, so
+ * the next open starts from the whole list.
+ */
+function ComboboxLifecycle({
+  open,
+  triggerRef,
+  onClose,
+}: {
+  open: boolean;
+  triggerRef: RefObject<HTMLButtonElement | null>;
+  onClose: () => void;
+}) {
+  const wasOpen = useRef(open);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  useEffect(() => {
+    if (wasOpen.current && !open) {
+      onCloseRef.current();
+      const active = document.activeElement;
+      if (active === null || active === document.body || !active.isConnected) {
+        triggerRef.current?.focus({ preventScroll: true });
+      }
+    }
+    wasOpen.current = open;
+  }, [open, triggerRef]);
+  return null;
 }
 
 // Unconsumed today (grepped across `admin/`) — kept for API parity. Radix's
@@ -208,6 +432,18 @@ export function SelectGroup({ children }: { children: ReactNode }) {
  * package, not assumed: `grep -rho '\b[a-z]*-bordered\b' node_modules/daisyui/`
  * returns zero matches anywhere in the compiled CSS, so the class matched
  * no selector and removing it changes nothing rendered.
+ *
+ * # The combobox engine's trigger is made reachable by hand
+ *
+ * With a `SelectSearch`, this is Headless UI's `ComboboxButton`, which
+ * hard-codes `tabIndex: -1` — its combobox expects the *field* to be the
+ * control you Tab to, and the button a pointer affordance beside it. Here
+ * the field only exists inside the open popup, so the button is the only
+ * way in, and `tabIndex={0}` cannot fix that: Headless UI's own props win
+ * over the caller's (probed in jsdom: passing `tabIndex={0}` still
+ * rendered `tabindex="-1"`). So the effect below sets it on the element
+ * after mount. React never re-applies the `-1` — it only writes an
+ * attribute when the prop *changes*, and Headless UI's never does.
  */
 export function SelectTrigger({
   id,
@@ -228,9 +464,14 @@ export function SelectTrigger({
    * text. */
   "aria-labelledby"?: string | undefined;
 }) {
-  const { invalid } = useSelectContext("SelectTrigger");
+  const { engine, invalid, triggerRef } = useSelectContext("SelectTrigger");
+  useEffect(() => {
+    if (engine === "combobox" && triggerRef.current !== null) triggerRef.current.tabIndex = 0;
+  }, [engine, triggerRef]);
+  const Button = engine === "combobox" ? ComboboxButton : ListboxButton;
   return (
-    <ListboxButton
+    <Button
+      ref={triggerRef}
       id={id}
       {...omitUndefined({ "aria-invalid": invalid })}
       aria-label={ariaLabel}
@@ -253,7 +494,7 @@ export function SelectTrigger({
         className="shrink-0 text-muted-foreground"
         aria-hidden="true"
       />
-    </ListboxButton>
+    </Button>
   );
 }
 
@@ -288,13 +529,29 @@ const SHEET_VELOCITY_HORIZON = 100; // ms
 const SHEET_VELOCITY_STOPPED = 40; // ms
 const SHEET_TOUCH_SLOP = 8;
 
+/** Release velocity in px/ms, `VelocityTracker`-style (see the constants
+ * above): the last 100ms of samples, zero if the pointer had stopped for
+ * 40ms before it lifted. */
+function releaseVelocity(samples: { t: number; y: number }[], t: number, y: number): number {
+  const last = samples[samples.length - 1];
+  if (last === undefined || t - last.t > SHEET_VELOCITY_STOPPED) return 0;
+  const first = samples.find((sample) => t - sample.t <= SHEET_VELOCITY_HORIZON) ?? last;
+  return (y - first.y) / Math.max(1, t - first.t);
+}
+
 /**
- * The drag handle at the top of the phone sheet — M3's `DragHandle`
- * (`SheetDefaults.kt`): a 32×4 bar in `OnSurfaceVariant`
- * (`SheetBottomTokens.DockedDragHandleWidth`/`Height`/`Color`), with 22dp
- * of padding above and below it (`DragHandleVerticalPadding`), so the
- * strip a finger actually grabs is 48px tall. `max-sm:` only — above
- * `sm` the options are a dropdown, which has nothing to drag.
+ * The sheet's drag handle — M3's `DragHandle` (`SheetDefaults.kt`): a 32×4
+ * bar in `OnSurfaceVariant` (`SheetBottomTokens.DockedDragHandleWidth`/
+ * `Height`/`Color`), with 22dp of padding above and below it
+ * (`DragHandleVerticalPadding`), so the strip a finger actually grabs is
+ * 48px tall.
+ *
+ * A public part with a default: every sheet renders one at its top when
+ * the caller did not place one, so most callers never write it. Place it
+ * yourself only to control where it sits. It appears only where the
+ * options are a sheet — below `sm` in `SelectContent`, at every width in
+ * `SelectModal`, never in `SelectDropdown` — and a searchable select has
+ * no sheet (its phone view is full-screen), so there it renders nothing.
  *
  * # It really drags
  *
@@ -318,13 +575,17 @@ const SHEET_TOUCH_SLOP = 8;
  * `role="listbox"` would be an ARIA violation (a listbox owns options and
  * groups only).
  */
-function SheetHandle() {
+export function SelectModalHandle({ className }: { className?: string | undefined }) {
+  const { engine } = useSelectContext("SelectModalHandle");
+  const { presentation } = useContext(PopupContext);
   const drag = useRef<{
     id: number;
     y: number;
     sheet: HTMLElement;
     samples: { t: number; y: number }[];
   } | null>(null);
+
+  if (engine === "combobox" || presentation === "dropdown") return null;
 
   function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     const sheet = event.currentTarget.closest<HTMLElement>('[role="listbox"]');
@@ -345,16 +606,6 @@ function SheetHandle() {
     if (state === null || state.id !== event.pointerId) return;
     state.samples.push({ t: event.timeStamp, y: event.clientY });
     state.sheet.style.translate = `0 ${Math.max(0, event.clientY - state.y)}px`;
-  }
-
-  /** Release velocity in px/ms, `VelocityTracker`-style (see the
-   * constants above): the last 100ms of samples, zero if the pointer had
-   * stopped for 40ms before it lifted. */
-  function releaseVelocity(samples: { t: number; y: number }[], t: number, y: number): number {
-    const last = samples[samples.length - 1];
-    if (last === undefined || t - last.t > SHEET_VELOCITY_STOPPED) return 0;
-    const first = samples.find((sample) => t - sample.t <= SHEET_VELOCITY_HORIZON) ?? last;
-    return (y - first.y) / Math.max(1, t - first.t);
   }
 
   function onPointerEnd(event: ReactPointerEvent<HTMLDivElement>) {
@@ -387,7 +638,10 @@ function SheetHandle() {
         // `sticky top-0` inside the sheet's own scroll container: the
         // handle stays put while the options scroll under it, on the
         // sheet's own fill so they do not show through.
-        "sticky top-0 z-10 -mx-2 hidden cursor-grab touch-none justify-center bg-surface-2 py-[22px] max-sm:flex",
+        presentation === "modal"
+          ? "sticky top-0 z-10 -mx-2 flex cursor-grab touch-none justify-center bg-surface-2 py-[22px]"
+          : "sticky top-0 z-10 -mx-2 hidden cursor-grab touch-none justify-center bg-surface-2 py-[22px] max-sm:flex",
+        className,
       )}
     >
       <span className="h-1 w-8 rounded-full bg-muted-foreground" />
@@ -396,10 +650,444 @@ function SheetHandle() {
 }
 
 /**
- * The options: a dropdown under the trigger from `sm` up, and **below
- * `sm` an M3 modal bottom sheet** — the same element, restyled by a
- * `max-sm:` media query, not a second component chosen by reading the
- * viewport in JS.
+ * Closes an open listbox *without* an Escape, for the one place an Escape
+ * cannot do it: inside a `vaul` drawer.
+ *
+ * Radix, under vaul, listens for Escape on the document in the capture
+ * phase — before the listbox's own handler — and whichever way it
+ * decides, it leaves the event `defaultPrevented`: dismissing the drawer
+ * calls `preventDefault()`, and a caller that declines the dismissal has
+ * to call it too. Headless UI's merged handlers skip any event that is
+ * already `defaultPrevented` (`utils/render.js`). So inside a drawer an
+ * Escape meant for this listbox either closes the drawer with it (measured,
+ * with focus left on `<body>`) or closes nothing at all — there is no
+ * ordering of listeners that gives it to the listbox alone, and relying on
+ * one is worse than useless: Radix re-registers its listener on re-render,
+ * so its position among the document's listeners is not stable (a drag
+ * dismissal passed and failed on alternate runs before this existed).
+ *
+ * Headless UI has no imperative close. Its Tab handler is the one other
+ * key that closes the listbox — it then moves focus past the trigger,
+ * which is why focus is put straight back on it. Radix ignores Tab at the
+ * document, and Headless UI stops the synthetic Tab reaching Radix's
+ * `FocusScope` (which traps Tab through a React handler further up).
+ */
+function closeListboxInsideDrawer(options: HTMLElement, trigger: HTMLElement | null) {
+  options.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }),
+  );
+  trigger?.focus({ preventScroll: true });
+}
+
+/**
+ * Closes the combobox engine's popup without a key at all. Headless UI's
+ * `ComboboxInput` closes the combobox when it loses focus to anything that
+ * is neither its options nor its button (`combobox.js`, the input's
+ * `onBlur`); the popup's own surface is neither, so focusing it closes the
+ * combobox, and focus then goes to the trigger. Escape would do the same
+ * outside a drawer, but not inside one (`closeListboxInsideDrawer` has why),
+ * and Tab is not a close here: the combobox's Tab *selects* the active
+ * option. One mechanism everywhere is the one that cannot differ between
+ * a drawer and a page.
+ */
+function closeComboboxPopup(surface: HTMLElement, trigger: HTMLElement | null) {
+  const field = surface.querySelector<HTMLElement>('[role="combobox"]');
+  if (field !== null && document.activeElement !== field) field.focus({ preventScroll: true });
+  surface.focus({ preventScroll: true });
+  trigger?.focus({ preventScroll: true });
+}
+
+/**
+ * The combobox engine's modality: the page cannot scroll, and everything
+ * but the trigger and the popup is `inert`.
+ *
+ * `Listbox` does this for itself (`useScrollLock` + `useInertOthers`), and
+ * so would `ComboboxOptions` — but its inert allowlist is the field, the
+ * button and the *options*, and the combobox engine's popup is more than
+ * its options: a header with a back arrow (`SelectClose`) and a clear
+ * button sits beside the field. Under Headless UI's modality those would
+ * be inert, and could not be tapped. So `ComboboxOptions` runs with
+ * `modal={false}` and this does the same two things with the popup's own
+ * surface allowed instead. It climbs to `<html>` rather than stopping at
+ * `<body>` as Headless UI's does, so body-level portals — `SideNav`'s
+ * toolbars, toasts — are inert too.
+ */
+function useComboboxModality(
+  active: boolean,
+  surfaceRef: RefObject<HTMLElement | null>,
+  triggerRef: RefObject<HTMLElement | null>,
+) {
+  useEffect(() => {
+    if (!active) return;
+    const keep = [surfaceRef.current, triggerRef.current].filter(
+      (element): element is HTMLElement => element !== null,
+    );
+    const touched = new Map<HTMLElement, boolean>();
+    for (const element of keep) {
+      let node: HTMLElement = element;
+      while (node.parentElement !== null) {
+        const parent: HTMLElement = node.parentElement;
+        for (const sibling of Array.from(parent.children)) {
+          if (!(sibling instanceof HTMLElement) || sibling === node || touched.has(sibling)) {
+            continue;
+          }
+          if (keep.some((kept) => sibling.contains(kept))) continue;
+          touched.set(sibling, sibling.inert);
+          sibling.inert = true;
+        }
+        node = parent;
+      }
+    }
+    const html = document.documentElement;
+    const overflow = html.style.overflow;
+    html.style.overflow = "hidden";
+    return () => {
+      for (const [element, was] of touched) element.inert = was;
+      html.style.overflow = overflow;
+    };
+  }, [active, surfaceRef, triggerRef]);
+}
+
+/**
+ * The options' container, in whichever engine and presentation — shared by
+ * `SelectContent`, `SelectDropdown` and `SelectModal`, whose docs say what
+ * each presents.
+ */
+function SelectPopup({
+  presentation,
+  className,
+  children,
+}: {
+  presentation: SelectPresentation;
+  className?: string | undefined;
+  children: ReactNode;
+}) {
+  const { engine, open, triggerRef } = useSelectContext("SelectContent");
+  const surfaceRef = useRef<HTMLElement | null>(null);
+
+  // Escape, caught at the window in the capture phase — the one listener
+  // guaranteed to run before Radix's — when it is aimed at this open
+  // popup or at its own trigger. The listbox engine only needs this inside
+  // a vaul drawer (everywhere else Headless UI's own Escape handling is
+  // left alone); the combobox engine always takes it, because its field
+  // unmounts with the popup and nothing else would put focus back.
+  // The sheet's drag handle dismisses with a synthetic Escape, so it goes
+  // through here too. See `closeListboxInsideDrawer` for why this exists.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const surface = surfaceRef.current;
+      if (event.key !== "Escape" || surface === null) return;
+      if (!(event.target instanceof Node)) return;
+      // Aimed at the popup, or at this select's own trigger. Headless UI
+      // moves focus into the popup when it opens, but the trigger stays
+      // outside the `inert` it applies, so a screen reader's cursor (or a
+      // caller's `.focus()`) can be sitting on it while the popup is open
+      // — and an Escape there closed the drawer along with the listbox,
+      // measured in the "Inside a drawer" story at 375px and 1280px.
+      const trigger = triggerRef.current;
+      if (!surface.contains(event.target) && event.target !== trigger) return;
+      if (engine === "listbox") {
+        if (surface.closest("[data-vaul-drawer]") === null) return;
+        event.stopImmediatePropagation();
+        event.preventDefault();
+        closeListboxInsideDrawer(surface, trigger);
+        return;
+      }
+      event.stopImmediatePropagation();
+      event.preventDefault();
+      closeComboboxPopup(surface, trigger);
+    }
+    // And every pointer-down outside the open popup is noted, so a drawer
+    // around this `Select` can tell "a tap that closes the listbox" from
+    // "a tap on the drawer's own overlay" when Radix asks it a moment
+    // later — see `lib/select-dismissal.ts`.
+    function onPointerDown(event: PointerEvent) {
+      const surface = surfaceRef.current;
+      if (surface === null) return;
+      if (event.target instanceof Node && surface.contains(event.target)) return;
+      notePointerDownUnderOpenSelect(event);
+    }
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("pointerdown", onPointerDown, true);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("pointerdown", onPointerDown, true);
+    };
+  }, [engine, triggerRef]);
+
+  // The combobox popup's chrome — its header, the clear button, the back
+  // arrow, the empty state — is outside the field, the button and the
+  // options, which is everything Headless UI's outside-click counts as
+  // "inside" (`combobox.js`). Left alone, a tap on the clear button would
+  // close the whole popup. Its pointer-up (desktop) and touch-end (mobile —
+  // which is what Headless UI listens to on a touch device) are stopped at
+  // the window before Headless UI's document listener sees them; the tap's
+  // own `click` still fires, because stopping propagation is not
+  // preventing a default.
+  useEffect(() => {
+    if (engine !== "combobox" || !open) return;
+    function guard(event: Event) {
+      const surface = surfaceRef.current;
+      const target = event.target;
+      if (surface === null || !(target instanceof Element) || !surface.contains(target)) return;
+      if (target.closest('[role="listbox"], [role="combobox"]') !== null) return;
+      event.stopPropagation();
+    }
+    window.addEventListener("pointerup", guard, true);
+    window.addEventListener("touchend", guard, true);
+    return () => {
+      window.removeEventListener("pointerup", guard, true);
+      window.removeEventListener("touchend", guard, true);
+    };
+  }, [engine, open]);
+
+  useComboboxModality(engine === "combobox" && open, surfaceRef, triggerRef);
+
+  const parts = Children.toArray(children);
+  const hasOwn = (type: unknown) =>
+    parts.some((part) => isValidElement(part) && part.type === type);
+
+  if (engine === "listbox") {
+    return (
+      <PopupContext.Provider value={{ presentation }}>
+        <ListboxOptions
+          ref={surfaceRef}
+          // `portal={false}` is a correctness fix, not a preference.
+          //
+          // Headless UI's `anchor` prop portals the options into
+          // `#headlessui-portal-root`, a top-level sibling of `<body>`. Inside a
+          // `vaul` drawer that is fatal: vaul's `Content` mounts a Radix
+          // `FocusScope` with `trapped: true`, a document-level `focusin`
+          // listener that force-refocuses back into the drawer the instant
+          // focus lands outside it. The portaled listbox is outside, so its
+          // enter transition stalls mid-flight and it never becomes usable.
+          //
+          // Measured on the live console rather than inferred — opening the
+          // registration status select inside its stacked drawer gave:
+          //
+          //   parentChain     [..., DIV#headlessui-portal-root, BODY]
+          //   insideAnyDrawer false
+          //   opacity         "0"
+          //   pointerEvents   "none"
+          //   rect            [122, 10]   (collapsed, not four options tall)
+          //
+          // — byte-for-byte the signature #274 recorded for a nested Dialog.
+          // #282 fixed that class for `Dialog` and never covered `Select`, so
+          // every select inside a drawer has been silently unusable since.
+          //
+          // Rendering inline keeps the options inside the drawer's own subtree,
+          // so the focus trap contains them instead of fighting them. The cost
+          // is losing `anchor`'s collision detection; `top-full` + `w-full`
+          // below reproduces the same "directly under the trigger, matching its
+          // width" placement, which is what every call site here wants anyway.
+          portal={false}
+          // Marks an open `Select` for `side-nav.tsx`, whose bottom toolbar
+          // hides while one is open below `sm` — see `SelectContent`'s doc.
+          // The options unmount on close, so its presence alone means "open".
+          data-select-content=""
+          data-vaul-no-drag=""
+          // No `transition`, and no `data-closed:*` classes. Headless UI's
+          // transition machinery holds `data-closed` until it observes the
+          // enter transition finish; inside a drawer it never does. Measured
+          // after the portal fix, 1.4s after opening: `data-closed` and
+          // `data-enter` both still present, `opacity: 0`, on an element that
+          // was otherwise correct (inside the drawer, `pointer-events: auto`,
+          // full 146px height, all four options present).
+          //
+          // That is the same failure mode twice now — #274's nested Dialog was
+          // also a stalled enter transition, not a mispositioned element. A
+          // 100ms fade on a select dropdown is not worth a second component
+          // that silently does not open, so it is gone rather than debugged.
+          className={cn(LISTBOX_SURFACE[presentation], className)}
+        >
+          {presentation !== "dropdown" && !hasOwn(SelectModalHandle) && <SelectModalHandle />}
+          {children}
+        </ListboxOptions>
+      </PopupContext.Provider>
+    );
+  }
+
+  if (!open) return null;
+
+  // The combobox popup is a surface *around* the listbox, not the listbox
+  // itself: the field (`role="combobox"`) and the header's buttons cannot
+  // live inside a `role="listbox"`, which may own options and groups only.
+  // The caller writes one flat list of parts; the header ones are lifted
+  // out of it here, and everything else is the list.
+  const isPart = (part: unknown, ...types: unknown[]) =>
+    isValidElement(part) && types.includes(part.type);
+  const header = parts.filter((part) => isPart(part, SelectSearch, SelectClose));
+  const empty = parts.filter((part) => isPart(part, SelectEmpty));
+  const list = parts.filter(
+    (part) => !isPart(part, SelectSearch, SelectClose, SelectEmpty, SelectModalHandle),
+  );
+  const showDefaultClose = presentation !== "dropdown" && !hasOwn(SelectClose);
+
+  return (
+    <PopupContext.Provider value={{ presentation }}>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: the handler is not an interaction — it only keeps focus in the search field (see the comment on it); every control inside is a real button or the field itself. */}
+      <div
+        ref={(element) => {
+          surfaceRef.current = element;
+        }}
+        // Focusable only so `closeComboboxPopup` can move focus onto it.
+        tabIndex={-1}
+        data-select-content=""
+        data-vaul-no-drag=""
+        className={cn(COMBOBOX_SURFACE[presentation], className)}
+        // A press anywhere on the popup's chrome keeps focus in the field:
+        // the field's blur *is* the combobox's close (`closeComboboxPopup`),
+        // so a tap on the header, the clear button or the back arrow must
+        // not move focus before its own `click` decides what happens.
+        onMouseDown={(event) => {
+          if (!(event.target instanceof Element)) return;
+          if (event.target.closest('[role="combobox"]') === null) event.preventDefault();
+        }}
+      >
+        <div className={COMBOBOX_HEADER[presentation]}>
+          {showDefaultClose && <SelectClose />}
+          {header}
+        </div>
+        <div className={COMBOBOX_SCROLL[presentation]}>
+          <ComboboxOptions portal={false} modal={false} className="outline-none">
+            {list}
+          </ComboboxOptions>
+          {empty.length > 0 ? empty : <SelectEmpty />}
+        </div>
+      </div>
+    </PopupContext.Provider>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Class strings, one per engine × presentation. Written out in full rather
+// than assembled from prefixes because Tailwind only generates a class it
+// can find *literally* in the source.
+// ---------------------------------------------------------------------------
+
+const LISTBOX_DROPDOWN =
+  "absolute top-full left-0 z-50 mt-1 max-h-80 w-full min-w-[8rem] overflow-y-auto rounded-md border border-edge bg-surface-2 p-1 shadow-[var(--shadow-popover)] focus:outline-none";
+
+const LISTBOX_SURFACE: Record<SelectPresentation, string> = {
+  dropdown: LISTBOX_DROPDOWN,
+  auto: cn(
+    LISTBOX_DROPDOWN,
+    // Below `sm`: the M3 modal bottom sheet (`SelectContent`'s doc).
+    // The top corners are `SheetBottomTokens.DockedContainerShape`,
+    // `CornerExtraLargeTop` (`--radius-sheet`, 28dp), the bottom edge
+    // square. The fill stays `surface-2`, the one every floating
+    // layer here uses — the dropdown above, and `DetailDrawerContent`'s
+    // own phone sheet, which this sheet most often opens over — not
+    // M3's `SurfaceContainerLow`, so that a sheet opened from a sheet
+    // is the same material as the one under it. `85dvh` is this
+    // library's number, not M3's — a modal sheet may grow to the top
+    // inset, and a strip of scrim left above it is what says "this is a
+    // sheet over the page", not a new page.
+    // `max-sm:w-full` restates what `w-full` already says, on purpose:
+    // a caller's `className="w-64"` is a *dropdown* width, and without
+    // this it would replace `w-full` at every width and leave the
+    // phone sheet 256px wide, pinned to the left edge.
+    "max-sm:fixed max-sm:inset-x-0 max-sm:top-auto max-sm:bottom-0 max-sm:mt-0 max-sm:w-full max-sm:max-h-[85dvh]",
+    "max-sm:overscroll-contain max-sm:rounded-t-sheet max-sm:rounded-b-none max-sm:border-0",
+    // `scroll-pt-12` reserves the sticky handle's 48px when Headless
+    // UI scrolls the active option into view (`block: "nearest"`).
+    // Without it, arrowing up a long list parked the focused row
+    // under the handle — measured: 8px of a 56px row left showing.
+    "max-sm:scroll-pt-12",
+    "max-sm:px-2 max-sm:pt-0 max-sm:pb-[max(0.5rem,env(safe-area-inset-bottom,0px))]",
+    "max-sm:shadow-[0_0_0_100vmax_var(--scrim)] max-sm:starting:shadow-[0_0_0_100vmax_transparent]",
+    "max-sm:starting:translate-y-full",
+    "max-sm:[transition-property:translate,box-shadow]",
+    "max-sm:[transition-duration:var(--dur-spatial),var(--dur-effects)]",
+    "max-sm:[transition-timing-function:var(--ease-spatial),var(--ease-effects)]",
+  ),
+  // The same sheet at every width. From `sm` up it stops at 640px and
+  // centres: `BottomSheetDefaults.SheetMaxWidth` (`SheetDefaults.kt`),
+  // M3's own cap for a modal bottom sheet on a wide window.
+  modal: cn(
+    "fixed inset-x-0 top-auto bottom-0 z-50 mx-auto w-full max-w-[640px] max-h-[85dvh] overflow-y-auto focus:outline-none",
+    "overscroll-contain rounded-t-sheet rounded-b-none border-0 bg-surface-2 scroll-pt-12",
+    "px-2 pt-0 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))]",
+    "shadow-[0_0_0_100vmax_var(--scrim)] starting:shadow-[0_0_0_100vmax_transparent]",
+    "starting:translate-y-full",
+    "[transition-property:translate,box-shadow]",
+    "[transition-duration:var(--dur-spatial),var(--dur-effects)]",
+    "[transition-timing-function:var(--ease-spatial),var(--ease-effects)]",
+  ),
+};
+
+/**
+ * M3's search view (`SearchViewTokens.kt`) in its two forms: **docked**
+ * under the trigger on a wide window — a 56dp header
+ * (`DockedHeaderContainerHeight`) — and **full-screen** on a compact one:
+ * square corners (`FullScreenContainerShape` `CornerNone`) and a 72dp
+ * header (`FullScreenHeaderContainerHeight`) with the back arrow leading
+ * (`ExpandedFullScreenSearchBar`). Full-screen rather than a sheet on a
+ * phone because a searchable picker brings up the on-screen keyboard,
+ * which takes roughly half the height: a half-height sheet plus a keyboard
+ * leaves almost no room for the results.
+ *
+ * "Full-screen" is written as *pinned to the bottom edge, `100dvh` tall*
+ * rather than `inset-0`, for the reason the sheet's doc gives about
+ * drawers: inside a `vaul` drawer a `fixed` element resolves against the
+ * drawer, and `inset-0` there covered only the drawer — measured at 375px,
+ * a 301px-tall "full screen" over the drawer's own sheet. Every drawer here
+ * reaches the viewport's bottom edge below `sm`, so bottom-anchored and a
+ * viewport tall is the whole screen inside one and outside one alike.
+ *
+ * The full-screen fill is `surface-3`, for M3's `SurfaceContainerHigh`
+ * (`SearchViewTokens.ContainerColor`), one step above the `surface-2` this
+ * library maps `SurfaceContainer` to; the docked view keeps `surface-2`,
+ * the dropdown family's own material. It enters by rising 16px and fading
+ * in, on the spatial and effects springs — a library choice: M3 expands the
+ * search bar into the view, and there is no bar here to expand.
+ */
+const COMBOBOX_DOCKED =
+  "absolute top-full left-0 z-50 mt-1 flex w-full min-w-[16rem] flex-col overflow-hidden rounded-md border border-edge bg-surface-2 shadow-[var(--shadow-popover)] outline-none";
+
+const COMBOBOX_SURFACE: Record<SelectPresentation, string> = {
+  dropdown: COMBOBOX_DOCKED,
+  auto: cn(
+    COMBOBOX_DOCKED,
+    "max-sm:fixed max-sm:inset-x-0 max-sm:top-auto max-sm:bottom-0 max-sm:h-dvh max-sm:mt-0 max-sm:w-full max-sm:min-w-0 max-sm:rounded-none max-sm:border-0",
+    "max-sm:bg-surface-3 max-sm:shadow-none max-sm:pt-[env(safe-area-inset-top,0px)]",
+    "max-sm:starting:translate-y-4 max-sm:starting:opacity-0",
+    "max-sm:[transition-property:translate,opacity]",
+    "max-sm:[transition-duration:var(--dur-spatial),var(--dur-effects)]",
+    "max-sm:[transition-timing-function:var(--ease-spatial),var(--ease-effects)]",
+  ),
+  modal: cn(
+    "fixed inset-x-0 top-auto bottom-0 z-50 flex h-dvh flex-col bg-surface-3 pt-[env(safe-area-inset-top,0px)] outline-none",
+    "starting:translate-y-4 starting:opacity-0",
+    "[transition-property:translate,opacity]",
+    "[transition-duration:var(--dur-spatial),var(--dur-effects)]",
+    "[transition-timing-function:var(--ease-spatial),var(--ease-effects)]",
+  ),
+};
+
+const COMBOBOX_HEADER: Record<SelectPresentation, string> = {
+  dropdown: "flex h-14 shrink-0 items-center gap-1 border-edge border-b px-2",
+  auto: "flex h-14 shrink-0 items-center gap-1 border-edge border-b px-2 max-sm:h-[72px] max-sm:px-1",
+  modal: "flex h-[72px] shrink-0 items-center gap-1 border-edge border-b px-1",
+};
+
+const COMBOBOX_SCROLL: Record<SelectPresentation, string> = {
+  dropdown: "max-h-72 overflow-y-auto p-1",
+  auto: cn(
+    "max-h-72 overflow-y-auto p-1",
+    "max-sm:max-h-none max-sm:min-h-0 max-sm:flex-1 max-sm:overscroll-contain max-sm:px-2 max-sm:pb-[max(0.5rem,env(safe-area-inset-bottom,0px))]",
+  ),
+  modal:
+    "min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))]",
+};
+
+/**
+ * The options, presented automatically: a dropdown under the trigger from
+ * `sm` up, and **below `sm` an M3 modal bottom sheet** — or, with a
+ * `SelectSearch`, M3's full-screen search view — the same element, restyled
+ * by a `max-sm:` media query, not a second component chosen by reading the
+ * viewport in JS. `SelectDropdown` and `SelectModal` are the same container
+ * with the choice made for you at every width.
  *
  * # Why a sheet below `sm`
  *
@@ -415,7 +1103,7 @@ function SheetHandle() {
  *
  * # Why the same element, and why that is safe inside a drawer
  *
- * Everything this file's `portal={false}` comment below says still
+ * Everything the `portal={false}` comment in `SelectPopup` says still
  * holds, so the sheet cannot be portalled either: inside a `vaul` drawer
  * it would land outside the drawer's focus trap and never open. It
  * stays in the tree and turns `fixed` instead. A `fixed` element inside
@@ -450,7 +1138,8 @@ function SheetHandle() {
  * therefore reaches nothing — it lands on an inert subtree, activates
  * nothing underneath, and Headless UI's own outside-click handler closes
  * the sheet. That is exactly a modal scrim's behaviour, and it was
- * already true of the dropdown.
+ * already true of the dropdown. (The combobox engine does the same with
+ * its own `useComboboxModality`, whose doc has why.)
  *
  * **Not everything is inert, and the gap is measured, not assumed.**
  * `useInertOthers` stops climbing at `body`, so anything portalled to
@@ -471,12 +1160,12 @@ function SheetHandle() {
  * phase and for pointer-downs outside the drawer — so an Escape meant for
  * this listbox, the handle's own synthetic Escape, or a tap on the scrim
  * above the drawer each closed the *drawer* too, and focus landed on
- * `<body>`. Two fixes, one per route: Escape is intercepted here, before
- * Radix sees it (`closeListboxInsideDrawer`); the tap is noted here and
- * declined by the drawer (`lib/select-dismissal.ts` — Radix only asks on
- * the `click` after the listbox has already closed, so "is one open now"
- * cannot answer it). Either way the listbox closes alone, focus returns
- * to its trigger, and the next Escape closes the drawer.
+ * `<body>`. Two fixes, one per route: Escape is intercepted before Radix
+ * sees it (`closeListboxInsideDrawer`); the tap is noted and declined by
+ * the drawer (`lib/select-dismissal.ts` — Radix only asks on the `click`
+ * after the listbox has already closed, so "is one open now" cannot answer
+ * it). Either way the listbox closes alone, focus returns to its trigger,
+ * and the next Escape closes the drawer.
  *
  * `data-vaul-no-drag` keeps vaul from treating a drag on the handle, or
  * a scroll of the list, as a drag of the drawer underneath. Without it,
@@ -489,240 +1178,162 @@ function SheetHandle() {
  * The sheet rises on `--ease-spatial`/`--dur-spatial` and the scrim
  * fades in on the effects pair, via `@starting-style` (`starting:`).
  * Not Headless UI's `transition` prop: the `portal={false}` comment
- * below records that machinery stalling half-open inside a drawer, and
+ * records that machinery stalling half-open inside a drawer, and
  * `@starting-style` is plain CSS with nothing to stall. It animates the
  * entrance only — the options unmount on close, so there is nothing left
  * to animate out, the same as the dropdown has always done.
  */
-/**
- * Closes an open listbox *without* an Escape, for the one place an Escape
- * cannot do it: inside a `vaul` drawer.
- *
- * Radix, under vaul, listens for Escape on the document in the capture
- * phase — before the listbox's own handler — and whichever way it
- * decides, it leaves the event `defaultPrevented`: dismissing the drawer
- * calls `preventDefault()`, and a caller that declines the dismissal has
- * to call it too. Headless UI's merged handlers skip any event that is
- * already `defaultPrevented` (`utils/render.js`). So inside a drawer an
- * Escape meant for this listbox either closes the drawer with it (measured,
- * with focus left on `<body>`) or closes nothing at all — there is no
- * ordering of listeners that gives it to the listbox alone, and relying on
- * one is worse than useless: Radix re-registers its listener on re-render,
- * so its position among the document's listeners is not stable (a drag
- * dismissal passed and failed on alternate runs before this existed).
- *
- * Headless UI has no imperative close. Its Tab handler is the one other
- * key that closes the listbox — it then moves focus past the trigger,
- * which is why focus is put straight back on it. Radix ignores Tab at the
- * document, and Headless UI stops the synthetic Tab reaching Radix's
- * `FocusScope` (which traps Tab through a React handler further up).
- */
-function closeListboxInsideDrawer(options: HTMLElement) {
-  // Found *before* closing: the trigger only carries `aria-controls`
-  // while the options it points at exist.
-  const trigger = document.querySelector<HTMLElement>(`[aria-controls="${options.id}"]`);
-  options.dispatchEvent(
-    new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }),
-  );
-  trigger?.focus({ preventScroll: true });
-}
-
 export function SelectContent({
   className,
   children,
 }: {
-  className?: string;
+  className?: string | undefined;
   children: ReactNode;
 }) {
-  useSelectContext("SelectContent");
-  const optionsRef = useRef<HTMLElement | null>(null);
-
-  // Escape, caught at the window in the capture phase — the one listener
-  // guaranteed to run before Radix's — but only when it is aimed at this
-  // open listbox *and* the listbox is inside a vaul drawer. Everywhere
-  // else Headless UI's own Escape handling is left alone. The sheet's drag
-  // handle dismisses with a synthetic Escape, so it goes through here
-  // too. See `closeListboxInsideDrawer` for why this exists at all.
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      const options = optionsRef.current;
-      if (event.key !== "Escape" || options === null) return;
-      if (!(event.target instanceof Node)) return;
-      // Aimed at the options, or at this listbox's own trigger. Headless UI
-      // moves focus into the options when it opens, but the trigger stays
-      // outside the `inert` it applies, so a screen reader's cursor (or a
-      // caller's `.focus()`) can be sitting on it while the listbox is open
-      // — and an Escape there closed the drawer along with the listbox,
-      // measured in the "Inside a drawer" story at 375px and 1280px.
-      const trigger = document.querySelector(`[aria-controls="${options.id}"]`);
-      if (!options.contains(event.target) && event.target !== trigger) return;
-      if (options.closest("[data-vaul-drawer]") === null) return;
-      event.stopImmediatePropagation();
-      event.preventDefault();
-      closeListboxInsideDrawer(options);
-    }
-    // And every pointer-down outside the open options is noted, so a
-    // drawer around this `Select` can tell "a tap that closes the
-    // listbox" from "a tap on the drawer's own overlay" when Radix asks it
-    // a moment later — see `lib/select-dismissal.ts`.
-    function onPointerDown(event: PointerEvent) {
-      const options = optionsRef.current;
-      if (options === null) return;
-      if (event.target instanceof Node && options.contains(event.target)) return;
-      notePointerDownUnderOpenSelect(event);
-    }
-    window.addEventListener("keydown", onKeyDown, true);
-    window.addEventListener("pointerdown", onPointerDown, true);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown, true);
-      window.removeEventListener("pointerdown", onPointerDown, true);
-    };
-  }, []);
-
   return (
-    <ListboxOptions
-      ref={optionsRef}
-      // `portal={false}` is a correctness fix, not a preference.
-      //
-      // Headless UI's `anchor` prop portals the options into
-      // `#headlessui-portal-root`, a top-level sibling of `<body>`. Inside a
-      // `vaul` drawer that is fatal: vaul's `Content` mounts a Radix
-      // `FocusScope` with `trapped: true`, a document-level `focusin`
-      // listener that force-refocuses back into the drawer the instant
-      // focus lands outside it. The portaled listbox is outside, so its
-      // enter transition stalls mid-flight and it never becomes usable.
-      //
-      // Measured on the live console rather than inferred — opening the
-      // registration status select inside its stacked drawer gave:
-      //
-      //   parentChain     [..., DIV#headlessui-portal-root, BODY]
-      //   insideAnyDrawer false
-      //   opacity         "0"
-      //   pointerEvents   "none"
-      //   rect            [122, 10]   (collapsed, not four options tall)
-      //
-      // — byte-for-byte the signature #274 recorded for a nested Dialog.
-      // #282 fixed that class for `Dialog` and never covered `Select`, so
-      // every select inside a drawer has been silently unusable since.
-      //
-      // Rendering inline keeps the options inside the drawer's own subtree,
-      // so the focus trap contains them instead of fighting them. The cost
-      // is losing `anchor`'s collision detection; `top-full` + `w-full`
-      // below reproduces the same "directly under the trigger, matching its
-      // width" placement, which is what every call site here wants anyway.
-      portal={false}
-      // Marks an open `Select` for `side-nav.tsx`, whose bottom toolbar
-      // hides while one is open below `sm` — see this component's doc.
-      // The options unmount on close, so its presence alone means "open".
-      data-select-content=""
-      data-vaul-no-drag=""
-      // No `transition`, and no `data-closed:*` classes. Headless UI's
-      // transition machinery holds `data-closed` until it observes the
-      // enter transition finish; inside a drawer it never does. Measured
-      // after the portal fix, 1.4s after opening: `data-closed` and
-      // `data-enter` both still present, `opacity: 0`, on an element that
-      // was otherwise correct (inside the drawer, `pointer-events: auto`,
-      // full 146px height, all four options present).
-      //
-      // That is the same failure mode twice now — #274's nested Dialog was
-      // also a stalled enter transition, not a mispositioned element. A
-      // 100ms fade on a select dropdown is not worth a second component
-      // that silently does not open, so it is gone rather than debugged.
-      className={cn(
-        "absolute top-full left-0 z-50 mt-1 max-h-80 w-full min-w-[8rem] overflow-y-auto rounded-md border border-edge bg-surface-2 p-1 shadow-[var(--shadow-popover)] focus:outline-none",
-        // Below `sm`: the M3 modal bottom sheet (this component's doc).
-        // The top corners are `SheetBottomTokens.DockedContainerShape`,
-        // `CornerExtraLargeTop` (`--radius-sheet`, 28dp), the bottom edge
-        // square. The fill stays `surface-2`, the one every floating
-        // layer here uses — the dropdown above, and `DetailDrawerContent`'s
-        // own phone sheet, which this sheet most often opens over — not
-        // M3's `SurfaceContainerLow`, so that a sheet opened from a sheet
-        // is the same material as the one under it. `85dvh` is this
-        // library's number, not M3's — a modal
-        // sheet may grow to the top inset, and a strip of scrim left
-        // above it is what says "this is a sheet over the page", not a
-        // new page.
-        // `max-sm:w-full` restates what `w-full` already says, on purpose:
-        // a caller's `className="w-64"` is a *dropdown* width, and without
-        // this it would replace `w-full` at every width and leave the
-        // phone sheet 256px wide, pinned to the left edge.
-        "max-sm:fixed max-sm:inset-x-0 max-sm:top-auto max-sm:bottom-0 max-sm:mt-0 max-sm:w-full max-sm:max-h-[85dvh]",
-        "max-sm:overscroll-contain max-sm:rounded-t-sheet max-sm:rounded-b-none max-sm:border-0",
-        // `scroll-pt-12` reserves the sticky handle's 48px when Headless
-        // UI scrolls the active option into view (`block: "nearest"`).
-        // Without it, arrowing up a long list parked the focused row
-        // under the handle — measured: 8px of a 56px row left showing.
-        "max-sm:scroll-pt-12",
-        "max-sm:px-2 max-sm:pt-0 max-sm:pb-[max(0.5rem,env(safe-area-inset-bottom,0px))]",
-        "max-sm:shadow-[0_0_0_100vmax_var(--scrim)] max-sm:starting:shadow-[0_0_0_100vmax_transparent]",
-        "max-sm:starting:translate-y-full",
-        "max-sm:[transition-property:translate,box-shadow]",
-        "max-sm:[transition-duration:var(--dur-spatial),var(--dur-effects)]",
-        "max-sm:[transition-timing-function:var(--ease-spatial),var(--ease-effects)]",
-        className,
-      )}
-    >
-      <SheetHandle />
+    <SelectPopup presentation="auto" className={className}>
       {children}
-    </ListboxOptions>
+    </SelectPopup>
   );
 }
 
-export function SelectItem({
-  value,
+/**
+ * The options as a dropdown under the trigger — or, searchable, M3's docked
+ * search view — **at every width, phones included**. The opt-out from
+ * `SelectContent`'s phone sheet, for the rare select that really is better
+ * as a short anchored list on a phone (two or three options inline in a
+ * dense form row). Most selects should stay on `SelectContent`.
+ */
+export function SelectDropdown({
   className,
   children,
 }: {
-  value: string;
-  className?: string;
+  className?: string | undefined;
   children: ReactNode;
 }) {
   return (
-    <ListboxOption
-      value={value}
-      className={cn(
-        "relative flex cursor-pointer items-center rounded-sm py-1.5 pr-2 pl-7 text-body text-foreground outline-none",
-        "data-focus:bg-surface-3",
-        // Below `sm`, a row of `SelectContent`'s bottom sheet: an M3
-        // Expressive list item (`ListTokens.kt`). 56px one-line height
-        // (`ItemOneLineContainerHeight`), 16px of leading and trailing
-        // space, 16px label (`BodyLarge`), 12px from a 20px check to the
-        // label (`ItemBetweenSpace`). The shape is the Expressive part: a
-        // resting row is `CornerExtraSmall` (4px) and the selected one
-        // rounds to `CornerLarge` (16px) as it fills, so the current value
-        // reads as a different *object* in the list, not just a tinted row.
-        // 16px is on no rung of `theme.css`'s audited radius register, and
-        // deliberately so, for the same reason `--radius-sheet` is not a
-        // rung: it is M3's corner for this one phone-sheet row, not a
-        // console surface. It is a literal because nothing else uses it.
-        //
-        // The fill is `primary` — this library's one neutral accent, the
-        // same pill `SideNav`'s toolbar marks the current page with —
-        // where M3 reaches for a tonal container, which is a hue here and
-        // would read as a status. Focus is a state layer
-        // (`FocusStateLayerOpacity` 10%): the foreground over a resting
-        // row, and — below — the selected row's own content colour over
-        // its fill, each written for its own case so the two rules never
-        // fight over the same property.
-        "max-sm:min-h-14 max-sm:rounded-[4px] max-sm:py-2 max-sm:pr-4 max-sm:pl-12 max-sm:text-title-sm",
-        "max-sm:data-focus:not-data-selected:bg-foreground/10",
-        "max-sm:data-selected:rounded-[16px] max-sm:data-selected:bg-primary max-sm:data-selected:font-medium max-sm:data-selected:text-primary-content",
-        // …and the selected row's own focus: the same 10% state layer,
-        // in its own content colour over its own fill — M3's rule for a
-        // focused filled item — or keyboard focus on the current value
-        // would look exactly like no focus at all.
-        "max-sm:data-selected:data-focus:bg-[color-mix(in_oklab,var(--color-primary)_90%,var(--color-primary-content))]",
-        "max-sm:[transition-property:background-color,border-radius]",
-        "max-sm:[transition-duration:var(--dur-fast),var(--dur-spatial-fast)]",
-        "max-sm:[transition-timing-function:var(--ease-out),var(--ease-spatial-fast)]",
-        className,
-      )}
-    >
-      {({ selected }) => (
+    <SelectPopup presentation="dropdown" className={className}>
+      {children}
+    </SelectPopup>
+  );
+}
+
+/**
+ * The options as a modal at every width: the M3 bottom sheet (capped at
+ * 640px and centred from `sm` up, `BottomSheetDefaults.SheetMaxWidth`) —
+ * or, searchable, the full-screen search view. For a picker that is a
+ * decision in its own right even on a desktop, and the presentation a
+ * native implementation of these parts would use everywhere.
+ */
+export function SelectModal({
+  className,
+  children,
+}: {
+  className?: string | undefined;
+  children: ReactNode;
+}) {
+  return (
+    <SelectPopup presentation="modal" className={className}>
+      {children}
+    </SelectPopup>
+  );
+}
+
+export interface SelectItemProps {
+  value: string;
+  className?: string | undefined;
+  children: ReactNode;
+  /** The text `SelectSearch` matches this option against. Defaults to the
+   * option's own text; pass it when the children are not plain text (an
+   * icon and a name, a formatted number) or should also be found by a
+   * word they do not show (a country found by its ISO code). */
+  textValue?: string | undefined;
+}
+
+// Row classes per presentation. A dropdown row is the dense desktop row; a
+// sheet or full-screen row is an M3 Expressive list item — see the comment
+// on the `auto` entry.
+const ROW: Record<SelectPresentation, string> = {
+  dropdown:
+    "relative flex cursor-pointer items-center rounded-sm py-1.5 pr-2 pl-7 text-body text-foreground outline-none data-focus:bg-surface-3",
+  auto: cn(
+    "relative flex cursor-pointer items-center rounded-sm py-1.5 pr-2 pl-7 text-body text-foreground outline-none data-focus:bg-surface-3",
+    // Below `sm`, a row of `SelectContent`'s bottom sheet: an M3
+    // Expressive list item (`ListTokens.kt`). 56px one-line height
+    // (`ItemOneLineContainerHeight`), 16px of leading and trailing
+    // space, 16px label (`BodyLarge`), 12px from a 20px check to the
+    // label (`ItemBetweenSpace`). The shape is the Expressive part: a
+    // resting row is `CornerExtraSmall` (4px) and the selected one
+    // rounds to `CornerLarge` (16px) as it fills, so the current value
+    // reads as a different *object* in the list, not just a tinted row.
+    // 16px is on no rung of `theme.css`'s audited radius register, and
+    // deliberately so, for the same reason `--radius-sheet` is not a
+    // rung: it is M3's corner for this one phone-sheet row, not a
+    // console surface. It is a literal because nothing else uses it.
+    //
+    // The fill is `primary` — this library's one neutral accent, the
+    // same pill `SideNav`'s toolbar marks the current page with —
+    // where M3 reaches for a tonal container, which is a hue here and
+    // would read as a status. Focus is a state layer
+    // (`FocusStateLayerOpacity` 10%): the foreground over a resting
+    // row, and the selected row's own content colour over its fill,
+    // each written for its own case so the two rules never fight over
+    // the same property — or keyboard focus on the current value would
+    // look exactly like no focus at all.
+    "max-sm:min-h-14 max-sm:rounded-[4px] max-sm:py-2 max-sm:pr-4 max-sm:pl-12 max-sm:text-title-sm",
+    "max-sm:data-focus:not-data-selected:bg-foreground/10",
+    "max-sm:data-selected:rounded-[16px] max-sm:data-selected:bg-primary max-sm:data-selected:font-medium max-sm:data-selected:text-primary-content",
+    "max-sm:data-selected:data-focus:bg-[color-mix(in_oklab,var(--color-primary)_90%,var(--color-primary-content))]",
+    "max-sm:[transition-property:background-color,border-radius]",
+    "max-sm:[transition-duration:var(--dur-fast),var(--dur-spatial-fast)]",
+    "max-sm:[transition-timing-function:var(--ease-out),var(--ease-spatial-fast)]",
+  ),
+  modal: cn(
+    "relative flex min-h-14 cursor-pointer items-center rounded-[4px] py-2 pr-4 pl-12 text-title-sm text-foreground outline-none",
+    "data-focus:not-data-selected:bg-foreground/10",
+    "data-selected:rounded-[16px] data-selected:bg-primary data-selected:font-medium data-selected:text-primary-content",
+    "data-selected:data-focus:bg-[color-mix(in_oklab,var(--color-primary)_90%,var(--color-primary-content))]",
+    "[transition-property:background-color,border-radius]",
+    "[transition-duration:var(--dur-fast),var(--dur-spatial-fast)]",
+    "[transition-timing-function:var(--ease-out),var(--ease-spatial-fast)]",
+  ),
+};
+
+const CHECK_SLOT: Record<SelectPresentation, string> = {
+  dropdown: "absolute left-2 flex h-3.5 w-3.5 items-center justify-center",
+  auto: "absolute left-2 flex h-3.5 w-3.5 items-center justify-center max-sm:left-4 max-sm:size-5",
+  modal: "absolute left-4 flex size-5 items-center justify-center",
+};
+
+const CHECK_ICON: Record<SelectPresentation, string> = {
+  dropdown: "",
+  auto: "max-sm:size-5",
+  modal: "size-5",
+};
+
+export function SelectItem({ value, className, children, textValue }: SelectItemProps) {
+  const { engine, query, filtering, registerItem } = useSelectContext("SelectItem");
+  const { presentation } = useContext(PopupContext);
+  const shown =
+    engine !== "combobox" || !filtering || matchesQuery(textValue ?? textOf(children), query);
+  // Counted while shown, before paint, so `SelectEmpty` never flashes.
+  useIsomorphicLayoutEffect(() => (shown ? registerItem() : undefined), [shown, registerItem]);
+  // Not matching the search: not rendered at all, so the combobox's
+  // keyboard navigation skips it rather than landing on a hidden row.
+  if (!shown) return null;
+  const Option = engine === "combobox" ? ComboboxOption : ListboxOption;
+  return (
+    <Option value={value} className={cn(ROW[presentation], className)}>
+      {({ selected }: { selected: boolean }) => (
         <>
-          <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center max-sm:left-4 max-sm:size-5">
+          <span className={CHECK_SLOT[presentation]}>
             {selected && (
-              <Check size={14} strokeWidth={1.5} aria-hidden="true" className="max-sm:size-5" />
+              <Check
+                size={14}
+                strokeWidth={1.5}
+                aria-hidden="true"
+                className={CHECK_ICON[presentation]}
+              />
             )}
           </span>
           {/* Two lines, then an ellipsis. An option whose label is a
@@ -734,6 +1345,173 @@ export function SelectItem({
           <span className="line-clamp-2 min-w-0">{children}</span>
         </>
       )}
-    </ListboxOption>
+    </Option>
+  );
+}
+
+export interface SelectSearchProps {
+  placeholder?: string | undefined;
+  /** The field's accessible name. Defaults to "Search". */
+  "aria-label"?: string | undefined;
+  /** Whether `SelectItem`s hide themselves when they do not match. `true`
+   * by default; pass `false` when the caller filters or fetches the items
+   * itself from `onQueryChange` — `SelectEmpty` then shows whenever the
+   * caller renders no items at all. */
+  filter?: boolean | undefined;
+  /** Called with the search text as it changes, and with `""` when the
+   * popup closes. */
+  onQueryChange?: ((query: string) => void) | undefined;
+  className?: string | undefined;
+}
+
+/**
+ * An M3 search field inside the popup, and the part that turns a `Select`
+ * into a searchable one (the combobox engine — see this file's header).
+ * It is lifted into the popup's header wherever it is written among the
+ * container's children.
+ *
+ * The field is M3's search view header: a leading magnifier in the docked
+ * view (the back arrow takes that place full-screen), the text in
+ * `BodyLarge` (16px) on a phone, and a trailing clear button once there is
+ * text to clear. It carries no focus ring of its own: it is the popup's
+ * only text field and has focus the whole time the popup is open, so the
+ * caret is the indicator — a ring around it would only restate that.
+ */
+export function SelectSearch({
+  placeholder,
+  "aria-label": ariaLabel = "Search",
+  onQueryChange,
+  className,
+}: SelectSearchProps) {
+  const { query, setQuery } = useSelectContext("SelectSearch");
+  const { presentation } = useContext(PopupContext);
+  const fieldRef = useRef<HTMLInputElement | null>(null);
+  const update = (next: string) => {
+    setQuery(next);
+    onQueryChange?.(next);
+  };
+  return (
+    <div className={cn("flex min-w-0 flex-1 items-center gap-2 ps-2", className)}>
+      <Search
+        size={20}
+        aria-hidden="true"
+        className={cn(
+          "shrink-0 text-muted-foreground",
+          presentation === "modal" && "hidden",
+          presentation === "auto" && "max-sm:hidden",
+        )}
+      />
+      <ComboboxInput
+        ref={fieldRef}
+        autoFocus
+        aria-label={ariaLabel}
+        placeholder={placeholder}
+        value={query}
+        onChange={(event) => update(event.target.value)}
+        className={cn(
+          "h-12 min-w-0 flex-1 bg-transparent text-prose text-foreground outline-none placeholder:text-subtle-foreground",
+          presentation === "modal" && "text-title-sm",
+          presentation === "auto" && "max-sm:text-title-sm",
+        )}
+      />
+      {query !== "" && (
+        <button
+          type="button"
+          aria-label="Clear search"
+          onClick={() => {
+            update("");
+            fieldRef.current?.focus({ preventScroll: true });
+          }}
+          className="flex size-12 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-foreground/8 hover:text-foreground"
+        >
+          <X size={20} aria-hidden="true" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Closes the popup. A public part with a default: a searchable select's
+ * full-screen view leads with one as M3's back arrow whenever the caller
+ * did not place their own, and a caller can add one anywhere else — a
+ * "Done" at the foot of a sheet, say — with any children. The default
+ * arrow is named "Back", what it shows — not "Close", which is what the
+ * dialogs and drawers it opens inside already call their own buttons.
+ *
+ * In a searchable select it is an ordinary button in the popup's header.
+ * In a plain one it sits inside the sheet's `role="listbox"`, which may own
+ * options and groups only, so there it is `aria-hidden` and out of the tab
+ * order — a redundant pointer affordance, like the drag handle; keyboard
+ * and screen-reader users have Escape, which does the same thing.
+ */
+export function SelectClose({
+  children,
+  className,
+  "aria-label": ariaLabel = "Back",
+}: {
+  children?: ReactNode;
+  className?: string | undefined;
+  "aria-label"?: string | undefined;
+}) {
+  const { engine, triggerRef } = useSelectContext("SelectClose");
+  const { presentation } = useContext(PopupContext);
+  const close = (button: HTMLElement) => {
+    if (engine === "combobox") {
+      const surface = button.closest<HTMLElement>("[data-select-content]");
+      if (surface !== null) closeComboboxPopup(surface, triggerRef.current);
+      return;
+    }
+    // The listbox engine closes on Escape; inside a drawer, `SelectPopup`'s
+    // window listener takes this synthetic one before Radix can.
+    button
+      .closest<HTMLElement>('[role="listbox"]')
+      ?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  };
+  const listbox = engine === "listbox";
+  return (
+    <button
+      type="button"
+      {...(listbox
+        ? { "aria-hidden": true, tabIndex: -1 }
+        : omitUndefined({ "aria-label": children == null ? ariaLabel : undefined }))}
+      onClick={(event) => close(event.currentTarget)}
+      className={cn(
+        "flex shrink-0 items-center justify-center rounded-full text-foreground transition-colors hover:bg-foreground/8",
+        children == null && "size-12",
+        // The default back arrow is a phone affordance: in `auto` it goes
+        // away where the popup becomes a docked dropdown.
+        children == null && presentation === "auto" && "sm:hidden",
+        className,
+      )}
+    >
+      {children ?? <ArrowLeft size={24} aria-hidden="true" />}
+    </button>
+  );
+}
+
+/**
+ * What a searchable select shows when the search matches nothing. A public
+ * part with a default ("No match") that every searchable popup renders on
+ * its own, for a caller who wants to say more — "No country matches", or
+ * an action to add one. Announced politely (`role="status"`), so a
+ * screen-reader user typing into the field hears that the list emptied. A
+ * plain select, which cannot be searched empty, renders nothing for it.
+ */
+export function SelectEmpty({ children }: { children?: ReactNode }) {
+  const { engine, open, matchCount } = useSelectContext("SelectEmpty");
+  const { presentation } = useContext(PopupContext);
+  if (engine !== "combobox" || !open || matchCount > 0) return null;
+  return (
+    <div
+      role="status"
+      className={cn(
+        "px-4 py-6 text-center text-body text-muted-foreground",
+        presentation === "modal" && "text-prose",
+        presentation === "auto" && "max-sm:text-prose",
+      )}
+    >
+      {children ?? "No match"}
+    </div>
   );
 }
