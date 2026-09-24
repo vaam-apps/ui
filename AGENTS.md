@@ -76,6 +76,21 @@ scan it rather than read it).
 in that file: *could this string be a template that only fills in a value
 the system already has?* Then it is an emitted fact and stays upright.
 
+**Compound components: the parts say what, the library decides how.**
+`Select` is the model (`select.tsx`'s header has the whole argument): a
+wrapper that owns the state, and every visible piece a nested, public
+part — including the presentation (`SelectModal`, `SelectDropdown`) and
+the chrome (`SelectClose`, `SelectModalHandle`, `SelectEmpty`), each with
+a default so a caller rarely writes it. The parts are *semantic and
+platform-neutral* in their props: no DOM-only concepts in a part's
+contract, because the same parts are meant to have a React Native
+implementation later, where a window-size class read in JS replaces the
+web's CSS breakpoints. Behind the parts the library is free to change
+engines (a `SelectSearch` swaps Headless UI's `Listbox` for `Combobox`)
+without a caller noticing. New components with more than one moving part
+follow this shape; existing ones move to it when they are next reworked,
+not in a sweep.
+
 **Stories live beside their component** and every export must appear in
 one — `src/lib/story-coverage.test.ts` makes it a build failure. The
 predecessor gallery lived in another repo, claimed to render everything,

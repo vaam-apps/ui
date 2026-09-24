@@ -61,6 +61,14 @@ export const STORY = {
   selectPhoneSheet: "primitives-select--phone-bottom-sheet",
   selectPhoneSheetShort: "primitives-select--phone-bottom-sheet-short-list",
   selectInsideAPlainDrawer: "primitives-select--inside-a-plain-drawer",
+  // The compound Select's searchable (combobox) engine and its two fixed
+  // containers (`e2e/select-search.spec.ts`).
+  selectSearchablePhone: "primitives-select--searchable-phone",
+  selectSearchableDesktop: "primitives-select--searchable-desktop",
+  selectSearchEmpty: "primitives-select--search-with-custom-empty",
+  selectSearchableInDrawer: "primitives-select--searchable-inside-a-drawer",
+  selectDropdownOnPhone: "primitives-select--dropdown-on-a-phone",
+  selectModalOnDesktop: "primitives-select--modal-on-a-desktop",
   // `SideNav`'s floating toolbars, one per M3 colour scheme, over real
   // content (`e2e/floating-toolbar.spec.ts`).
   sideNavToolbarStandard: "primitives-sidenav--toolbar-colors-standard",

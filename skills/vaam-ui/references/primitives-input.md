@@ -180,13 +180,23 @@ import { FieldError, FormField, Input } from "@vaam-apps/ui";
 </form>
 ```
 
-## Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem
+## Select and its parts
 
-A listbox, for a vocabulary too long to show at once. For a handful of
+`Select`, `SelectTrigger`, `SelectValue`, `SelectContent`, `SelectDropdown`,
+`SelectModal`, `SelectItem`, `SelectGroup`, `SelectSearch`, `SelectEmpty`,
+`SelectClose`, `SelectModalHandle`.
+
+A picker, for a vocabulary too long to show at once. For a handful of
 options prefer `RadioGroup` or `ChipSelect` — a select costs one click to
 discover the choices and another to pick one.
 
-The composition is the Radix shape kept deliberately intact:
+It is a **compound component**: `Select` is the wrapper that owns the
+value, and everything visible is a part you nest inside it. You describe
+*what* you want; the library decides *how* — which engine, which
+presentation at which width. Adding a `<SelectSearch />` is the whole
+switch from a plain picker to a searchable one.
+
+**The value and the trigger**
 
 - **`Select`** owns the value. `value` / `defaultValue` / `onValueChange`
   (all `string`), plus `disabled` and `aria-invalid`. Controlled when
@@ -201,39 +211,80 @@ The composition is the Radix shape kept deliberately intact:
   nothing else can name it.
 - **`SelectValue`** renders the selected item's *children* (the label),
   not the raw value, falling back to the value if no item matches. Its
-  `placeholder` shows while nothing is selected.
-- **`SelectContent`** is the dropdown. It renders **inline, not
-  portalled** — a correctness fix, not a preference: Headless UI's
-  portalled options land outside a vaul drawer's focus trap, where the
-  enter transition stalls and the listbox is measurably never usable
-  (`opacity: 0`, `pointer-events: none`, a collapsed rect). Every select
-  inside a drawer was broken that way until it was rendered inline.
-  **Below 640px it is an M3 modal bottom sheet instead of a dropdown** —
-  pinned to the bottom edge, full width, 28px top corners, a scrim over
-  the page, capped at 85dvh and scrolling, with a drag handle that
-  dismisses past 56px or on a flick, and 56px rows where the current
-  value is a filled row with 16px corners. It is the same element
-  restyled by a `max-sm:` media query, so there is nothing to opt into
-  and nothing to wire: it still renders inline, still works inside a
-  drawer, and Escape, a tap on the dimmed page, or picking a row all close
-  it. **There is no opt-out** — no prop keeps the dropdown on a phone. A
-  width you pass to `SelectContent`'s `className` (`w-64`) applies to the
-  dropdown only; the sheet stays full-width unless you pass a `max-sm:`
-  width yourself. Do not build your own phone picker around a `Select`,
-  and do not put a `Select` inside something that re-anchors
-  `position: fixed` children at phone width (a `transform`ed or
-  `will-change`d ancestor that is *not* pinned to the bottom edge — the
-  sheet anchors to that ancestor's bottom instead of the screen's).
-  `SideNav`'s bottom toolbar hides itself while a sheet is open. Inside
-  a drawer, Escape, a drag of the handle or a tap on the dimmed page
-  closes the `Select` alone and returns focus to its trigger; the next
-  Escape closes the drawer. (It used to close both at once — on desktop
-  too, for Escape.)
+  `placeholder` shows while nothing is selected. The label is found by
+  walking `Select`'s children, so write `SelectItem`s directly rather than
+  from inside your own wrapper component if the label differs from the
+  value.
+
+**The container — pick one**
+
+- **`SelectContent`** (use this by default) — a dropdown under the
+  trigger from 640px up; **below 640px an M3 modal bottom sheet** (pinned
+  to the bottom edge, full width, 28px top corners, a scrim, capped at
+  85dvh and scrolling, a drag handle that dismisses past 56px or on a
+  flick, 56px rows with the current value as a filled row with 16px
+  corners). With a `SelectSearch` it is instead M3's **docked search
+  view** from 640px up and its **full-screen search view** below. Chosen
+  by CSS media query, so it server-renders correctly.
+- **`SelectDropdown`** — the dropdown (or docked search view) at *every*
+  width, phones included. The opt-out, for a two- or three-option select
+  inline in a dense form row. Most selects should not use it.
+- **`SelectModal`** — the sheet (or full-screen search view) at every
+  width; from 640px up the sheet is capped at 640px and centred.
+
+All three render **inline, not portalled** — a correctness fix, not a
+preference: Headless UI's portalled options land outside a vaul drawer's
+focus trap, where they never become usable. So they all work inside a
+`Drawer`. Do not put a `Select` inside something that re-anchors
+`position: fixed` children at phone width (a `transform`ed or
+`will-change`d ancestor that is *not* pinned to the bottom edge — the
+sheet anchors to that ancestor instead of the screen). A width you pass
+to `SelectContent`'s `className` (`w-64`) applies to the dropdown only;
+the phone sheet stays full-width unless you pass a `max-sm:` width.
+
+**The options**
+
 - **`SelectItem`** takes a `value` and its label as children. Labels clamp
-  to two lines.
+  to two lines. `textValue` is what search matches against — pass it when
+  the children are not plain text, or to be findable by a word not shown
+  (`textValue="Cameroon CM"` makes "CM" find Cameroon).
 - **`SelectGroup`** is semantic grouping only — a `contents` fieldset with
-  no visual treatment of its own. Nothing in the console uses it today; it
-  exists for API parity.
+  no visual treatment of its own.
+
+**Search — a searchable select**
+
+- **`SelectSearch`** — an M3 search field in the popup's header (write it
+  first among the container's children; it is lifted into the header
+  wherever you put it, but it must be a direct part, not inside your own
+  wrapper component). It makes the select a WAI-ARIA combobox: focus stays
+  in the field while the arrow keys move through the options, Enter picks,
+  Escape closes. Matching is case- and accent-insensitive ("cote" finds
+  "Côte d’Ivoire"). `placeholder`, `aria-label` (default "Search"),
+  `onQueryChange(query)` (called as the text changes, and with `""` on
+  close), and `filter` — pass `filter={false}` when you filter or fetch the
+  items yourself from `onQueryChange`; every item you render is then shown.
+- **`SelectEmpty`** — shown when no option is shown. Every searchable
+  popup renders "No match" on its own; write a `SelectEmpty` to say more
+  ("No country matches", or "Searching…" while your fetch is in flight).
+  It is announced politely (`role="status"`).
+
+**Chrome — public parts with defaults, so you rarely write them**
+
+- **`SelectClose`** — closes the popup. The full-screen search view leads
+  with one (a back arrow, named "Back") unless you place your own; add one
+  anywhere else with any children (`<SelectClose>Done</SelectClose>`). In a
+  plain (non-searchable) select it is a pointer-only affordance
+  (`aria-hidden`, out of the tab order) because it sits inside the
+  listbox; keyboard users have Escape.
+- **`SelectModalHandle`** — the sheet's M3 drag handle. Every sheet
+  renders one at its top unless you place your own; there is none in a
+  dropdown or a search view.
+
+**Behaviour you get for free:** Escape, a tap on the dimmed page, the back
+arrow, a drag of the handle, or picking an option closes it and returns
+focus to the trigger. Inside a drawer, any of those closes the `Select`
+alone; the next Escape closes the drawer. `SideNav`'s bottom toolbar hides
+itself while a phone sheet or search view is open.
 
 ```tsx
 import {
@@ -251,6 +302,32 @@ const [provider, setProvider] = useState<string>();
       <SelectItem value="orange_cm">Orange Cameroon</SelectItem>
       <SelectItem value="mtn_agg">MTN (aggregator)</SelectItem>
       <SelectItem value="twilio">Twilio</SelectItem>
+    </SelectContent>
+  </Select>
+</FormField>
+```
+
+Searchable — the same parts plus a `SelectSearch`:
+
+```tsx
+import {
+  FormField, Select, SelectContent, SelectEmpty, SelectItem, SelectSearch,
+  SelectTrigger, SelectValue,
+} from "@vaam-apps/ui";
+
+<FormField label="Country" htmlFor="sender-country">
+  <Select value={country} onValueChange={setCountry}>
+    <SelectTrigger id="sender-country">
+      <SelectValue placeholder="Choose a country" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectSearch placeholder="Search countries" />
+      {countries.map((c) => (
+        <SelectItem key={c.code} value={c.code} textValue={`${c.name} ${c.code}`}>
+          {c.name}
+        </SelectItem>
+      ))}
+      <SelectEmpty>No country matches</SelectEmpty>
     </SelectContent>
   </Select>
 </FormField>
