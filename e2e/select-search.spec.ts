@@ -333,10 +333,20 @@ test.describe("searchable, inside a Dialog", () => {
     });
   }
 
-  test('an option whose value is "" can be picked', async ({ page }) => {
+  test('an option whose value is "" can be picked, and the trigger then shows it', async ({
+    page,
+  }) => {
     await openSelect(page);
-    await page.getByRole("option", { name: "Any country" }).click();
+    // Nothing is picked yet, so "Any country" is not the selected option:
+    // `""` used to double as "nothing picked" and marked it selected.
+    const any = page.getByRole("option", { name: "Any country" });
+    await expect(any).toHaveAttribute("aria-selected", "false");
+    await any.click();
     await expect(storyRoot(page).getByText("value: (any)")).toBeVisible();
+    // The pick closed the dialog; reopened, the trigger reads the pick,
+    // not the placeholder it used to fall back to for `""`.
+    await storyRoot(page).getByRole("button", { name: "Open dialog" }).click();
+    await expect(page.getByRole("button", { name: "Country" })).toHaveText("Any country");
   });
 
   test("a SelectClose written inside the list keeps the listbox valid (axe)", async ({ page }) => {

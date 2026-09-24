@@ -208,9 +208,11 @@ switch from a plain picker to a searchable one.
   `useState<string>()` → `value={v}` pattern would otherwise be a type
   error.
 - **`SelectTrigger`** is the button. Takes `id`, `className`, and
-  `aria-label` / `aria-labelledby` for a select used outside a
-  `FormField` — the trigger only ever renders the selected value, so
-  nothing else can name it.
+  `aria-label` for a select used outside a `FormField` — the trigger only
+  ever renders the selected value, so nothing else can name it. Use
+  `aria-label`, not `aria-labelledby`: the latter is accepted but does not
+  currently reach the rendered button (Headless UI's own label wiring
+  overrides it), so a select named that way has no name at all.
 - **`SelectValue`** renders the selected item's *children* (the label),
   not the raw value. Its `placeholder` shows while nothing is selected.
   The label is found by walking `Select`'s children, so write
@@ -255,7 +257,9 @@ centred in `MoreDetailDrawer`'s 680px panel rather than on the screen.
 
 - **`SelectItem`** takes a `value` and its label as children. Labels clamp
   to two lines. Any string is a valid `value`, `""` included (an "Any
-  country" row). `textValue` is what search matches against — pass it
+  country" row): picked, the trigger shows its label. Without a
+  `<SelectItem value="">`, `value=""` on `Select` still means "nothing
+  picked" and shows the placeholder. `textValue` is what search matches against — pass it
   when the children are not plain text, or to be findable by a word not
   shown. It *replaces* the children's text rather than adding to it, so
   include the label: `textValue="Cameroon CM"` makes "CM" find Cameroon,
@@ -277,7 +281,9 @@ centred in `MoreDetailDrawer`'s 680px panel rather than on the screen.
   select's own name — "Search Country" inside a `FormField` labelled
   Country); `clearLabel`, the clear button's name (default "Clear
   search"); `onQueryChange(query)` (called as the text changes, and with
-  `""` on close); and `filter` — pass `filter={false}` when you filter or
+  `""` on close if anything was typed — not on the close of a popup nobody
+  searched, so a per-query fetch does not refetch the full list on every
+  open and close); and `filter` — pass `filter={false}` when you filter or
   fetch the items yourself from `onQueryChange`; every item you render is
   then shown. Adding or removing the `SelectSearch` swaps the engine and
   remounts the trigger and the popup, so change it only while the select
@@ -293,11 +299,14 @@ centred in `MoreDetailDrawer`'s 680px panel rather than on the screen.
 ### Chrome — public parts with defaults, so you rarely write them
 
 - **`SelectClose`** — closes the popup. The full-screen search view leads
-  with one (a back arrow, named "Back") unless you place your own; add one
-  anywhere else with any children (`<SelectClose>Done</SelectClose>`).
-  Where it lands decides what it is. Written as a direct part of a
-  searchable select's container, it is lifted into the header beside the
-  field and is a real button, named by `aria-label` (default "Back").
+  with one (a back arrow, named "Back") unless you write your own as a
+  direct part of the container — one wrapped in your own element does not
+  replace it. Add one anywhere else with any children
+  (`<SelectClose>Done</SelectClose>`); with children, they are its name
+  and `aria-label` is ignored. Where it lands decides what it is. Written
+  as a direct part of a searchable select's container, it is lifted into
+  the header beside the field and is a real button, named by its children
+  or, with none, by `aria-label` (default "Back").
   Anywhere inside the list — every `SelectClose` in a plain select, or one
   you wrap in your own element in a searchable one — it is a pointer-only
   affordance (`aria-hidden`, out of the tab order), because a listbox may

@@ -150,7 +150,8 @@ interface SelectContextValue {
   /** Remembers an option's label as it renders, so `SelectValue` can still
    * show it once the option is gone from `children` — a remote search
    * (`filter={false}`) whose current results leave out the selected item.
-   * Measured before this: the trigger read "p2" instead of "Safaricom". */
+   * Measured with it disabled, in `CallerFilteredSearch`: the trigger read
+   * "prv_106" instead of "Safaricom". */
   rememberLabel: (value: string, label: ReactNode) => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }
@@ -330,7 +331,10 @@ export function Select({
       <Combobox
         as="div"
         className="relative"
-        value={currentValue ?? ""}
+        // `null`, not `""`, for "nothing picked": `""` can be a real
+        // option's value, and Headless UI would mark that option selected
+        // before anyone picked it.
+        value={currentValue ?? null}
         // Headless UI hands `null` here when the field is cleared — the
         // combobox pattern's "no value" — but clearing the *search* must
         // not clear the *selection*, so `null` is ignored. `""` is not: it
@@ -372,8 +376,11 @@ export function Select({
     <Listbox
       as="div"
       className="relative"
-      value={currentValue ?? ""}
-      onChange={handleChange}
+      // `null` for "nothing picked" — see the same line on `Combobox` above.
+      value={currentValue ?? null}
+      onChange={(next: string | null) => {
+        if (next !== null) handleChange(next);
+      }}
       {...omitUndefined({ disabled })}
     >
       {({ open }) => (
@@ -529,10 +536,15 @@ export function SelectTrigger({
 
 export function SelectValue({ placeholder }: { placeholder?: string }) {
   const { value, itemLabel } = useSelectContext("SelectValue");
-  if (value === undefined || value === "") {
+  // `""` is two things: the "nothing picked" a caller's `value=""` has
+  // always meant, and — when a `<SelectItem value="">` exists — a real
+  // pick ("Any country"). Only the item decides which; without one it
+  // stays the placeholder, as before.
+  const label = value === undefined ? undefined : itemLabel(value);
+  if (value === undefined || (value === "" && label === undefined)) {
     return <span className="text-subtle-foreground">{placeholder}</span>;
   }
-  return <>{itemLabel(value) ?? value}</>;
+  return <>{label ?? value}</>;
 }
 
 /**
@@ -752,7 +764,8 @@ function closeComboboxPopup(surface: HTMLElement, trigger: HTMLElement | null) {
  * a reload. So now it never touches an element that is already inert
  * (someone else owns that), un-inerts only what it flipped itself, and
  * locks scroll with an attribute rather than an inline style
- * (`html[data-select-scroll-lock]` in `theme.css`), reference-counted, so
+ * (`:root:not(span)[data-select-scroll-lock]` in `theme.css`, whose
+ * comment says why not `html[…]`), reference-counted, so
  * it and Headless UI's inline `overflow` can come and go in any order.
  *
  * The lock also pads the page by the scrollbar it hides, as Headless UI's
@@ -1168,6 +1181,12 @@ const LISTBOX_SURFACE: Record<SelectPresentation, string> = {
  * which takes roughly half the height: a half-height sheet plus a keyboard
  * leaves almost no room for the results.
  *
+ * `SelectModal` asks for the full-screen form at every width. From `sm` up
+ * it stops at the sheet's 640px (`SheetMaxWidth`), centred, with the
+ * sheet's 28dp top corners and its scrim — M3 has no wide-window form of
+ * the full-screen view, so that is a library choice, made to match the
+ * modal sheet a plain `SelectModal` is there.
+ *
  * "Full-screen" is written as *pinned to the bottom edge, `100dvh` tall*
  * rather than `inset-0`, for the reason the sheet's doc gives about
  * drawers: inside a `vaul` drawer a `fixed` element resolves against the
@@ -1371,9 +1390,11 @@ export function SelectDropdown({
 /**
  * The options as a modal at every width: the M3 bottom sheet (capped at
  * 640px and centred from `sm` up, `BottomSheetDefaults.SheetMaxWidth`) —
- * or, searchable, the full-screen search view. For a picker that is a
- * decision in its own right even on a desktop, and the presentation a
- * native implementation of these parts would use everywhere.
+ * or, searchable, the full-screen search view, capped the same way from
+ * `sm` up (full height there, with the sheet's top corners). For a picker
+ * that is a decision in its own right even on a desktop, and the
+ * presentation a native implementation of these parts would use
+ * everywhere.
  */
 export function SelectModal({
   className,
@@ -1522,7 +1543,9 @@ export interface SelectSearchProps {
    * caller renders no items at all. */
   filter?: boolean | undefined;
   /** Called with the search text as it changes, and with `""` when the
-   * popup closes. */
+   * popup closes after something was typed — not on the close of a popup
+   * nobody searched, so a caller fetching per query does not refetch the
+   * full list on every open and close. */
   onQueryChange?: ((query: string) => void) | undefined;
   className?: string | undefined;
 }

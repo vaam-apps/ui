@@ -3,7 +3,14 @@ import { describe, expect, it } from "vitest";
 import { DatePicker } from "./date-picker";
 import { FormField } from "./form-field";
 import { Input } from "./input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectSearch,
+  SelectTrigger,
+  SelectValue,
+} from "./select";
 import { Textarea } from "./textarea";
 
 /**
@@ -49,7 +56,12 @@ describe("FormField wires the control to its hint and error", () => {
     expect(html).toContain(`id="${id}-error"`);
   });
 
-  it("Select carries aria-invalid, and cannot carry aria-describedby", () => {
+  // Both engines: a `SelectSearch` swaps the trigger for Headless UI's
+  // `ComboboxButton`, which builds its own `aria-describedby` the same way.
+  it.each([
+    ["Select", false],
+    ["Searchable Select", true],
+  ])("%s carries aria-invalid, and cannot carry aria-describedby", (_name, searchable) => {
     const html = wrap(
       "s",
       <Select defaultValue="a">
@@ -57,6 +69,7 @@ describe("FormField wires the control to its hint and error", () => {
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
+          {searchable && <SelectSearch />}
           <SelectItem value="a">A</SelectItem>
         </SelectContent>
       </Select>,

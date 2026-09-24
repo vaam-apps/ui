@@ -865,9 +865,8 @@ function HorizontalRail({
         // Gone while any `Select` is open below `sm` — its phone sheet,
         // its full-screen search view, or a `SelectDropdown` (each marks
         // its popup `data-select-content`, and unmounts it on close). The
-        // sheet or view
-        // is full-width on the bottom edge, so it normally covers this
-        // toolbar anyway — but it is not portalled, so its `z-50` only
+        // sheet or view is full-width on the bottom edge, so it normally
+        // covers this toolbar anyway — but it is not portalled, so its `z-50` only
         // counts inside whatever stacking context the `Select` sits in,
         // and inside a `sticky`, `isolate`d (every `InstrumentPanel`) or
         // transformed ancestor this `fixed z-40` bar, portalled to `body`,
