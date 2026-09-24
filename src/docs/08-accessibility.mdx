@@ -139,9 +139,14 @@ That is the definition of a false positive, and the rule this suite sets
 for itself is that a gate which cries wolf gets switched off wholesale.
 So the narrow rule is switched off instead of the gate, in that one
 block, with the reason written down — and the invariant it would have
-checked is pinned on the breakpoint gates themselves in
-`side-nav.portal.test.tsx`, the only place it is observable without a
-real layout.
+checked runs in a real browser instead: `e2e/side-nav-bands.spec.ts` runs
+axe's `landmark-unique` at 375, 700, 1100 and 1280px. This paragraph used
+to name `side-nav.portal.test.tsx` as that guard. It pins the two rails'
+gates as class strings and never looked at the in-flow `<nav>`, which had
+no `hidden` below 1280px and was a second exposed `Primary` landmark at
+every narrower width for two releases
+([#16](https://github.com/vaam-apps/ui/issues/16)) — a guard that could
+not see the thing it was cited for.
 
 `region` stays on. It is the rule that caught the rails being plain
 `<div>`s outside any landmark, which is why they are `<nav>` at all, and

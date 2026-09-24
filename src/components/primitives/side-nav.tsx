@@ -846,8 +846,9 @@ function HorizontalRail({
     // precisely because these rails portal out of the component).
     //
     // All three shapes carry the same `aria-label="Primary"`, and exactly
-    // one is ever displayed — the gates are complements, pinned by
-    // `side-nav.portal.test.tsx`.
+    // one is ever displayed — the gates are complements, measured in a
+    // real browser by `e2e/side-nav-bands.spec.ts` (see `SideNav`'s
+    // "Landmarks" doc for the one that was not).
     <nav
       aria-label="Primary"
       data-floating-rail=""
@@ -973,9 +974,12 @@ function HorizontalRail({
  *
  * So all three shapes are `<nav aria-label="Primary">` now, and there are
  * three of them in the DOM at once. That is safe only because exactly one
- * is ever displayed — the breakpoint gates are complements — which is
- * what `side-nav.portal.test.tsx` pins, on the class gates themselves,
- * since jsdom applies no CSS and cannot observe the result.
+ * is ever displayed — the breakpoint gates are complements.
+ * `side-nav.portal.test.tsx` pins the two rails' gates as class strings,
+ * which is all jsdom can see; whether exactly one is *exposed* is measured
+ * in Chromium by `e2e/side-nav-bands.spec.ts`, because the class-string
+ * version passed for two releases while the in-flow `<nav>` was a second
+ * exposed landmark (vaam-apps/ui#16, `SideNav`'s "Landmarks" doc).
  */
 function FloatingRailPortal({
   collapsed,
@@ -1060,8 +1064,17 @@ function FloatingRailPortal({
  * is ever displayed — the gates are complements — and `display: none`
  * removes a subtree from the accessibility tree, so a hidden band is
  * genuinely absent rather than merely invisible.
- * `side-nav.portal.test.tsx` pins the complementarity on the class gates
- * themselves, because jsdom applies no CSS and cannot observe the result.
+ *
+ * For two releases that paragraph was true of the two rails and false of
+ * this element: its gate was `xl:flex` with no unprefixed `hidden`, so
+ * below `xl` it was a zero-width `display: block` box — still a landmark,
+ * and so two `Primary` landmarks at every width under 1280px
+ * (vaam-apps/ui#16). `side-nav.portal.test.tsx` pinned the complementarity
+ * on the two rails' class strings and never looked at this one, and jsdom
+ * could not have seen the result anyway. The guard now is a real browser:
+ * `e2e/side-nav-bands.spec.ts` counts the exposed `Primary` landmarks and
+ * runs axe's `landmark-unique` at 375, 700, 1100 and 1280px, and was seen
+ * failing at the first three before the fix.
  *
  * This used to read "there is only ever one `<nav>` element in this file,
  * full stop", and that was true right up until it was the bug: below
@@ -1103,9 +1116,10 @@ export function SideNav({
   toolbarVariant = "standard",
   className,
 }: SideNavProps) {
-  // In floating mode the in-flow tree exists only at `xl`. The `<nav>`
-  // itself already knew that; its children did not, and a wrapper with
-  // `px-2` lays out whether or not everything inside it is
+  // In floating mode the in-flow tree exists only at `xl`. This comment
+  // used to say the `<nav>` itself already knew that; it did not (#16 —
+  // see its own class list below), and neither did its children: a
+  // wrapper with `px-2` lays out whether or not everything inside it is
   // `display: none`. Measured: at 375px and 900px the in-flow nav was a
   // **16px wide by 510px tall** box with zero visible descendants, and at
   // 1262px a 40px one painting two `border-t` hairlines beside the
@@ -1138,9 +1152,24 @@ export function SideNav({
             // the *sidebar* appears; the `1024–1279px` band that used to
             // draw a 64px in-flow icon rail is served by the floating
             // rail instead. Collapsed, it never appears at all.
+            //
+            // The unprefixed `hidden` is the half that was missing
+            // (vaam-apps/ui#16). Every other utility here is `xl:`, so
+            // below `xl` this `<nav>` had no display utility at all and
+            // fell back to the UA's `display: block` — an empty, zero-width
+            // box, but a box, and so a second `navigation "Primary"`
+            // landmark beside whichever rail was showing. Measured in
+            // Chromium before this line: two exposed `Primary` landmarks
+            // and one axe `landmark-unique` violation at 375, 700 and
+            // 1100px, one landmark and none at 1280px
+            // (`e2e/side-nav-bands.spec.ts`). `display: none` is the fix
+            // rather than a second name, because there is nothing in this
+            // element below `xl` to name: every child is `hidden xl:flex`
+            // too (`inFlow`), so a distinctly-labelled landmark here would
+            // be an empty one in every screen reader's landmark list.
             collapsed
             ? "hidden"
-            : "xl:flex xl:h-full xl:shrink-0 xl:flex-col xl:gap-4 xl:overflow-y-auto xl:overflow-x-hidden xl:bg-base-200 xl:py-4",
+            : "hidden xl:flex xl:h-full xl:shrink-0 xl:flex-col xl:gap-4 xl:overflow-y-auto xl:overflow-x-hidden xl:bg-base-200 xl:py-4",
         // Real widths rather than "however wide a 16px icon plus its
         // padding happens to be". `lg:w-16` is off-canvas-only now,
         // because that is the only mode with an in-flow icon rail left.

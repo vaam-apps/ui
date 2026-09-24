@@ -359,12 +359,19 @@ landmark at all.
 Three identically-named landmarks in the DOM is only safe because exactly
 one is ever displayed, and their breakpoint gates are complements. jsdom
 applies no CSS, so axe sees all three and reports `landmark-unique`,
-which here genuinely is a false positive. That one rule is disabled in
-that one block with the reason written down, and the invariant it would
-have checked is pinned instead on the breakpoint gates themselves in
-`side-nav.portal.test.tsx` — the weaker kind of test, pinning the
-mechanism rather than the result, chosen because the result is not
-observable without a real layout and the alternative is pinning nothing.
+which there genuinely is a false positive. That one rule is disabled in
+that one jsdom block with the reason written down.
+
+This page used to say the invariant was pinned instead on the breakpoint
+gates in `side-nav.portal.test.tsx`. That test pins the two *rails'*
+gates as class strings, and it passed for two releases while the in-flow
+`<nav>` had no `hidden` below 1280px at all — a zero-width box, but still
+a second exposed `Primary` landmark at every narrower width
+([#16](https://github.com/vaam-apps/ui/issues/16)). The invariant now
+lives where it is observable: `e2e/side-nav-bands.spec.ts` counts the
+exposed `Primary` landmarks and runs axe's `landmark-unique` in Chromium
+at 375, 700, 1100 and 1280px, and was seen failing on the first three
+before the fix.
 
 The rails carry a `data-floating-rail` attribute. It is a stable hook
 rather than a test-only wart: the subtree is portalled, so it is the one

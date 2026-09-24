@@ -138,6 +138,12 @@ complements, and that every shape carries the `Primary` landmark. The
 a11y gate cannot make the landmark-count check: it audits the
 component's own host node, and the portal escapes it.
 
+What it cannot check is that exactly one landmark is *exposed* at a
+given width — jsdom applies no CSS. It passed for two releases while the
+in-flow `<nav>` was a second exposed `Primary` landmark below 1280px
+([#16](https://github.com/vaam-apps/ui/issues/16)); that count, and axe's
+`landmark-unique`, now run in Chromium in `e2e/side-nav-bands.spec.ts`.
+
 It also replaces a citation with a test. `side-nav.tsx` cited a
 measurement from a scratch test that had been deleted; this file is that
 citation made real, so the claim fails with the code rather than

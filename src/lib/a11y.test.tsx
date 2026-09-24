@@ -809,9 +809,12 @@ describe("SideNav, including the portalled rails", () => {
    * That is the definition of a false positive, and the rule this file's
    * own doc sets is that a gate which cries wolf gets switched off
    * wholesale — so the narrow rule is switched off instead of the gate.
-   * The invariant it would otherwise be checking is not dropped: it is
-   * pinned in `side-nav.portal.test.tsx`, on the class gates themselves,
-   * which is the only place it is observable without a real layout.
+   * The invariant it would otherwise be checking is not dropped: it runs
+   * in Chromium, in `e2e/side-nav-bands.spec.ts`, at four widths. This
+   * used to point at `side-nav.portal.test.tsx`'s class-gate checks, which
+   * cover the two rails only — and the in-flow `<nav>` was a second
+   * exposed `Primary` landmark below 1280px for two releases while they
+   * passed (vaam-apps/ui#16).
    *
    * Everything else stays on. `region` in particular — the rule that
    * caught the rails being plain `<div>`s outside any landmark, which is

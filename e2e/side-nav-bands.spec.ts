@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { expect, test } from "@playwright/test";
 import { box, openStory } from "./helpers";
 import { STORY } from "./story-ids";
@@ -18,8 +19,8 @@ import { STORY } from "./story-ids";
  * rather than "has a box". That was originally a workaround — the in-flow
  * `<nav>` used to occupy a narrow strip below `xl`, so counting boxes
  * counted a band with nothing in it — and the strip is now fixed (see the
- * last test in this file). The definition stays, because it is the better
- * question either way: a navigation nobody can click is not a
+ * "takes no width" tests below). The definition stays, because it is the
+ * better question either way: a navigation nobody can click is not a
  * navigation.
  */
 
@@ -143,11 +144,88 @@ for (const width of [375, 900, 1262]) {
   test(`at ${width}px the in-flow nav takes no width at all`, async ({ page }) => {
     await openStory(page, STORY.sideNavInAShell, { width, height: 760 });
     const inFlow = page.locator('nav[aria-label="Primary"]:not([data-floating-rail])').first();
-    const rect = await box(inFlow);
+    // `getBoundingClientRect`, not `box()`: below `xl` this element is
+    // `display: none` now (#16, the next block), which has no box at all —
+    // and "no box" is the strongest form of "no width" there is.
+    const measured = await inFlow.evaluate((el) => el.getBoundingClientRect().width);
     expect(
-      rect.width,
+      measured,
       "the in-flow nav is laying out a box below `xl`; the rails are `fixed`, " +
         "so every pixel here is a lane taken from the caller's content for nothing",
     ).toBe(0);
+  });
+}
+
+/**
+ * Exactly one **exposed** `Primary` landmark at every width —
+ * vaam-apps/ui#16.
+ *
+ * The test above proved the in-flow `<nav>` took no *width* below `xl`, and
+ * that was true while the bug it sat next to stayed open: the element was
+ * a zero-width `display: block` box, which is still a landmark. A screen
+ * reader's landmark list — and axe's `landmark-unique` — saw two
+ * `navigation "Primary"` entries at every width below 1280px: the empty
+ * in-flow one and whichever rail was showing. vaam-apps/vpay suppressed
+ * that rule on its Shell stories because of it (re-measured on 0.3.0: one
+ * violation at 375–1279px, none from 1280px).
+ *
+ * "Exposed" is `checkVisibility({ visibilityProperty: true })` — no
+ * `display: none` or `visibility: hidden` on it or any ancestor — not "has
+ * a box". A zero-size box is exactly the case that slipped through, and
+ * size is not what puts an element in the accessibility tree.
+ *
+ * Every class-string and jsdom check in this repo passed through all of
+ * it — jsdom applies no stylesheet, so it cannot tell "hidden below `xl`"
+ * from "no display utility at all below `xl`" — which is why this runs axe
+ * in the real browser rather than trusting `side-nav.portal.test.tsx`'s
+ * gate strings.
+ *
+ * The widths: one in each band — the phone pill (375), the vertical rail
+ * (700 and 1100: either side of the `lg` line the old in-flow icon rail
+ * used to start at) — and 1280, the first sidebar width, where the rails
+ * must hand over rather than join it.
+ */
+const AXE_PATH = createRequire(import.meta.url).resolve("axe-core/axe.min.js");
+
+for (const width of [375, 700, 1100, 1280]) {
+  test(`at ${width}px exactly one Primary landmark is exposed (axe landmark-unique)`, async ({
+    page,
+  }) => {
+    await openStory(page, STORY.sideNavInAShell, { width, height: 760 });
+
+    const exposed = await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>("nav[aria-label]")]
+        .filter((nav) => nav.checkVisibility({ visibilityProperty: true }))
+        .map((nav) => nav.getAttribute("aria-label")),
+    );
+    // Soft, so a failure reports axe's verdict as well: the two are
+    // independent measurements of the same property, and seeing both fail
+    // together is what says the count is not an artefact of its own filter.
+    expect
+      .soft(
+        exposed.filter((label) => label === "Primary"),
+        '`nav[aria-label="Primary"]` elements a screen reader can reach at this width',
+      )
+      .toHaveLength(1);
+
+    await page.addScriptTag({ path: AXE_PATH });
+    const violations = await page.evaluate(async () => {
+      const axe = (
+        window as unknown as {
+          axe: {
+            run: (
+              context: Document,
+              options: unknown,
+            ) => Promise<{ violations: { id: string; nodes: { target: unknown[] }[] }[] }>;
+          };
+        }
+      ).axe;
+      const result = await axe.run(document, { runOnly: ["landmark-unique"] });
+      return result.violations.map((violation) => ({
+        id: violation.id,
+        targets: violation.nodes.map((node) => JSON.stringify(node.target)),
+      }));
+    });
+    expect(violations).toEqual([]);
   });
 }
