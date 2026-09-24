@@ -19,10 +19,10 @@ success or warning button** — those hues belong to the status system, and
 a button that borrows one erodes the state language on every screen where
 both appear.
 
-| Prop | Type | Default |
-|---|---|---|
+| Prop      | Type                                                   | Default     |
+| --------- | ------------------------------------------------------ | ----------- |
 | `variant` | `"primary" \| "secondary" \| "ghost" \| "destructive"` | `"primary"` |
-| `size` | `"sm" \| "md" \| "icon"` | `"md"` |
+| `size`    | `"sm" \| "md" \| "icon"`                               | `"md"`      |
 
 Everything else is `<button>`'s own attributes, and the ref lands on the
 element. `ButtonVariant` and `ButtonSize` are exported if you need to

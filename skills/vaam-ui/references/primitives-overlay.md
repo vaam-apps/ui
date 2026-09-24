@@ -11,19 +11,19 @@ months ago, a message that expired while they were looking at a payload.
 
 ## Choosing one
 
-| The operator is… | Use | Not |
-|---|---|---|
-| deciding something irreversible, and must stop | `ConfirmDialog` | a toast |
-| confirming a row-level action | `InlineConfirm` | `ConfirmDialog` |
-| confirming something **inside an open drawer** | `InlineConfirm` | a nested `Dialog` — it does not work, see below |
-| reading one record's headline without leaving the list | `QuickDetailDrawer` | `Dialog` |
-| working through a whole record — every field, an edit form, destructive actions | `MoreDetailDrawer` | `Dialog` |
-| taking one focused action with a form in it | `Dialog` | a drawer |
-| picking from a short list of actions on a row | `DropdownMenu` | `Popover` |
-| reading a little extra anchored content, possibly interactive | `Popover` | `Tooltip` |
-| reading a one-line gloss on a label | `Tooltip` | `Popover` |
-| jumping somewhere by typing | `CommandMenu` | `DropdownMenu` |
-| being told something already finished | `toast` | anything modal |
+| The operator is…                                                                | Use                 | Not                                             |
+| ------------------------------------------------------------------------------- | ------------------- | ----------------------------------------------- |
+| deciding something irreversible, and must stop                                  | `ConfirmDialog`     | a toast                                         |
+| confirming a row-level action                                                   | `InlineConfirm`     | `ConfirmDialog`                                 |
+| confirming something **inside an open drawer**                                  | `InlineConfirm`     | a nested `Dialog` — it does not work, see below |
+| reading one record's headline without leaving the list                          | `QuickDetailDrawer` | `Dialog`                                        |
+| working through a whole record — every field, an edit form, destructive actions | `MoreDetailDrawer`  | `Dialog`                                        |
+| taking one focused action with a form in it                                     | `Dialog`            | a drawer                                        |
+| picking from a short list of actions on a row                                   | `DropdownMenu`      | `Popover`                                       |
+| reading a little extra anchored content, possibly interactive                   | `Popover`           | `Tooltip`                                       |
+| reading a one-line gloss on a label                                             | `Tooltip`           | `Popover`                                       |
+| jumping somewhere by typing                                                     | `CommandMenu`       | `DropdownMenu`                                  |
+| being told something already finished                                           | `toast`             | anything modal                                  |
 
 Two rules that cut most of the wrong answers:
 
