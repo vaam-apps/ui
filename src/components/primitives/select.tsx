@@ -873,7 +873,9 @@ const DROPDOWN_MIN_HEIGHT = 200;
  * clips (`transform`, `filter`, `backdrop-filter` or `contain`, with
  * `overflow: hidden`) clips it as it clipped `absolute` — measured, one
  * row left in a 120px `backdrop-filter` card. Nothing in this library is
- * built that way; a caller's container can be. The popup
+ * built that way at rest — a `Dialog`'s panel is, for the length of its
+ * enter transition, while `scale-95` applies — and a caller's container
+ * can be. The popup
  * still renders inline, not portalled: the reason is `SelectContent`'s
  * `portal={false}` comment, and it has not changed.
  *
@@ -934,9 +936,12 @@ function useDropdownPlacement(
       // its trigger 100px scrolled up under it. The surface goes
       // transparent and stops taking the pointer instead (its classes,
       // on `data-reference-hidden`), and comes back when the trigger
-      // does. Not `visibility: hidden`: an element that stops being
-      // rendered loses focus, and the search field's blur is the popup's
-      // close.
+      // does. Not `visibility: hidden`: Chromium blurs a focused element
+      // that stops being rendered, and focus lands on `<body>` while the
+      // popup stays open — measured in both engines, after which the next
+      // Escape closed the drawer and left the popup open. Transparent, the
+      // list keeps focus and still answers the keyboard, which is also what
+      // a list the scroller clipped used to do.
       hide({ strategy: "referenceHidden" }),
     ],
     whileElementsMounted: autoUpdate,

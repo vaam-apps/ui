@@ -190,17 +190,26 @@ test("plain, with too little room on either side: it stays on the window, shorte
   ).toBeLessThanOrEqual(360 - 8 + 1);
 });
 
-test("inside a scrolling drawer: it follows its trigger, and fades out when the trigger scrolls away", async ({
-  page,
-}) => {
-  await openStory(page, STORY.selectInsideADrawer, DESKTOP);
+const DRAWER_STORIES = [
+  ["plain", STORY.selectInsideADrawer, "Provider"],
+  ["searchable", STORY.selectSearchableInDrawer, "Country"],
+] as const;
+
+/** Opens the drawer, makes its body long enough to scroll (the scroller
+ * is marked `data-test-scroller`), then opens the select in it. */
+async function openInScrollingDrawer(
+  page: Page,
+  story: string,
+  name: string,
+  size: { width: number; height: number },
+) {
+  await openStory(page, story, size);
   await storyRoot(page).getByRole("button", { name: "Open drawer" }).click();
-  const triggerLocator = page.getByRole("button", { name: "Provider" });
-  await expect(triggerLocator).toBeVisible();
+  const trigger = page.getByRole("button", { name });
+  await expect(trigger).toBeVisible();
   await settleTransitions(page);
-  // A drawer body long enough to scroll.
-  const scrolled = await triggerLocator.evaluate((trigger) => {
-    let scroller = trigger.parentElement;
+  const found = await trigger.evaluate((element) => {
+    let scroller = element.parentElement;
     while (scroller !== null && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) {
       scroller = scroller.parentElement;
     }
@@ -211,36 +220,72 @@ test("inside a scrolling drawer: it follows its trigger, and fades out when the 
     scroller.setAttribute("data-test-scroller", "");
     return true;
   });
-  expect(scrolled, "failed: no scrolling ancestor found in the drawer").toBe(true);
-  await triggerLocator.click();
-  await expect(page.getByRole("listbox")).toBeVisible();
+  expect(found, "failed: no scrolling ancestor found in the drawer").toBe(true);
+  await trigger.click();
+  await expect(surface(page)).toBeVisible();
   await settleTransitions(page);
-  const scrollBy = async (top: number) => {
-    await page.locator("[data-test-scroller]").evaluate((element, y) => {
-      element.scrollTop = y;
-    }, top);
-    await page.evaluate(
-      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-    );
-  };
-  const opacity = () => surface(page).evaluate((element) => getComputedStyle(element).opacity);
+  return trigger;
+}
 
-  await scrollBy(30);
-  const trigger = await box(triggerLocator);
-  const rect = await box(surface(page));
-  expect(
-    rect.y - (trigger.y + trigger.height),
-    "failed: the dropdown stayed put while its trigger scrolled",
-  ).toBeCloseTo(4, 0);
-  expect(await opacity()).toBe("1");
-
-  // Scrolled well past: the trigger is out of the drawer body's view.
-  await scrollBy(600);
-  expect(await opacity(), "failed: the dropdown floats on without its trigger").toBe("0");
-  expect(await surface(page).evaluate((element) => getComputedStyle(element).pointerEvents)).toBe(
-    "none",
+async function scrollDrawerTo(page: Page, top: number) {
+  await page.locator("[data-test-scroller]").evaluate((element, y) => {
+    element.scrollTop = y;
+  }, top);
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
   );
+}
 
-  await scrollBy(0);
-  expect(await opacity(), "failed: the dropdown did not come back with its trigger").toBe("1");
-});
+const painted = (page: Page) =>
+  surface(page).evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { opacity: style.opacity, pointerEvents: style.pointerEvents };
+  });
+
+for (const [engine, story, name] of DRAWER_STORIES) {
+  test(`${engine}, inside a scrolling drawer: it follows its trigger, and fades out when the trigger scrolls away`, async ({
+    page,
+  }) => {
+    const triggerLocator = await openInScrollingDrawer(page, story, name, DESKTOP);
+
+    await scrollDrawerTo(page, 30);
+    const trigger = await box(triggerLocator);
+    const rect = await box(surface(page));
+    expect(
+      rect.y - (trigger.y + trigger.height),
+      "failed: the dropdown stayed put while its trigger scrolled",
+    ).toBeCloseTo(4, 0);
+    expect(await painted(page)).toEqual({ opacity: "1", pointerEvents: "auto" });
+
+    // Scrolled well past: the trigger is out of the drawer body's view.
+    await scrollDrawerTo(page, 600);
+    expect(
+      await painted(page),
+      "failed: the dropdown floats on without its trigger, over the drawer",
+    ).toEqual({ opacity: "0", pointerEvents: "none" });
+
+    await scrollDrawerTo(page, 0);
+    expect(await painted(page), "failed: the dropdown did not come back with its trigger").toEqual({
+      opacity: "1",
+      pointerEvents: "auto",
+    });
+  });
+
+  test(`${engine}, on a phone: the sheet or full-screen view never fades with its trigger`, async ({
+    page,
+  }) => {
+    // Below 640px the popup is a sheet or a full-screen view, which does
+    // not hang off its trigger: the hide flag is still computed, and must
+    // change nothing there.
+    await openInScrollingDrawer(page, story, name, { width: 375, height: 812 });
+    await scrollDrawerTo(page, 600);
+    expect(
+      await surface(page).getAttribute("data-reference-hidden"),
+      "failed: the trigger never counted as scrolled away — this test would check nothing",
+    ).not.toBeNull();
+    expect(await painted(page), "failed: the phone popup faded with its trigger").toEqual({
+      opacity: "1",
+      pointerEvents: "auto",
+    });
+  });
+}
