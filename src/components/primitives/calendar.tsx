@@ -7,6 +7,52 @@ import { cn } from "../../lib/cn";
 export type CalendarProps = DayPickerProps & { className?: string | undefined };
 
 /**
+ * The month-navigation arrows: M3's icon button — a 40dp circle with a
+ * 24dp icon (`SmallIconButtonTokens`: `ContainerHeight`, `IconSize`,
+ * `CornerFull`) in a 48dp touch target (`RecommendedSizeForAccessibility`,
+ * `DatePicker.kt`), dimmed to 38% when unavailable
+ * (`StandardIconButtonTokens.DisabledOpacity`) — grouped at the end of the
+ * 56dp month row, as `MonthsNavigation` lays them out.
+ *
+ * In flow inside `nav`, so the in-flow `.tap-target`: at comfortable
+ * density its margin spaces the pair 48px centre to centre, and its cover
+ * is that reservation exactly, so the two targets meet without
+ * overlapping (`theme.css`, D11). The `nav` itself is absolutely placed at
+ * the top of the calendar, 12px from its end (`DatePickerHorizontalPadding`)
+ * — over the caption row of the last month when two sit side by side;
+ * `e2e/tap-targets.spec.ts` asserts both covers stay inside the panel.
+ *
+ * `aria-disabled:`, not `disabled:`: react-day-picker marks an unavailable
+ * month with `aria-disabled` and `tabIndex={-1}` and never sets
+ * `disabled`, so the previous `disabled:` styling matched nothing — at
+ * `min` or `max` the arrow looked live and did nothing (read off
+ * `components/Nav.js`, then seen in a render).
+ */
+const NAV_BUTTON = cn(
+  "relative inline-flex size-10 items-center justify-center rounded-full",
+  "text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground",
+  "aria-disabled:pointer-events-none aria-disabled:opacity-38",
+  "[--tap-size:40px] tap-target",
+);
+
+/**
+ * The in-range band behind a range: M3's
+ * `RangeSelectionActiveIndicatorContainer`, 40dp tall across the 48dp
+ * row, on the cell rather than the button so consecutive days meet with
+ * no gap. At either end it covers only the half toward the interior, so
+ * the band runs into the end's filled circle; a range that starts and
+ * ends on one day sets both halves and draws none. Two custom properties
+ * rather than two `left-*` utilities because a one-day range carries both
+ * classes, and two utilities setting `left` is a cascade coin-flip.
+ *
+ * M3 fills it with `SecondaryContainer`. This palette has one achromatic
+ * accent and no secondary container (`theme.css` §1.3), so the band is a
+ * 15% wash of the selection colour, which is also what it means.
+ */
+const RANGE_BAND =
+  "before:absolute before:inset-y-1 before:left-[var(--band-start,0px)] before:right-[var(--band-end,0px)] before:bg-primary/15";
+
+/**
  * `react-day-picker`, themed with this design system's own tokens.
  *
  * # Why the whole `classNames` map is spelled out
@@ -48,59 +94,38 @@ export function Calendar({
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
-      className={cn("p-3", className)}
+      className={cn("relative px-3 pb-2", className)}
       classNames={{
         root: "text-body text-foreground",
-        months: "flex flex-col gap-4 sm:flex-row",
-        month: "flex flex-col gap-3",
-        month_caption: "flex h-8 items-center justify-center",
-        caption_label: "font-medium text-body text-foreground",
-        nav: "flex items-center gap-1",
-        // The nav buttons are absolutely positioned by RDP's own layout at
-        // the top corners of the month; these restyle them in place.
-        // `rounded-full`, not `rounded-sm`: `button.tsx`'s own convention
-        // comment calls the circular shape universal for icon-only
-        // controls ("it only pays off if every icon-only control uses
-        // it") and this pair — icon-only, aria-labelled by RDP itself —
-        // was the one it missed. `day_button` below stays `rounded-sm` on
-        // purpose: it's a labelled calendar cell (a date, not an icon),
-        // not an icon-only control, so the convention doesn't apply to it.
-        // D11 (`theme.css`'s own header on `.tap-target`): both nav
-        // buttons are a fixed `size-7` (28px) icon-only circle in both
-        // densities, absolutely positioned against the top corners, so
-        // they take the `-anchored` variant — the in-flow one reserves
-        // its target as margin, and margin on a box with an inset set
-        // moves it rather than growing the room around it.
-        //
-        // A 28px box needs 10px a side to reach 48, and `top-3 left-3`
-        // leaves 12px toward each anchored edge, so no `--tap-room-*`
-        // clamp is needed and the cover lands 2px inside the panel's own
-        // `p-3`. No clamp is *declared* either: one that clamps nothing
-        // is dormant code, and what actually keeps this target inside the
-        // panel if the offsets ever change is a gate rather than a
-        // defensive declaration — `e2e/tap-targets.spec.ts` asserts both
-        // nav covers stay within the popover panel they are anchored to.
-        // What the cover *does* overlap is `month_caption`'s full-width
-        // flex row, which is not a target and has no click action of its
-        // own — the caption label sits centred, 41px clear of it — and
-        // that same file asserts no control claims the caption's pixels
-        // rather than leaving it as a claim.
-        button_previous: cn(
-          "absolute top-3 left-3 inline-flex size-7 items-center justify-center rounded-full",
-          "text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground",
-          "disabled:pointer-events-none disabled:opacity-40",
-          "[--tap-size:28px] tap-target-anchored",
-        ),
-        button_next: cn(
-          "absolute top-3 right-3 inline-flex size-7 items-center justify-center rounded-full",
-          "text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground",
-          "disabled:pointer-events-none disabled:opacity-40",
-          "[--tap-size:28px] tap-target-anchored",
-        ),
+        // Side by side from `md`: two 336px months, their gap and the
+        // panel's padding and border are 714px wide (measured, the docked
+        // range), which a 640px window does not have.
+        months: "flex flex-col gap-4 md:flex-row",
+        // Seven 48dp columns, 336dp, and no wider than the container: a
+        // table sizes itself from its columns' minimums, so without a width
+        // here every column settled at `min-w-10` and the grid came out
+        // 40px a day (measured: a 306px docked panel for M3's 360).
+        month: "flex w-84 max-w-full flex-col",
+        // M3's month row (`MonthYearHeight`, 56dp): the month and year at
+        // the start in `LabelLarge`, the arrows at the end. M3's label is
+        // a menu button opening a year grid; this one is text — a library
+        // choice, with `min`/`max` bounding the arrows instead.
+        month_caption: "flex h-14 items-center ps-3",
+        caption_label: "font-medium text-prose text-muted-foreground",
+        nav: "absolute top-0 right-3 flex h-14 items-center",
+        button_previous: NAV_BUTTON,
+        button_next: NAV_BUTTON,
         month_grid: "w-full border-collapse",
         weekdays: "flex",
-        weekday: "w-8 font-normal text-caption text-subtle-foreground",
-        week: "mt-1 flex w-full",
+        // M3's rows are 48dp (`RecommendedSizeForAccessibility`) and seven
+        // 48dp columns fill the modal's 336dp between its 12dp paddings.
+        // A column may shrink to the 40dp date it holds (`basis-12
+        // min-w-10`) so the grid still fits a 360px modal inset from a
+        // 375px phone's edges. Weekdays and dates are `BodyLarge` (16/24),
+        // `OnSurface`.
+        weekday:
+          "flex h-12 min-w-10 basis-12 items-center justify-center font-normal text-title-sm text-foreground",
+        week: "flex",
         // Selection state lives on the CELL, not on the button inside it.
         // Read off the real DOM, not guessed: react-day-picker puts
         // `aria-selected` and `data-selected` on the `<td>` and leaves the
@@ -112,54 +137,57 @@ export function Calendar({
         // Neither `tsc` nor the classNames-key test could see it: the keys
         // were all real, and the class strings were valid CSS for a DOM
         // shape that does not exist. Found by rendering it.
-        day: "relative size-8 p-0 text-center",
+        day: "relative h-12 min-w-10 basis-12 p-0 text-center",
+        // M3's date: a 40dp circle (`DateContainerWidth`/`Height`,
+        // `CornerFull`), its state layer the same circle. The digits stay
+        // mono — a date is an emitted fact here as everywhere else in the
+        // library (the type voices, `theme.css`) — at M3's 16px.
+        // `relative` so it paints above the cell's range band.
         day_button: cn(
-          "inline-flex size-8 items-center justify-center rounded-sm font-mono text-caption tabular-nums",
+          "relative mx-auto flex size-10 items-center justify-center rounded-full font-mono text-title-sm tabular-nums",
           "text-foreground transition-colors hover:bg-surface-3",
           "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
         ),
         // Fills the button from the cell's own state, which is where the
-        // state actually is. Covers single mode outright and both ends of
-        // a range; `range_middle` below overrides it for the interior.
+        // state actually is: `DateSelectedContainerColor` `Primary`,
+        // `DateSelectedLabelTextColor` `OnPrimary`. Covers single mode
+        // outright and both ends of a range; `range_middle` below
+        // overrides it for the interior.
         selected:
           "[&>button]:bg-primary [&>button]:text-primary-content [&>button]:hover:bg-primary",
-        // "Today" is a calendar fact, not a system status — it does not
-        // belong in the status-hue vocabulary (`status-tokens.ts`), the
-        // same category error `radio-group.tsx` documents for selection.
-        // It also would not have worked: `day_button` already sets its own
-        // `text-foreground`, which — because inherited colour only applies
-        // when the element carries no explicit declaration of its own —
-        // always wins over a colour set here on the cell. Rendered and
-        // measured (`getComputedStyle`) to be sure rather than reasoned
-        // about: the digit painted `--foreground`, never
-        // `--state-uncertain-fg`, in either theme. So today was already
-        // achromatic in practice; only the (dead) class name was wrong.
-        // Marked instead with the same achromatic border every other
-        // unselected-but-present control state in this library uses
-        // (`border-edge-strong`: `checkbox.tsx`, `switch.tsx`,
-        // `radio-group.tsx`, `chip-select.tsx`) plus the weight this class
-        // already carried — shape and weight, never hue.
-        today: "font-semibold [&>button]:border [&>button]:border-edge-strong",
+        // M3's today: a 1dp `Primary` ring and a `Primary` label
+        // (`DateTodayContainerOutline*`, `DateTodayLabelTextColor`). Not a
+        // status hue — "today" is a calendar fact, and `Primary` here is
+        // the palette's one achromatic accent — so it stays inside the
+        // colour rule (`radio-group.tsx` documents the same category error
+        // for selection). The label colour skips a selected today, where
+        // `Primary` on the `Primary` fill would erase the digit; the ring
+        // stays and is simply invisible against the fill, as in M3.
+        today:
+          "[&>button]:border [&>button]:border-primary [&:not([data-selected])>button]:text-primary",
         outside: "text-subtle-foreground opacity-50",
-        disabled: "pointer-events-none opacity-30",
+        // M3 dims a disabled day by `DisabledAlpha` (`DatePicker.kt`'s
+        // default colours); 38%, the opacity its icon buttons name.
+        disabled: "pointer-events-none opacity-38",
         hidden: "invisible",
-        // The interior of a range: tint the CELL so consecutive days meet
-        // with no gap, and knock the button's own fill back out.
+        // The interior of a range: the band (`RANGE_BAND`) on the cell,
+        // and the button's own fill knocked back out, its label
+        // `OnSecondaryContainer` — the foreground. The `!` is load-bearing:
+        // a middle day also carries `selected` above, and both rules are
+        // arbitrary variants of equal specificity, so without it the
+        // winner is whichever class Tailwind emits last.
         //
-        // Two things here were wrong on the first attempt and are worth
-        // keeping written down. The tint was `bg-state-neutral-bg`, which
-        // is a real token that resolves to `transparent` — `neutral` is
-        // the quiet hue and deliberately has no fill — so the interior
-        // rendered as nothing at all. It is a wash of the selection
-        // colour instead, which is also what it means. And the `!` is
-        // load-bearing: a middle day also carries `selected` above, and
-        // both rules are arbitrary variants of equal specificity, so
-        // without it the winner is whichever class Tailwind emits last.
-        range_middle:
-          "bg-primary/15 [&>button]:bg-transparent! [&>button]:text-foreground! [&>button]:hover:bg-surface-3!",
-        range_start: "rounded-l-sm",
-        range_end: "rounded-r-sm",
-        week_number: "w-8 font-mono text-caption text-subtle-foreground",
+        // The band was once `bg-state-neutral-bg`, a real token that
+        // resolves to `transparent` (`neutral` is the quiet hue and
+        // deliberately has no fill), and the interior rendered as nothing.
+        range_middle: cn(
+          RANGE_BAND,
+          "[&>button]:bg-transparent! [&>button]:text-foreground! [&>button]:hover:bg-surface-3!",
+        ),
+        range_start: cn(RANGE_BAND, "[--band-start:50%]"),
+        range_end: cn(RANGE_BAND, "[--band-end:50%]"),
+        week_number:
+          "flex h-12 min-w-10 basis-12 items-center justify-center font-mono text-caption text-subtle-foreground",
         footer: "pt-2 text-caption text-muted-foreground",
         ...classNames,
       }}
@@ -168,11 +196,13 @@ export function Calendar({
         // `orientation`; swapping in two real icons reads better than a
         // CSS rotation and keeps the stroke weight matching every other
         // icon in the system.
-        Chevron: ({ orientation, ...iconProps }) =>
+        // `disabled` is react-day-picker's hint to the icon, not an SVG
+        // attribute; the button carries the state.
+        Chevron: ({ orientation, disabled: _disabled, ...iconProps }) =>
           orientation === "left" ? (
-            <ChevronLeft size={16} strokeWidth={1.5} {...iconProps} />
+            <ChevronLeft size={24} strokeWidth={1.5} {...iconProps} />
           ) : (
-            <ChevronRight size={16} strokeWidth={1.5} {...iconProps} />
+            <ChevronRight size={24} strokeWidth={1.5} {...iconProps} />
           ),
       }}
       {...props}

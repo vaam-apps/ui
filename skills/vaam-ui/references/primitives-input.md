@@ -583,40 +583,111 @@ You need these only when talking to something that works in date objects
 (a chart axis, a bare `Calendar`). Application code should hold the ISO
 string and pass it straight to the API.
 
-### DatePicker and DateRangePicker
+### DatePicker and DateRangePicker, and their parts
+
+`DatePicker`, `DateRangePicker`, `DatePickerTrigger`, `DatePickerValue`,
+`DatePickerClear`, `DatePickerContent`, `DatePickerDropdown`,
+`DatePickerModal`, `DatePickerTitle`, `DatePickerCancel`,
+`DatePickerConfirm`, `DatePickerClose`.
+
+A **compound component**, shaped like `Select`: the root (`DatePicker` for
+one date, `DateRangePicker` for a range) owns the value, and every visible
+piece is a part nested inside it. The same parts serve both roots.
 
 ```ts
 interface DatePickerProps {
   value: IsoDate | undefined;
   onValueChange: (value: IsoDate | undefined) => void;
-  placeholder?: string;              // default "Pick a date"
   min?: IsoDate | undefined;         // earliest selectable, inclusive
   max?: IsoDate | undefined;         // latest selectable, inclusive
   disabled?: boolean | undefined;
-  clearable?: boolean;               // default true
   "aria-describedby"?: string | undefined;
   "aria-invalid"?: boolean | undefined;
-  className?: string | undefined;
+  children: ReactNode;
 }
 ```
 
-`DateRangePickerProps` is the same with `value: IsoDateRange | undefined`,
-a default placeholder of "Pick a date range", and `numberOfMonths`
-(default `2`, so "last 30 days" is selectable without navigating).
+`DateRangePickerProps` is the same with `value: IsoDateRange | undefined`.
+A half-finished range (`from` set, `to` open) is a value, not a validation
+error. `aria-describedby` and `aria-invalid` are what `FormField` hands
+its child; the root passes both on to the trigger.
 
-`min` / `max` clamp navigation as well as selection — the chevrons stop
+**A pick is staged, then confirmed, at every width.** Tapping a day only
+moves the pick. A range follows M3's rule: the first tap sets the start, a
+tap on or after the start sets the end, and a tap before the start or on a
+whole range starts a new range. `onValueChange` fires once, when the operator presses OK
+(Save for a range). Cancel, Escape, a press outside the picker and the
+full-screen picker's close icon all throw the pick away. OK is disabled
+until there is a date to commit; a range needs only its start, and
+committing a start alone gives an open-ended range (`{ from, to:
+undefined }`). Focus goes
+back to the trigger on close.
+
+#### The parts
+
+- **`DatePickerTrigger`** is the field-looking button. It takes `id` (the
+  `htmlFor` of a `FormField`), `className`, `children` and `aria-label`.
+  It is named by its label: a `FormField` label, or `aria-label` for a
+  picker used outside one. The date it shows is added to its description,
+  so a screen reader hears "Send on, button, 2026-09-11". With no label at
+  all, it is named by its own text.
+- **`DatePickerValue`** is the shown value: `YYYY-MM-DD`, or
+  `from → to` for a range, in mono. While the value is empty it shows its
+  `placeholder`.
+- **`DatePickerClear`** empties the value at once, without opening the
+  picker and without OK. Write it inside the trigger. It renders beside
+  the button, over the field's right end, and only while there is a value
+  and the picker is enabled. Its `aria-label` defaults to "Clear the
+  date", or "Clear the dates" for a range. Leave it out for a date that
+  must always be set.
+- **A container, pick one.** Each takes `className` and, as `children`,
+  any chrome parts you want to relabel.
+  - **`DatePickerContent`** (the default) is M3's docked picker from
+    640px up: a 360px panel under the trigger. Below 640px a single date
+    opens M3's modal date picker: 360px wide (the window less 32px on a
+    narrower phone) and centred over a scrim,
+    with 28px corners and a 120px header that shows the pick as its
+    headline. A range below 640px opens M3's full-screen range picker. It
+    has a bar with a close icon and Save, a 128px header, and one pinned
+    weekday row over the months, stacked vertically to scroll through:
+    12 months either side of the range's start (or today), narrowed by
+    `min`/`max`. The presentation is chosen by CSS media query, so it
+    server-renders correctly.
+  - **`DatePickerDropdown`** is docked at every width, phones included.
+    It's the opt-out for a picker inline in a dense row.
+  - **`DatePickerModal`** is the modal at every width, centred over a
+    scrim on a wide window (a range shows two months there). Below 640px
+    it is the same modal or full-screen picker as `DatePickerContent`.
+- **The chrome** is public parts with defaults, so you rarely write them.
+  Write one inside the container to relabel it:
+  - `DatePickerTitle` defaults to "Select date" or "Select dates". It
+    always names the picker. It is *shown* only where there is a header:
+    a single date's modal, and the full-screen range picker below 640px.
+    The docked picker, and a range's `DatePickerModal` from 640px up (two
+    months, no header), show no title.
+  - `DatePickerCancel` defaults to "Cancel".
+  - `DatePickerConfirm` defaults to "OK", or "Save" for a range.
+  - `DatePickerClose` is the full-screen range picker's close icon, at the
+    start of its bar; it throws the pick away, as Cancel does elsewhere.
+    Named "Close" by default: give it an `aria-label` to rename it, or
+    `children` to replace the icon with text. Only the full-screen picker
+    has a bar, so anywhere else a written one is not shown.
+
+A docked range shows two months side by side from 768px up, and stacked
+between 640px and 768px.
+
+All three containers render **inline, not portalled**, so they work
+inside a `Drawer`. Escape inside a drawer closes the picker, not the
+drawer. The docked panel is `position: fixed`, placed under its trigger
+by Floating UI exactly as `SelectDropdown` is, with the same caveat: a
+container that clips *and* has a `transform`, `filter`,
+`backdrop-filter`, `contain` or `will-change: transform` still clips it.
+While any picker is open the rest of the page is inert and does not
+scroll.
+
+`min` / `max` clamp navigation as well as selection. The arrows stop,
 rather than letting the operator wander into a month with nothing
-selectable. `clearable` adds an inline clear control once a date is
-picked; it sits outside the trigger button, because a button nested in a
-button is invalid HTML that browsers resolve by hoisting the inner one
-out, silently detaching its handler.
-
-`placeholder` doubles as the accessible name: it is rendered into the
-trigger as visually hidden text, so a picker outside a `FormField` is
-still named. The single picker closes on pick; the range picker stays
-open, because the first click is only half the answer, and a half-finished
-range (`from` set, `to` open) is representable rather than a validation
-error.
+selectable. Every day outside the bounds is disabled.
 
 The trigger is a button, not an editable field — the value comes from the
 calendar, and a text input that looks editable but is not is worse than a
@@ -625,7 +696,8 @@ button that looks like a field. If you want typed entry, use a plain
 
 ```tsx
 import {
-  DatePicker, DateRangePicker, FormField, type IsoDate, type IsoDateRange,
+  DatePicker, DatePickerClear, DatePickerContent, DatePickerTrigger,
+  DatePickerValue, DateRangePicker, FormField, type IsoDate, type IsoDateRange,
 } from "@vaam-apps/ui";
 
 const [settledOn, setSettledOn] = useState<IsoDate | undefined>();
@@ -635,26 +707,66 @@ const [attemptWindow, setAttemptWindow] = useState<IsoDateRange | undefined>({
 });
 
 <FormField label="Settlement date" htmlFor="settled-on">
-  <DatePicker
-    value={settledOn}
-    onValueChange={setSettledOn}
-    min="2026-09-01"
-    max="2026-09-30"
-    placeholder="A day in September"
-  />
+  <DatePicker value={settledOn} onValueChange={setSettledOn} min="2026-09-01" max="2026-09-30">
+    <DatePickerTrigger id="settled-on">
+      <DatePickerValue placeholder="A day in September" />
+      <DatePickerClear />
+    </DatePickerTrigger>
+    <DatePickerContent />
+  </DatePicker>
 </FormField>
 
-<DateRangePicker
-  value={attemptWindow}
-  onValueChange={setAttemptWindow}
-  placeholder="Attempt window"
-/>
+<DateRangePicker value={attemptWindow} onValueChange={setAttemptWindow}>
+  <DatePickerTrigger aria-label="Attempt window">
+    <DatePickerValue placeholder="Any time" />
+    <DatePickerClear />
+  </DatePickerTrigger>
+  <DatePickerContent />
+</DateRangePicker>
 ```
+
+#### Migrating from the single-component picker (0.2.x)
+
+The old `<DatePicker value onValueChange placeholder />` rendered
+everything itself. It is gone; there is no compatibility shim.
+
+- **Nest the parts.** At minimum a `DatePickerTrigger` holding a
+  `DatePickerValue`, and a `DatePickerContent`.
+- **`placeholder`** moves to `<DatePickerValue placeholder>`. It no longer
+  names the trigger: the old picker repeated it in visually hidden text,
+  and an empty trigger was announced twice ("Created between Created
+  between"). Outside a `FormField`, give the trigger an `aria-label`.
+- **`clearable`** (default `true`) is replaced by writing
+  `<DatePickerClear />` in the trigger. **The default flipped:** a picker
+  with no `DatePickerClear` has no clear button. Add one wherever the old
+  picker left `clearable` at its default.
+- **The clear button's name changed.** It was `Clear ${placeholder}`
+  ("Clear Created between"); it is now "Clear the date" / "Clear the
+  dates", or its own `aria-label`. Tests that query it by name need the new
+  one.
+- **`className`** moves to `DatePickerTrigger`, or to the container for
+  the picker's own panel.
+- **`numberOfMonths`** on `DateRangePicker` is gone: two months docked,
+  stacked in the full-screen picker.
+- **A tap on a whole range starts a new one.** The old picker used
+  react-day-picker's rule, which extended the range from its start, so a
+  new start needed Clear first. Its first tap was also a one-day range
+  (`from` = `to`); it is now a start with an open end until the second tap.
+- **`onValueChange` fires on OK or Save only.** The old single picker
+  committed and closed on the first click, and the old range picker
+  committed each click while it stayed open. Code that filtered live as
+  the operator clicked now filters once, on confirm.
+- **Inside a `Drawer` it now works.** The old calendar was portalled out
+  of the drawer, where no day could be clicked.
 
 ### Calendar
 
-The bare month grid, for a different shell than the popover — a filter
-panel, a sidebar, anything that wants the calendar always visible. It is
+The bare month grid, for a different shell than the pickers — a filter
+panel, a sidebar, anything that wants the calendar always visible. It
+has M3's date picker geometry: 40px round days in 48px cells, a 56px
+month row with the arrows at its end, the range as a band running between
+two filled ends, and today as a ring. Unlike the pickers, it shows the
+neighbouring months' days by default (`showOutsideDays`). It is
 `react-day-picker` with every element's class supplied from this system's
 tokens; its own stylesheet is deliberately **not** imported, so there is
 no second theme in the page to drift from `theme.css`. `CalendarProps` is

@@ -102,17 +102,19 @@ describe("Calendar renders its selection styling onto real elements", () => {
     }
   });
 
-  it("rounds the outer corners of the range, and only those", () => {
-    expect(cellClassOf(markup, 3)).toContain("rounded-l-sm");
-    expect(cellClassOf(markup, 14)).toContain("rounded-r-sm");
-    expect(cellClassOf(markup, 8)).not.toContain("rounded-l-sm");
-    expect(cellClassOf(markup, 8)).not.toContain("rounded-r-sm");
+  it("starts the band at the centre of each end, and only there", () => {
+    // Each end draws the half of the band toward the interior, so the band
+    // runs into the end's filled circle rather than past it.
+    expect(cellClassOf(markup, 3)).toContain("[--band-start:50%]");
+    expect(cellClassOf(markup, 14)).toContain("[--band-end:50%]");
+    expect(cellClassOf(markup, 8)).not.toContain("[--band-start:50%]");
+    expect(cellClassOf(markup, 8)).not.toContain("[--band-end:50%]");
   });
 
   it("tints the interior cell and clears the button inside it", () => {
     const middle = cellClassOf(markup, 8);
-    // The tint is on the CELL so consecutive days meet with no gap...
-    expect(middle).toContain("bg-primary/15");
+    // The band is on the CELL so consecutive days meet with no gap...
+    expect(middle).toContain("before:bg-primary/15");
     // ...and the button's own fill is knocked out, importantly, because
     // an interior day also carries `selected`.
     expect(middle).toContain("[&>button]:bg-transparent!");
@@ -136,7 +138,9 @@ describe("Calendar renders its selection styling onto real elements", () => {
 });
 
 /**
- * `today` used to be `font-semibold text-state-uncertain-fg` — a status
+ * `today` is M3's 1dp ring and label in `Primary`, the palette's one
+ * achromatic accent — a calendar fact marked by shape, never by a status
+ * hue. It once was `font-semibold text-state-uncertain-fg` — a status
  * hue on a calendar fact. `day_button` (the element the digit actually
  * renders in) sets its own `text-foreground`, and an inherited colour
  * only ever applies where the element carries no explicit declaration of
@@ -150,19 +154,18 @@ describe("Calendar renders its selection styling onto real elements", () => {
  * the real clock: react-day-picker accepts it as a prop precisely so a
  * caller (here, a test) is not hostage to what day it happens to be run.
  */
-describe("Calendar marks 'today' with shape and weight, never a status hue", () => {
+describe("Calendar marks 'today' with a ring, never a status hue", () => {
   const STATUS_HUE = /state-(neutral|progress|success|warning|danger|uncertain|expired|parked)-/;
 
-  it("gives the today cell an achromatic border and no status-hue class", () => {
+  it("gives the today cell a primary ring and no status-hue class", () => {
     const markup = renderToStaticMarkup(
       <Calendar mode="single" today={new Date(2026, 8, 8)} defaultMonth={from} />,
     );
     const todayClass = cellClassOf(markup, 8);
-    expect(todayClass).toContain("font-semibold");
-    expect(todayClass).toContain("[&>button]:border-edge-strong");
+    expect(todayClass).toContain("[&>button]:border-primary");
     expect(todayClass).not.toMatch(STATUS_HUE);
     // A day that is not today gets none of it.
-    expect(cellClassOf(markup, 9)).not.toContain("border-edge-strong");
+    expect(cellClassOf(markup, 9)).not.toContain("border-primary");
   });
 
   it("keeps the border when today is also selected", () => {
@@ -170,7 +173,7 @@ describe("Calendar marks 'today' with shape and weight, never a status hue", () 
       <Calendar mode="single" today={from} selected={from} defaultMonth={from} />,
     );
     const cellClass = cellClassOf(markup, 3);
-    expect(cellClass).toContain("[&>button]:border-edge-strong");
+    expect(cellClass).toContain("[&>button]:border-primary");
     expect(cellClass).toContain("[&>button]:bg-primary");
     expect(cellClass).toContain("[&>button]:text-primary-content");
     expect(cellClass).not.toMatch(STATUS_HUE);
@@ -187,8 +190,8 @@ describe("Calendar marks 'today' with shape and weight, never a status hue", () 
       />,
     );
     const cellClass = cellClassOf(markup, 8);
-    expect(cellClass).toContain("[&>button]:border-edge-strong");
-    expect(cellClass).toContain("bg-primary/15");
+    expect(cellClass).toContain("[&>button]:border-primary");
+    expect(cellClass).toContain("before:bg-primary/15");
     expect(cellClass).not.toMatch(STATUS_HUE);
   });
 });

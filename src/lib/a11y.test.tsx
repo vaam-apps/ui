@@ -2,7 +2,7 @@
 import axe from "axe-core";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DetailList, DetailRow } from "../components/data/detail-row";
 import { IdDisplay } from "../components/data/id-display";
 import { InstrumentPanel } from "../components/data/instrument-panel";
@@ -17,6 +17,14 @@ import { Button } from "../components/primitives/button";
 import { Card, CardBody, CardHeader } from "../components/primitives/card";
 import { CheckboxField } from "../components/primitives/checkbox";
 import { ChipSelect } from "../components/primitives/chip-select";
+import {
+  DatePicker,
+  DatePickerClear,
+  DatePickerContent,
+  DatePickerTrigger,
+  DatePickerValue,
+  DateRangePicker,
+} from "../components/primitives/date-picker";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -421,6 +429,85 @@ describe("the audit itself is wired up", () => {
   it("reports an unlabelled control", async () => {
     const violations = await audit(<button type="button" />);
     expect(violations.map((v) => v.id)).toContain("button-name");
+  });
+});
+
+/**
+ * The date pickers, closed and **open**. The open picker is where its
+ * semantics live — a `dialog` named by its title, a grid of labelled days,
+ * Cancel and OK — and none of it exists until the trigger is pressed, so a
+ * closed-only fixture would audit a button and nothing else. Both trees of
+ * the range picker are in the document when open (one hidden by CSS), and
+ * jsdom has no CSS, so the audit sees both: a duplicated id or an
+ * unnamed control in either fails here.
+ */
+describe("DatePicker and DateRangePicker, closed and open", () => {
+  // Floating UI's `autoUpdate` observes the trigger with a `ResizeObserver`
+  // jsdom does not have; nothing here depends on a size.
+  const REAL_RO = globalThis.ResizeObserver;
+  beforeAll(() => {
+    globalThis.ResizeObserver ??= class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
+  });
+  afterAll(() => {
+    globalThis.ResizeObserver = REAL_RO;
+  });
+
+  const PICKERS: [string, React.ReactElement][] = [
+    [
+      "DatePicker in a FormField, with a hint and an error",
+      <FormField
+        key="single"
+        label="Send on"
+        htmlFor="a11y-send-on"
+        hint="The day it goes out."
+        error="Pick a weekday."
+      >
+        <DatePicker value="2026-09-11" onValueChange={() => undefined}>
+          <DatePickerTrigger id="a11y-send-on">
+            <DatePickerValue placeholder="Pick a date" />
+            <DatePickerClear />
+          </DatePickerTrigger>
+          <DatePickerContent />
+        </DatePicker>
+      </FormField>,
+    ],
+    [
+      "DateRangePicker named by aria-label",
+      <DateRangePicker
+        key="range"
+        value={{ from: "2026-09-03", to: "2026-09-14" }}
+        onValueChange={() => undefined}
+      >
+        <DatePickerTrigger aria-label="Created between">
+          <DatePickerValue placeholder="Any time" />
+          <DatePickerClear />
+        </DatePickerTrigger>
+        <DatePickerContent />
+      </DateRangePicker>,
+    ],
+  ];
+
+  it.each(PICKERS)("%s, closed", async (_name, element) => {
+    const violations = await audit(element);
+    expect(violations, `\n${describeViolations(violations)}\n`).toHaveLength(0);
+  });
+
+  it.each(PICKERS)("%s, open", async (_name, element) => {
+    const violations = await mount(element, async (host) => {
+      const trigger = host.querySelector<HTMLButtonElement>('button[aria-haspopup="dialog"]');
+      if (trigger === null) throw new Error("no trigger rendered");
+      await act(async () => {
+        trigger.click();
+      });
+      expect(host.querySelector('[role="dialog"]'), "the picker did not open").not.toBeNull();
+      expect(host.querySelectorAll('[role="grid"]').length).toBeGreaterThan(0);
+      return (await axe.run(host, AXE_OPTIONS)).violations;
+    });
+    expect(violations, `\n${describeViolations(violations)}\n`).toHaveLength(0);
   });
 });
 

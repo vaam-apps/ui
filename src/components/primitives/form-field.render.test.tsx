@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { DatePicker } from "./date-picker";
+import { DatePicker, DatePickerContent, DatePickerTrigger, DatePickerValue } from "./date-picker";
 import { FormField } from "./form-field";
 import { Input } from "./input";
 import {
@@ -47,7 +47,16 @@ describe("FormField wires the control to its hint and error", () => {
   it.each([
     ["Input", "i", <Input id="i" key="i" />],
     ["Textarea", "t", <Textarea id="t" key="t" />],
-    ["DatePicker", "d", <DatePicker key="d" value={undefined} onValueChange={() => undefined} />],
+    [
+      "DatePicker",
+      "d",
+      <DatePicker key="d" value={undefined} onValueChange={() => undefined}>
+        <DatePickerTrigger id="d">
+          <DatePickerValue placeholder="Pick a date" />
+        </DatePickerTrigger>
+        <DatePickerContent />
+      </DatePicker>,
+    ],
   ])("%s carries aria-describedby and aria-invalid", (_name, id, control) => {
     const html = wrap(id, control);
     expect(html).toContain(`aria-describedby="${id}-hint ${id}-error"`);

@@ -44,8 +44,18 @@ const DROPDOWN_MIN_HEIGHT = 200;
  *
  * `enabled: false` returns no placement at all, for a popup its own
  * classes place at every width — a `Select`'s `SelectModal`.
+ *
+ * `minHeight` is that floor: `DROPDOWN_MIN_HEIGHT` by default, for a list
+ * that scrolls; `"content"` for a popup that should never scroll while the
+ * other side has room for all of it — a docked date picker, whose month
+ * shrunk to 200px was a calendar to scroll through. The floor is then its
+ * own full height (`scrollHeight`, which `max-height` does not cut).
  */
-export function useDropdownPlacement(enabled: boolean, triggerRef: RefObject<HTMLElement | null>) {
+export function useDropdownPlacement(
+  enabled: boolean,
+  triggerRef: RefObject<HTMLElement | null>,
+  minHeight: number | "content" = DROPDOWN_MIN_HEIGHT,
+) {
   const { refs, x, y, middlewareData } = useFloating({
     strategy: "fixed",
     placement: "bottom-start",
@@ -61,7 +71,8 @@ export function useDropdownPlacement(enabled: boolean, triggerRef: RefObject<HTM
       size({
         padding: 8,
         apply({ availableHeight, elements }) {
-          const floor = Math.max(DROPDOWN_MIN_HEIGHT, Math.floor(availableHeight));
+          const least = minHeight === "content" ? elements.floating.scrollHeight : minHeight;
+          const floor = Math.max(least, Math.floor(availableHeight));
           elements.floating.style.setProperty("--select-float-max-h", `${floor}px`);
         },
       }),

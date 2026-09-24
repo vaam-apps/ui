@@ -1,7 +1,9 @@
 /**
  * The pointer-downs that landed outside a `Select`'s open options — the
  * ones whose job was to close *that listbox* — so a surrounding drawer can
- * tell them apart from a tap meant for the drawer itself.
+ * tell them apart from a tap meant for the drawer itself. An open
+ * `DatePicker` notes its own the same way (`useDismissal` in
+ * `date-picker.tsx`): the same drawer, the same question.
  *
  * Why an event registry rather than "is a select open right now": Radix's
  * dismissable layer (under vaul) does not judge a pointer-down outside the
@@ -15,13 +17,14 @@
  * pointer-down travels with Radix's event (`detail.originalEvent`), so
  * remembering *that event* answers the question at the time it mattered.
  *
- * Not exported from the package: it is the handshake between
- * `select.tsx` and `drawer.tsx`, nothing a consumer calls.
+ * Not exported from the package: it is the handshake between the popups
+ * (`select.tsx`, `date-picker.tsx`) and `drawer.tsx`, nothing a consumer
+ * calls. The names still say "select"; both popups depend on them.
  */
 const underOpenSelect = new WeakSet<Event>();
 
 /** Called by `SelectContent` for every pointer-down outside its open
- * options. */
+ * options, and by an open date picker for every one outside it. */
 export function notePointerDownUnderOpenSelect(event: Event): void {
   underOpenSelect.add(event);
 }

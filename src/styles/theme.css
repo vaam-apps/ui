@@ -546,7 +546,7 @@
  * reveal toggle, `DialogClose`, the drawer and toast dismiss buttons,
  * `DatePicker`'s inline Clear button, and `Calendar`'s prev/next nav.
  * None of these read `--size-field` or `.btn-sm` (D10's own two hooks) —
- * each is either a fixed-utility box (`size-4`, `h-5 w-9`, `size-7`) or a
+ * each is either a fixed-utility box (`size-4`, `h-5 w-9`, `size-10`) or a
  * padding-grown one (`-m-1 p-1` around a 12–16px icon) with no
  * `--density` term at all, so every one of them measured identically at
  * both densities before this rule (`e2e/density.spec.ts`'s assertions
@@ -640,7 +640,7 @@
  *
  * `.tap-target-anchored` — for a control that is **absolutely positioned
  * against its container's edge** (`DialogClose`, `DatePicker`'s Clear
- * button, `Calendar`'s prev/next nav). Margin cannot reserve anything
+ * button). Margin cannot reserve anything
  * here: on an absolutely positioned box with an `inset` set, margin
  * *moves* the box, so the reserve half of the pair would drag the glyph
  * off its anchor. So this variant covers without reserving, and the
@@ -672,7 +672,7 @@
  *
  * `--tap-w`/`--tap-h` name the control's own resting **border** box, in
  * px, so one rule computes the right reservation for a 16px checkbox, a
- * 36×20 switch track, a 12–16px icon-in-padding circle or a 28px calendar
+ * 36×20 switch track, a 12–16px icon-in-padding circle or a 40px calendar
  * nav button without each writing its own arithmetic. `--tap-size` is the
  * square shorthand for a control whose two axes agree (every caller here
  * except `Switch`). `max(0px, …)` is the guard: a control already at or
