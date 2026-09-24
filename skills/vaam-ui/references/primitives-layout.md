@@ -339,7 +339,15 @@ What this means for your app:
 - **Without an `accountSlot` nothing changes.** The phone bar's overflow
   stays a dropdown menu of links named "More destinations", and the
   vertical rail gains no control. A `role="menu"` may only hold menu
-  items, which is why the account block needs a sheet at all.
+  items, which is why the account block needs a sheet at all. `false`,
+  `true` and `""` count as no `accountSlot`, so
+  `accountSlot={signedIn && <Account />}` is safe.
+- **Confirm with `InlineConfirm`, never a `Dialog`, inside the account
+  block.** Below 1280px it renders in a modal drawer, so the drawer rule
+  in `primitives-overlay.md` applies: a `ConfirmDialog` behind Sign out
+  opens under the sheet's scrim, where a click or a tap cannot reach it
+  (only the keyboard can). `Select`, `DatePicker` and `RadioGroup` work
+  in the sheet.
 - **The control's accessible name** is "More" when it opens the sheet and
   "More destinations" when it opens the menu. An end-to-end test that
   clicks "More destinations" on a page that passes `accountSlot` must
@@ -347,8 +355,17 @@ What this means for your app:
 - **`accountSlot` can be mounted twice at once.** While a sheet is open,
   the sidebar's copy stays in the DOM under `display: none`. Do not put a
   hard-coded `id` in it; use `useId`. The two copies do not share
-  component state, so keep anything that must survive (the theme, the
-  session) in a store, not in `useState` inside the slot.
+  component state, and the sheet's copy mounts when the sheet opens and
+  unmounts when it closes, so `useState` inside the slot starts over on
+  every open. Keep anything that must survive (the theme, the session)
+  in a store.
+- **The hidden copy comes first in the DOM.** Below 1280px, and at every
+  width when `collapsed`, the sidebar's copy is still there under
+  `display: none`, before the sheet's. A test
+  that finds the account block by its text (`cy.contains(email)`,
+  `getByText(email)`) finds the hidden one first, or two with the sheet
+  open. Scope the query to the sheet:
+  `getByRole("dialog", { name: "More" })`.
 - The sheet carries `data-side-nav-sheet="bottom"` or `"side"`, the
   account block's wrapper `data-side-nav-account`, and the control
   `data-side-nav-more` — stable hooks for tests, because like the rails

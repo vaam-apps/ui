@@ -66,7 +66,18 @@ export interface SideNavProps {
    *
    * While a sheet is open this node is mounted twice — the sidebar's copy
    * stays in the DOM under `display: none` — so it must not hardcode an
-   * `id`; derive one with `useId` if it needs one.
+   * `id`; derive one with `useId` if it needs one. The sheet's copy mounts
+   * when the sheet opens and unmounts when it closes, so `useState` inside
+   * the slot starts over on every open.
+   *
+   * The sheet is a vaul (Radix) modal, so the library's drawer rule holds
+   * for everything inside it: confirm with `InlineConfirm`, not a
+   * `Dialog`. Measured in review with a `ConfirmDialog` behind the account
+   * block's Sign out, at 375 and 1100px: it opened *under* the sheet's
+   * scrim — the hit test at its confirm button returned vaul's overlay, and
+   * a click never reached it — and only the keyboard could press it. The
+   * same `ConfirmDialog` from the 1440px sidebar worked. `Select`,
+   * `DatePicker` and `RadioGroup` render inline and work in the sheet.
    *
    * `"off-canvas"` mode is unchanged: the account block sits in the
    * off-canvas tree below `lg` and in the sidebar at `xl`. */
@@ -787,6 +798,14 @@ function NavSheetList({
  * `keepOpenForSelect` has the measurement and the mechanism. Repeated here
  * rather than imported because `drawer.tsx` is re-exported whole from the
  * package root, and this handshake is not public API.
+ *
+ * Redundant today, and kept on purpose. `select-dismissal.ts` also
+ * declines these events for *every* Radix layer from a window listener,
+ * and with this handler removed the sheet's Select test in
+ * `e2e/side-nav-account-sheet.spec.ts` stayed green (measured in review).
+ * But that listener is keyed to Radix's internal event name, which its
+ * own doc says goes quiet if a Radix release renames it; this prop is
+ * Radix's documented API and does not.
  */
 function keepOpenForPopup(event: CustomEvent<{ originalEvent: PointerEvent }>) {
   if (wasPointerDownUnderOpenSelect(event.detail.originalEvent)) event.preventDefault();
@@ -870,9 +889,15 @@ const NAV_SHEET_SURFACE: Record<"bottom" | "side", string> = {
  *   the mechanism, not something this component's tests exercise: what
  *   they exercise is the containing-block half below, with `SideNav`
  *   inside a `will-change: transform` wrapper. A `SideNav` mounted inside
- *   an open *modal* drawer is a different question — its rails are
- *   portalled out of that drawer and sit under its modality, before this
- *   change as after — and is not measured here.
+ *   an open *modal* drawer is a different question, and the answer is
+ *   that "More" cannot be reached there at all, exactly like every other
+ *   control on the rails: they are portalled out of that drawer and sit
+ *   under its modality. Measured in review with the floating `SideNav`
+ *   inside an open `DrawerContent`, at 375 and 1100px: Radix had set
+ *   `pointer-events: none` on `body`, and the hit test at More's centre
+ *   returned the consumer's drawer or its overlay. A consumer who nests
+ *   `SideNav` in a drawer uses `smallScreen="off-canvas"`
+ *   (`SideNavProps.smallScreen`).
  * - **It escapes containing blocks by portal.** `DrawerPrimitive.Portal`
  *   puts the sheet in `document.body`, beside the rails. That is not
  *   optional twice over: a consumer's `transform`/`will-change` ancestor
@@ -883,10 +908,15 @@ const NAV_SHEET_SURFACE: Record<"bottom" | "side", string> = {
  *   be laid out against the 64px toolbar.
  *
  * What that buys, as the library's other sheets do it: focus moves into
- * the sheet on open (`autoFocus`) and is trapped there; Escape and a tap
- * on the scrim close it; focus returns to the "More" control; the page
- * behind is scroll-locked, `aria-hidden` and inert to the pointer; a
- * `Select` inside closes alone (`keepOpenForPopup`). The bottom sheet
+ * the sheet on open (`onOpenAutoFocus`) and is trapped there; Escape and
+ * a tap on the scrim close it; focus returns to the "More" control; the
+ * page behind is scroll-locked, `aria-hidden` and inert to the pointer; a
+ * `Select` inside closes alone (`keepOpenForPopup`). What it costs is the
+ * drawer rule: a Headless UI `Dialog` opened from inside the sheet — a
+ * `ConfirmDialog` behind Sign out — opens under the sheet's scrim, where a
+ * pointer cannot reach it (`SideNavProps.accountSlot` has the
+ * measurement), so an account block confirms with `InlineConfirm`. The
+ * bottom sheet
  * drags from its handle only (`handleOnly`, as `DetailDrawerContent`), so
  * a drag inside the account block — selecting the email — is not a
  * dismissal. vaul's own release thresholds decide a drag, not androidx's
@@ -924,9 +954,6 @@ function NavSheet({
       // detail), so each presentation passes its own.
       direction={presentation === "bottom" ? "bottom" : "left"}
       handleOnly
-      // vaul prevents Radix's open auto-focus unless asked; without this
-      // focus would stay on the toolbar, behind the scrim.
-      autoFocus
     >
       <DrawerPrimitive.Trigger aria-label="More" data-side-nav-more="" className={trigger.target}>
         <span aria-hidden="true" data-toolbar-item="" className={trigger.container}>
@@ -951,6 +978,13 @@ function NavSheet({
           // sheet, it announces "More, dialog" and reads from the top, and
           // the first Tab reaches the first row. Radix's `Content` is
           // already `tabIndex={-1}`, so it can take focus.
+          //
+          // This handler is also why the root needs no `autoFocus`. vaul
+          // cancels Radix's open auto-focus unless that prop is set, but
+          // it calls this first (`onOpenAutoFocus` in
+          // `vaul/dist/index.mjs`), and this focuses the sheet either way;
+          // the prop was here once, and removing it left the keyboard test
+          // in `e2e/side-nav-account-sheet.spec.ts` green.
           onOpenAutoFocus={(event) => {
             event.preventDefault();
             (event.currentTarget as HTMLElement | null)?.focus({ preventScroll: true });

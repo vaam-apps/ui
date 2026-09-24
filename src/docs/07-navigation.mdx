@@ -244,6 +244,12 @@ scrim closes it and focus returns to More. The rows are M3's
 navigation-drawer items — 56px, fully round, the current page in the
 toolbar's own `primary` pill — and real anchors.
 
+Being a drawer is also the one constraint on what the account block may
+do: the drawer rule holds inside it. A `Select`, a `DatePicker` or a
+`RadioGroup` works there, but a `Dialog` opened from it — a
+`ConfirmDialog` behind Sign out — opens under the sheet's scrim, out of
+reach of a click or a tap, so the block confirms with `InlineConfirm`.
+
 **Without an `accountSlot` nothing changes**: the phone bar's overflow is
 the menu above, still named "More destinations", and the vertical rail
 gains no control. For a list of links a menu is what M3's own toolbar
