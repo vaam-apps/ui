@@ -65,6 +65,9 @@ export const STORY = {
   datePickerRangeBoundedPast: "primitives-date-pickers--range-bounded-in-the-past-on-a-phone",
   datePickerRangeRelabelledPhone: "primitives-date-pickers--range-relabelled-on-a-phone",
   sideNavInAShell: "primitives-sidenav--in-a-shell",
+  // `collapsed`: the rail at every width from 640px up, the sidebar never
+  // (`e2e/side-nav-bands.spec.ts`'s landmark count).
+  sideNavCollapsedOnDesktop: "primitives-sidenav--collapsed-on-desktop",
   tableAsAScreenUsesIt: "primitives-table--as-a-screen-uses-it",
   tableDefault: "primitives-table--default",
   tabsManyScrolling: "primitives-tabs--many-tabs-scrolling",

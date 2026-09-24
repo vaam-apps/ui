@@ -184,14 +184,31 @@ for (const width of [375, 900, 1262]) {
  * (700 and 1100: either side of the `lg` line the old in-flow icon rail
  * used to start at) — and 1280, the first sidebar width, where the rails
  * must hand over rather than join it.
+ *
+ * And `collapsed`, which takes the in-flow `<nav>` down a different branch
+ * of its class list (`collapsed ? "hidden" : …`) and keeps the vertical
+ * rail past `xl` — so at 1440 the rail is the landmark and the in-flow
+ * `<nav>` must be the one that is absent. The default-mode cases above
+ * cannot see that branch at all: deleting its `hidden` left all four of
+ * them green while the collapsed story exposed two `Primary` landmarks,
+ * and axe reported `landmark-unique`, at each of 375, 1100 and 1440px.
  */
 const AXE_PATH = createRequire(import.meta.url).resolve("axe-core/axe.min.js");
 
-for (const width of [375, 700, 1100, 1280]) {
-  test(`at ${width}px exactly one Primary landmark is exposed (axe landmark-unique)`, async ({
+const LANDMARK_CASES = [
+  ...[375, 700, 1100, 1280].map((width) => ({ width, story: STORY.sideNavInAShell, prefix: "" })),
+  ...[375, 1100, 1440].map((width) => ({
+    width,
+    story: STORY.sideNavCollapsedOnDesktop,
+    prefix: "collapsed, ",
+  })),
+];
+
+for (const { width, story, prefix } of LANDMARK_CASES) {
+  test(`${prefix}at ${width}px exactly one Primary landmark is exposed (axe landmark-unique)`, async ({
     page,
   }) => {
-    await openStory(page, STORY.sideNavInAShell, { width, height: 760 });
+    await openStory(page, story, { width, height: 760 });
 
     const exposed = await page.evaluate(() =>
       [...document.querySelectorAll<HTMLElement>("nav[aria-label]")]
