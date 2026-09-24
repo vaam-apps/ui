@@ -12,10 +12,11 @@ import {
 } from "./command-menu";
 import {
   Dialog,
+  DialogActions,
   DialogClose,
   DialogContent,
   DialogDescription,
-  DialogFooter,
+  DialogFullScreen,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -41,8 +42,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./dropdown-menu";
+import { FormField } from "./form-field";
 import { InlineConfirm } from "./inline-confirm";
+import { Input } from "./input";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
+import { Textarea } from "./textarea";
 import { Toaster, toast } from "./toast";
 import { Tooltip } from "./tooltip";
 
@@ -94,12 +99,12 @@ export const DialogStory: Story = {
             The current secret moves to `prevSecret` and keeps verifying for 24 hours.
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter>
+        <DialogActions>
           <DialogClose as={Button} variant="ghost" size="sm">
             Cancel
           </DialogClose>
           <Button size="sm">Rotate</Button>
-        </DialogFooter>
+        </DialogActions>
       </DialogContent>
     </Dialog>
   ),
@@ -172,12 +177,12 @@ export const DialogWithLongTitle: Story = {
             cannot be undone once the grace period ends.
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter>
+        <DialogActions>
           <DialogClose as={Button} variant="ghost" size="sm">
             Cancel
           </DialogClose>
           <Button size="sm">Rotate</Button>
-        </DialogFooter>
+        </DialogActions>
       </DialogContent>
     </Dialog>
   ),
@@ -187,12 +192,12 @@ export const DialogWithLongTitle: Story = {
  * WP5 stories brief: a body taller than the viewport.
  *
  * This story originally documented an unfixed finding — `DialogPanel` had
- * no `max-h`/`overflow-y`, so a body this tall pushed `DialogFooter` off
+ * no `max-h`/`overflow-y`, so a body this tall pushed `DialogActions` off
  * the bottom with no scrollbar anywhere, making the footer (and its only
  * close button) genuinely unreachable. `dialog.tsx` has since been fixed
  * (see `DialogContent`'s own module doc there for the mechanism: a bounded
  * `max-h-[85vh]` panel, an internal `overflow-y-auto` wrapper around
- * `children`, and `DialogHeader`/`DialogFooter` made `sticky` so they stay
+ * `children`, and `DialogHeader`/`DialogActions` made `sticky` so they stay
  * pinned to the visible panel while the body between them scrolls) and
  * re-verified live in Storybook. This story now asserts that positively:
  * with 30 rows of body content, the header and footer stay in place and
@@ -215,14 +220,144 @@ export const DialogWithScrollingBody: Story = {
             </p>
           ))}
         </div>
-        <DialogFooter>
+        <DialogActions>
           <DialogClose as={Button} variant="ghost" size="sm">
             Close
           </DialogClose>
-        </DialogFooter>
+        </DialogActions>
       </DialogContent>
     </Dialog>
   ),
+};
+
+/**
+ * A form a phone should give the whole screen: the parts of any dialog,
+ * inside `DialogFullScreen` instead of `DialogContent`.
+ *
+ * Below 640px this is M3's full-screen dialog — a 64dp top bar leading
+ * with the close icon and carrying "Create" trailing, the "Cancel" among
+ * the actions hidden because the close icon is that action. From 640px up
+ * it is the same basic dialog as every other. The actions are written
+ * once, at the end, in tab order after the fields; only their position
+ * moves. "Create" submits the form through `form="…"`, wherever it sits.
+ */
+function EndpointFormDialog() {
+  const [open, setOpen] = useState(false);
+  const [created, setCreated] = useState<string>();
+  return (
+    <div className="flex flex-col items-start gap-3 p-4">
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger as={Button}>New endpoint</DialogTrigger>
+        <DialogFullScreen>
+          <DialogHeader>
+            <DialogTitle>New webhook endpoint</DialogTitle>
+            <DialogDescription>
+              A signing secret is generated automatically and shown once creation completes.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            id="sb-endpoint-form"
+            className="flex flex-col gap-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const data = new FormData(event.currentTarget);
+              setCreated(String(data.get("url") ?? ""));
+              setOpen(false);
+            }}
+          >
+            <FormField label="Endpoint URL" htmlFor="sb-endpoint-url">
+              <Input
+                id="sb-endpoint-url"
+                name="url"
+                defaultValue="https://hooks.example.com/vaam"
+              />
+            </FormField>
+            <FormField label="Retry policy" htmlFor="sb-endpoint-retry">
+              <Select defaultValue="exponential">
+                <SelectTrigger id="sb-endpoint-retry">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Never retry</SelectItem>
+                  <SelectItem value="linear">Every 5 minutes, 6 times</SelectItem>
+                  <SelectItem value="exponential">Exponential backoff, up to 24 hours</SelectItem>
+                </SelectContent>
+              </Select>
+            </FormField>
+            <FormField
+              label="Note for the team"
+              htmlFor="sb-endpoint-note"
+              hint="Shown beside the endpoint in the list."
+            >
+              <Textarea id="sb-endpoint-note" name="note" rows={4} />
+            </FormField>
+          </form>
+          <DialogActions>
+            <DialogClose as={Button} variant="ghost" size="sm">
+              Cancel
+            </DialogClose>
+            <Button type="submit" form="sb-endpoint-form" size="sm">
+              Create
+            </Button>
+          </DialogActions>
+        </DialogFullScreen>
+      </Dialog>
+      <p className="font-mono text-caption text-subtle-foreground">created: {created ?? "—"}</p>
+    </div>
+  );
+}
+
+const openEndpointDialog: Story["play"] = async ({ canvasElement }) => {
+  await userEvent.click(within(canvasElement).getByRole("button", { name: "New endpoint" }));
+  await expect(await body().findByRole("heading", { name: "New webhook endpoint" })).toBeVisible();
+};
+
+/** `DialogFullScreen` below 640px: M3's full-screen dialog. */
+export const FullScreenDialogOnAPhone: Story = {
+  globals: { viewport: { value: "phone" } },
+  render: () => <EndpointFormDialog />,
+  play: openEndpointDialog,
+};
+
+/** The same `DialogFullScreen` from 640px up: the basic dialog. */
+export const FullScreenDialogOnADesktop: Story = {
+  globals: { viewport: { value: "desktop" } },
+  render: () => <EndpointFormDialog />,
+  play: openEndpointDialog,
+};
+
+/**
+ * `DialogContent` on a phone: still M3's basic dialog — centred, 28dp
+ * corners, the screen's width less 16px each side. A confirmation does not
+ * take over the screen; M3 keeps full-screen for long tasks.
+ */
+export const BasicDialogOnAPhone: Story = {
+  globals: { viewport: { value: "phone" } },
+  render: () => (
+    <Dialog>
+      <DialogTrigger as={Button}>Open dialog</DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Rotate the signing secret?</DialogTitle>
+          <DialogDescription>
+            The current secret keeps verifying for 24 hours, then stops.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogActions>
+          <DialogClose as={Button} variant="ghost" size="sm">
+            Cancel
+          </DialogClose>
+          <Button size="sm">Rotate</Button>
+        </DialogActions>
+      </DialogContent>
+    </Dialog>
+  ),
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByRole("button", { name: "Open dialog" }));
+    await expect(
+      await body().findByRole("heading", { name: "Rotate the signing secret?" }),
+    ).toBeVisible();
+  },
 };
 
 /**

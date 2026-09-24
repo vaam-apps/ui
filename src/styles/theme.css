@@ -201,8 +201,12 @@
         had been a phone bottom sheet below `md` since D14, and `Select`
         is a second one below `sm` now. Both take M3's own 28dp as
         `--radius-sheet`, declared beside `--radius-xs` below as a
-        single-purpose corner rather than a fourth step. The objection
-        here is to *console* surfaces at that radius, and it stands.) A desktop
+        single-purpose corner rather than a fourth step — and so does
+        `Dialog`'s panel, M3's `DialogTokens.ContainerShape`, the same
+        `CornerExtraLarge`, by the maintainer's call when dialogs moved
+        to M3 (2026-09-24). The objection here is to *console* surfaces
+        at that radius — cards, tables, panels in the page — and it
+        stands.) A desktop
         operator console grounded in Polar's/Column's drawer and card
         corners has no reference screen calling for a fourth, larger step,
         and "one register, no fourth" (this comment's own opening line) is
@@ -229,7 +233,8 @@
         gap to fill for it either.
 
      So: three tiers plus two single-purpose outliers — the checkbox-only
-     `--radius-xs` and the phone-sheet-only `--radius-sheet` — already
+     `--radius-xs` and `--radius-sheet`, M3's corner for its sheets and
+     dialogs and nothing else — already
      say everything this component set needs said. Widening the register
      "to match the spec" without a reference screen or a real interaction
      calling for the extra step would be exactly the unargued change this
@@ -1361,7 +1366,10 @@
   --radius-md: 20px;
   /*
    * `--radius-sheet` is not a fourth step of the register — it is the one
-   * corner a *phone bottom sheet* wears, and nothing else may use it.
+   * corner a *phone bottom sheet* and a *dialog* wear, and nothing else may
+   * use it: M3's `CornerExtraLarge`, which `SheetBottomTokens` puts on a
+   * sheet's top corners and `DialogTokens.ContainerShape` on all four of a
+   * dialog's (read as `rounded-sheet` there).
    * M3's `SheetBottomTokens.DockedContainerShape` is `CornerExtraLargeTop`,
    * 28dp on the top two corners only (`ShapeTokens.kt`). The shape-scale
    * audit in the daisyUI theme block above kept this value out on the

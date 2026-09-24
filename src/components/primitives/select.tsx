@@ -16,9 +16,7 @@ import { ArrowLeft, Check, ChevronDown, Search, X } from "lucide-react";
 import {
   Children,
   type CSSProperties,
-  cloneElement,
   createContext,
-  Fragment,
   isValidElement,
   type ReactElement,
   type ReactNode,
@@ -34,6 +32,7 @@ import {
 } from "react";
 import { cn } from "../../lib/cn";
 import { omitUndefined } from "../../lib/omit-undefined";
+import { flattenParts } from "../../lib/parts";
 import { notePointerDownUnderOpenSelect } from "../../lib/select-dismissal";
 
 /**
@@ -824,31 +823,6 @@ function useComboboxModality(
       unlock();
     };
   }, [active, surfaceRef, triggerRef]);
-}
-
-/** A container's direct parts, with fragments opened up — so
- * `<><SelectSearch /><SelectEmpty /></>` is lifted into the header like the
- * same parts written bare, rather than landing inside the listbox.
- *
- * Each part lifted out of a fragment is re-keyed under that fragment's own
- * key. `Children.toArray` keys a fragment's children afresh (`.0`,
- * `.$cm`), so two sibling fragments — "recent" and "all", each mapping
- * `key={code}` — produced duplicate keys once flattened into one array, and
- * React then kept stale options on screen: measured, emptying the first
- * fragment's list left its "Recent Cameroon" and "Recent Kenya" rows in
- * place. The separator is `:` because `Children.toArray` escapes a `:` in
- * a caller's own key (to `=2`), so no sibling's key can spell a composed
- * one; with `/`, a sibling keyed `f/.$cm` collided with `cm` inside a
- * fragment keyed `f`. */
-function flattenParts(node: ReactNode, prefix = ""): ReactNode[] {
-  return Children.toArray(node).flatMap((part) => {
-    if (!isValidElement(part)) return [part];
-    const key = `${prefix}${String(part.key)}`;
-    if (part.type === Fragment) {
-      return flattenParts((part.props as { children?: ReactNode }).children, `${key}:`);
-    }
-    return prefix === "" ? [part] : [cloneElement(part, { key })];
-  });
 }
 
 /** The shortest a dropdown shrinks to before it flips to the other side

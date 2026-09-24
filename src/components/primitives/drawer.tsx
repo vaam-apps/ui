@@ -462,7 +462,7 @@ function DetailDrawerContent({
                 rather than a `-m-1` utility because `.tap-target` writes
                 `margin` itself — D11) against `p-1`: same hit-area fix as
                 `dialog.tsx`'s close button
-                (§ that file's own `DialogContent` comment) — grows the
+                (§ that file's `CLOSE_CHROME` comment) — grows the
                 clickable box to **24×24px** — 16px icon plus 4px each side,
                 not the 32×32 this said before it was measured, and
                 exactly WCAG 2.2 §2.5.8's floor. `dialog.tsx` shares the

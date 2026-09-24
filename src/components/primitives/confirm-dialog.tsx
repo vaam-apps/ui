@@ -4,9 +4,10 @@ import type { ReactNode } from "react";
 import { Button } from "./button";
 import {
   Dialog,
+  DialogActions,
+  DialogClose,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "./dialog";
@@ -61,6 +62,12 @@ export interface ConfirmDialogProps {
  * A self-closing confirm reports failure through a toast on a screen the
  * operator has already been returned to, which is where error messages go
  * to be missed.
+ *
+ * # A recipe, not a component of its own
+ *
+ * It is `Dialog`'s parts, composed: `DialogContent` (M3's basic dialog),
+ * `DialogHeader`, `DialogActions`, and a `DialogClose` as the cancel. For
+ * anything these props do not cover, write the parts directly.
  */
 export function ConfirmDialog({
   open,
@@ -76,22 +83,16 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         {children}
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={busy}
-            onClick={() => onOpenChange(false)}
-          >
+        <DialogActions>
+          <DialogClose as={Button} variant="ghost" size="sm" disabled={busy}>
             {cancelLabel}
-          </Button>
+          </DialogClose>
           <Button
             type="button"
             variant={tone === "destructive" ? "destructive" : "primary"}
@@ -102,7 +103,7 @@ export function ConfirmDialog({
             {busy && <Spinner size="xs" />}
             {confirmLabel}
           </Button>
-        </DialogFooter>
+        </DialogActions>
       </DialogContent>
     </Dialog>
   );

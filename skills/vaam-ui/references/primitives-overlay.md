@@ -40,8 +40,14 @@ Two rules that cut most of the wrong answers:
 
 ## `Dialog` — a modal for one focused decision
 
-Parts: `Dialog`, `DialogTrigger`, `DialogContent`, `DialogHeader`,
-`DialogTitle`, `DialogDescription`, `DialogFooter`, `DialogClose`.
+Parts: `Dialog`, `DialogTrigger`, `DialogContent`, `DialogFullScreen`,
+`DialogHeader`, `DialogTitle`, `DialogDescription`, `DialogActions`,
+`DialogClose`.
+
+It is a **compound component**, like `Select`: `Dialog` owns the open
+state, and everything visible is a part you nest inside it. You pick the
+*presentation* by the container part; the other parts are the same in
+both.
 
 `Dialog` itself is a context provider, not a rendered element — it holds
 the open state so that both shapes work: uncontrolled, driven by a
@@ -61,13 +67,50 @@ The `| undefined` on each is deliberate: this package compiles under
 `exactOptionalPropertyTypes`, where a bare `open?: boolean` would reject
 `open={maybeUndefined}`. Yours can pass it.
 
+### The container — pick one
+
+- **`DialogContent`** — M3's basic dialog at every width: centred, 28px
+  corners, up to 560px wide (the screen less 16px each side on a phone),
+  on `surface-3`. Use it for anything short: a confirmation, a few fields.
+- **`DialogFullScreen`** — M3's full-screen dialog **below 640px**, the
+  same basic dialog from 640px up. Use it for a long or form-heavy dialog
+  a phone should give the whole screen. Below 640px: a 64px top bar leads
+  with a close icon and carries your `DialogActions` trailing, and a
+  `DialogClose` among the actions is hidden (the close icon is that
+  action). Chosen by CSS media query, so it server-renders correctly.
+
+`className` on either lands on the panel. The panel is bounded at
+`max-h-[85vh]` (full height when full-screen) and scrolls internally.
+
+### The parts
+
+- **`DialogHeader`** — holds `DialogTitle` and `DialogDescription`, pinned
+  to the top of the visible panel while a long body scrolls.
+- **`DialogTitle`** — the headline and the dialog's accessible name.
+  Always include it.
+- **`DialogDescription`** — the supporting text, what `aria-describedby`
+  points at.
+- **`DialogActions`** — the dialog's buttons, end-aligned, pinned to the
+  bottom of the visible panel (in the full-screen bar below 640px). Put the
+  dismissing one in as a `DialogClose`, so the full-screen dialog knows to
+  hide it. **Renamed from `DialogFooter` in 0.3.0** — same place, same
+  children.
+- **`DialogClose`** — closes the dialog, two ways:
+  - **Bare** (`<DialogClose />`, no children, no `as`): the close icon.
+    Every dialog renders one already — the ✕ in the top-right corner, or
+    the bar's leading close icon when full-screen — so you only write it
+    to change its `aria-label` (default "Close"); it replaces the default.
+  - **With children or `as`**: closes on click and renders what you give
+    it, e.g. `<DialogClose as={Button} variant="ghost">Cancel</DialogClose>`.
+
 `DialogTrigger` and `DialogClose` are polymorphic — `as={Button}` rather
-than Radix's old `asChild`. `DialogContent`'s `className` lands on the
-panel, whose default is `max-w-[480px]`.
+than Radix's old `asChild`. Both set `type="button"` unless `as` is an
+intrinsic tag that is not a button (`"a"`, `"div"`), so neither submits a
+surrounding `<form>`; pass `type="submit"` yourself if you want that.
 
 ```tsx
 <Dialog>
-  <DialogTrigger as={Button} type="button" variant="secondary" size="sm">
+  <DialogTrigger as={Button} variant="secondary" size="sm">
     Requeue payout
   </DialogTrigger>
 
@@ -85,37 +128,55 @@ panel, whose default is `max-w-[480px]`.
       <DetailRow label="Provider" value="orange_cm" />
     </DetailList>
 
-    <DialogFooter>
-      <DialogClose as={Button} type="button" variant="ghost" size="sm">
+    <DialogActions>
+      <DialogClose as={Button} variant="ghost" size="sm">
         Cancel
       </DialogClose>
       <Button type="button" size="sm" onClick={requeue}>
         Requeue
       </Button>
-    </DialogFooter>
+    </DialogActions>
   </DialogContent>
 </Dialog>
 ```
 
-**Pass `type="button"` when you use `as`.** `DialogTrigger` and
-`DialogClose` set `type="button"` only on the plain `<button>` they
-render by default; with `as={Button}` nothing sets it, and `Button` has no
-default either — so inside a `<form>` the browser treats it as a submit.
-(Menu and popover triggers do not have this problem: Headless UI resolves
-the type itself.)
+A form a phone should give the whole screen — the same parts inside
+`DialogFullScreen`, the submit button pointing at the form with `form=`:
 
-**You do not have to solve tall content.** The panel is bounded at
-`max-h-[85vh]` and scrolls internally; `DialogHeader` and `DialogFooter`
-are `sticky`, so they stay pinned to the visible panel while the body
-scrolls between them, and the close button is a sibling of the scrollport
-rather than inside it, so it never travels out of view. A short dialog is
-unaffected — the cap is a maximum, not a height. Do not add your own
-`overflow-y-auto`; putting it on the panel is the exact bug this layout
-was built to avoid.
+```tsx
+<Dialog open={open} onOpenChange={setOpen}>
+  <DialogFullScreen>
+    <DialogHeader>
+      <DialogTitle>New webhook endpoint</DialogTitle>
+      <DialogDescription>The signing secret is shown once, after creation.</DialogDescription>
+    </DialogHeader>
+    <form id="create-endpoint" onSubmit={create}>{/* FormFields */}</form>
+    <DialogActions>
+      <DialogClose as={Button} variant="ghost" size="sm">Cancel</DialogClose>
+      <Button type="submit" form="create-endpoint" size="sm">Create</Button>
+    </DialogActions>
+  </DialogFullScreen>
+</Dialog>
+```
 
-Both `DialogTitle` and `DialogDescription` should be present:
-`DialogTitle` becomes the dialog's accessible name, and the description is
-what `aria-describedby` points at.
+**Migrating from 0.2.x:** rename `DialogFooter` to `DialogActions`, and
+write a Cancel button as `<DialogClose as={Button} …>` rather than a
+`Button` whose `onClick` closes the dialog — that is how the full-screen
+dialog knows to hide it. The panel is now M3's: 28px corners, `surface-3`,
+560px wide by default (was 480px), no border, and it fades in without
+scaling. A `className="max-w-[560px]"` you added for width is now the
+default and can go.
+
+**You do not have to solve tall content.** `DialogHeader` and
+`DialogActions` are `sticky`, pinned to the visible panel while the body
+scrolls between them, and the close icon is a sibling of the scrollport
+rather than inside it, so it never travels out of view. Do not add your
+own `overflow-y-auto`; putting it on the panel is the exact bug this
+layout was built to avoid.
+
+A `Select` inside a dialog works: its dropdown floats over the panel
+rather than being clipped by it, and on a phone its sheet opens over the
+dialog.
 
 ---
 
@@ -210,8 +271,8 @@ interface DetailDrawerProps {
   weight, never the routing.
 
 Below 768px both are a phone bottom sheet with M3's own shape: 28px top
-corners (`rounded-t-sheet`, the `--radius-sheet` token — reserved for
-phone sheets, do not put it on a card) and M3's 32×4 drag handle, with
+corners (`rounded-t-sheet`, the `--radius-sheet` token — M3's corner for
+sheets and dialogs only; do not put it on a card) and M3's 32×4 drag handle, with
 22px above it and 22px below. That handle used to be a 5px bar 8px from
 the top, so the title row now sits about 19px lower than it did — worth
 knowing if a screenshot test pins it. Below 640px a `Select` inside one
