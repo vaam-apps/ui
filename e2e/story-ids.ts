@@ -94,6 +94,13 @@ export const STORY = {
   selectSearchableInDialog: "primitives-select--searchable-in-a-dialog",
   selectCallerFiltered: "primitives-select--caller-filtered-search",
   sideNavRailUnderModalSelect: "primitives-sidenav--rail-under-a-modal-select",
+  // `accountSlot` behind each toolbar's "More" control, and the sidebar
+  // that still renders it in flow (`e2e/side-nav-account-sheet.spec.ts`).
+  // The three sheet stories open their sheet from their play function.
+  sideNavAccountSheetPhone: "primitives-sidenav--account-sheet-on-a-phone",
+  sideNavAccountSheetNoOverflow: "primitives-sidenav--account-sheet-with-no-overflow",
+  sideNavAccountSheetRail: "primitives-sidenav--account-sheet-from-the-rail",
+  sideNavWithAnAccountBlock: "primitives-sidenav--with-an-account-block",
   // `SideNav`'s floating toolbars, one per M3 colour scheme, over real
   // content (`e2e/floating-toolbar.spec.ts`).
   sideNavToolbarStandard: "primitives-sidenav--toolbar-colors-standard",

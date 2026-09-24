@@ -47,7 +47,7 @@ const PROPS = {
   currentPath: "/",
 };
 
-async function mount(node: React.ReactElement, inspect: () => void, wrap = false) {
+async function mount(node: React.ReactElement, inspect: () => void | Promise<void>, wrap = false) {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   const host = document.createElement("div");
   // The hazard, reproduced: an ancestor that establishes a containing
@@ -59,7 +59,7 @@ async function mount(node: React.ReactElement, inspect: () => void, wrap = false
     await act(async () => {
       root.render(node);
     });
-    inspect();
+    await inspect();
   } finally {
     await act(async () => {
       root.unmount();
@@ -183,6 +183,100 @@ describe("the floating rail escapes its wrapper without duplicating the landmark
       expect(document.querySelectorAll("[data-floating-rail]")).toHaveLength(0);
       expect(document.querySelectorAll('nav[aria-label="Primary"]')).toHaveLength(1);
     });
+  });
+
+  /**
+   * `accountSlot` below the sidebar (vaam-apps/ui#36): each rail ends in a
+   * "More" control that opens a sheet. Presence and structure only — where
+   * the sheet lands and whether its contents can be operated is geometry
+   * and focus, measured in `e2e/side-nav-account-sheet.spec.ts`.
+   */
+  it("with an accountSlot, both rails end in a More control that opens a dialog", async () => {
+    await mount(
+      <SideNav {...PROPS} accountSlot={<button type="button">Sign out</button>} />,
+      () => {
+        const controls = [...document.querySelectorAll("[data-side-nav-more]")];
+        // One per rail; CSS shows one rail at a time.
+        expect(controls).toHaveLength(2);
+        for (const control of controls) {
+          expect(control.getAttribute("aria-label")).toBe("More");
+          expect(control.getAttribute("aria-haspopup")).toBe("dialog");
+          // The rail's last control, after every destination and footer row.
+          const rail = control.closest("[data-floating-rail]");
+          const all = [...(rail?.querySelectorAll("a[href], button") ?? [])];
+          expect(all.at(-1)).toBe(control);
+        }
+        // The menu is gone from the phone bar: a `role="menu"` cannot hold
+        // the account block.
+        expect(document.querySelector('button[aria-label="More destinations"]')).toBeNull();
+      },
+    );
+  });
+
+  it("without an accountSlot, the phone bar keeps its menu and the vertical rail gains nothing", async () => {
+    await mount(<SideNav {...PROPS} />, () => {
+      expect(document.querySelectorAll("[data-side-nav-more]")).toHaveLength(0);
+      expect(
+        document
+          .querySelector('button[aria-label="More destinations"]')
+          ?.getAttribute("aria-haspopup"),
+      ).toBe("menu");
+    });
+  });
+
+  /**
+   * The sheet is `fixed`, and the rail it opens from is `translate`d to
+   * centre it — so a sheet rendered inside the rail would be laid out
+   * against the 64px toolbar, whatever the caller wrapped `SideNav` in.
+   * It must be portalled out of the rail, to body, as the rails are out of
+   * the caller's tree. This is that half, observable without layout.
+   */
+  it("opens its sheet in a portal on body, outside the rail and the caller's transformed wrapper", async () => {
+    // vaul reads `matchMedia('(display-mode: standalone)')` when it opens;
+    // jsdom has none.
+    const original = Object.getOwnPropertyDescriptor(window, "matchMedia");
+    if (typeof window.matchMedia !== "function") {
+      Object.defineProperty(window, "matchMedia", {
+        configurable: true,
+        value: (query: string) => ({
+          matches: false,
+          media: query,
+          addEventListener() {},
+          removeEventListener() {},
+        }),
+      });
+    }
+    try {
+      await mount(
+        <SideNav {...PROPS} accountSlot={<button type="button">Sign out</button>} />,
+        async () => {
+          const more = document.querySelector<HTMLButtonElement>(
+            '[data-floating-rail-axis="horizontal"] [data-side-nav-more]',
+          );
+          await act(async () => {
+            more?.click();
+          });
+          const sheet = document.querySelector('[role="dialog"][data-side-nav-sheet="bottom"]');
+          expect(sheet).not.toBeNull();
+          expect(sheet?.closest("[data-floating-rail]")).toBeNull();
+          // Not inside the host `mount` made, which carries the transform.
+          expect(
+            document.querySelector("body > div[style*='translateZ']")?.contains(sheet ?? null),
+          ).toBe(false);
+          expect(sheet?.querySelector("[data-side-nav-account] button")?.textContent).toBe(
+            "Sign out",
+          );
+          // The destinations the bar had no room for, then the footer.
+          expect(
+            [...(sheet?.querySelectorAll("a") ?? [])].map((a) => a.getAttribute("href")),
+          ).toEqual(["/settings"]);
+        },
+        true,
+      );
+    } finally {
+      if (original === undefined) Reflect.deleteProperty(window, "matchMedia");
+      else Object.defineProperty(window, "matchMedia", original);
+    }
   });
 
   it("leaves nothing behind in body when it unmounts", async () => {

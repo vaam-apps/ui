@@ -35,11 +35,11 @@ what lets a caller build one layout instead of one layout per band.
   <tbody>
     <tr>
       <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>Below 640px</td>
-      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>M3 Expressive's horizontal floating toolbar along the bottom — 64px tall, 16px off the edge: four destinations and a menu for the rest.</td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>M3 Expressive's horizontal floating toolbar along the bottom — 64px tall, 16px off the edge: four destinations and a menu for the rest — a sheet instead, with the account block in it, when there is an <code>accountSlot</code>.</td>
     </tr>
     <tr>
       <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>640–1279px</td>
-      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>The vertical floating toolbar — 64px wide, <code>fixed</code>, vertically centred, 16px from the left edge.</td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>The vertical floating toolbar — 64px wide, <code>fixed</code>, vertically centred, 16px from the left edge. With an <code>accountSlot</code> it ends in a More control that opens a navigation drawer.</td>
     </tr>
     <tr>
       <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>1280px and up</td>
@@ -211,6 +211,47 @@ current, which reads as a bug.
 
 [**Story: Floating rail overflow**](?path=/story/primitives-sidenav--floating-rail-overflow) — more destinations than slots.
 
+### With an `accountSlot`, the overflow is a sheet
+
+The menu holds links and nothing else — a `role="menu"` may only own
+menu items, and Headless UI's `Menu` moves between items with the arrow
+keys and closes on Tab, so a radio group or a sign-out form inside one
+could be neither valid nor reached. That left `accountSlot` with nowhere
+to go below the sidebar: in `"floating"` mode it rendered at 1280px and
+up and nowhere else, and consumers pinned their own `fixed` chrome beside
+the toolbar to reach Sign out — which the 288px toolbar then covered
+([#36](https://github.com/vaam-apps/ui/issues/36)).
+
+So with an `accountSlot`, the toolbars' last control is **More**, and it
+opens an M3 modal sheet with the account block in it, rendered as-is:
+
+- **From the phone bar, a modal bottom sheet**: the destinations that did
+  not fit, the footer items, then `accountSlot`. The control appears
+  whenever there is overflow *or* an `accountSlot`.
+- **From the vertical rail, a modal navigation drawer** from the left
+  edge, 360px wide and full height: every destination labelled under its
+  group header, the footer items, then `accountSlot`. The rail shows every
+  destination already, but only as an icon whose label is a hover — and a
+  touch tablet does not hover. The control is the rail's last item. This
+  covers `collapsed` at 1280px and up too, where the sidebar never
+  renders.
+
+Both are vaul drawers, portalled to `document.body` — out of any
+`transform`ed ancestor a consumer wraps `SideNav` in, and out of the rail
+itself, which is `translate`d to centre it and would otherwise capture a
+`fixed` sheet. Focus moves onto the sheet and stays in it; Escape or the
+scrim closes it and focus returns to More. The rows are M3's
+navigation-drawer items — 56px, fully round, the current page in the
+toolbar's own `primary` pill — and real anchors.
+
+**Without an `accountSlot` nothing changes**: the phone bar's overflow is
+the menu above, still named "More destinations", and the vertical rail
+gains no control. For a list of links a menu is what M3's own toolbar
+overflow uses, and the sheet replaces it only when there is something a
+menu cannot hold.
+
+[**Story: Account sheet — phone**](?path=/story/primitives-sidenav--account-sheet-on-a-phone), [**no overflow**](?path=/story/primitives-sidenav--account-sheet-with-no-overflow) and [**the vertical rail**](?path=/story/primitives-sidenav--account-sheet-from-the-rail) — each opens its sheet on load. `e2e/side-nav-account-sheet.spec.ts` measures where each lands and operates what is inside it.
+
 ## The portal, and what it costs
 
 Both rails are rendered through `createPortal` to `document.body`.
@@ -271,9 +312,11 @@ It differs from the default in four ways worth knowing:
 
 - Every band is in flow, including the 1024–1279px icon rail.
 - No rails, no portal, no mount gate: it is fully server-rendered.
-- `accountSlot` works below `lg`. In `"floating"` mode it never renders
-  below `lg` at all, because 64px has no room for an email address and
-  a sign-out control, and there is no wider sibling column to defer to.
+- `accountSlot` renders in the off-canvas tree below `lg`, in flow. In
+  `"floating"` mode it renders in the sidebar at 1280px and up, and below
+  that behind the toolbars' More control (see "With an `accountSlot`, the
+  overflow is a sheet" above) — 64px has no room for an email address and
+  a sign-out control, so the toolbar carries the way to it instead.
 - `collapsed` means nothing, because the mode has its own in-flow tree at
   every width.
 
@@ -308,7 +351,11 @@ touching its edge — move to `sm:pl-24`.
 router.
 
 **The account block's markup.** Rendered as-is through `accountSlot`, so
-this component stays free of any auth-specific knowledge.
+this component stays free of any auth-specific knowledge. Pass it at
+every width; *where* it appears is this component's job, and a consumer
+never needs floating account chrome of its own. It can be mounted twice
+while a sheet is open (the sidebar's copy stays in the DOM under
+`display: none`), so it should not carry a hard-coded `id`.
 
 **The collapse preference**, if the application offers one.
 

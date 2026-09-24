@@ -2,10 +2,12 @@
 
 import { Disclosure, DisclosureButton, DisclosurePanel } from "@headlessui/react";
 import { ChevronDown, MoreVertical } from "lucide-react";
-import type { ComponentType, ReactNode } from "react";
-import { useEffect, useState } from "react";
+import type { ComponentType, MouseEvent, ReactNode } from "react";
+import { useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
+import { Drawer as DrawerPrimitive } from "vaul";
 import { cn } from "../../lib/cn";
+import { wasPointerDownUnderOpenSelect } from "../../lib/select-dismissal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,9 +48,28 @@ export interface SideNavProps {
    * <email> · Sign out" row) — rendered as-is, never built here, so this
    * component stays free of any auth-specific knowledge.
    *
-   * Not rendered below `lg` in `"floating"` mode: a 64px toolbar has no
-   * room for an email address, the same reason the `1024–1279px` icon
-   * rail has always hidden it. */
+   * Where it renders, in the default `"floating"` mode:
+   *
+   * - **The sidebar (`≥1280px`, not `collapsed`)** — under the footer
+   *   rows, in flow, as it always has.
+   * - **Everywhere a floating toolbar is the navigation** — below
+   *   `1280px`, and at every width when `collapsed` — behind a "More"
+   *   control at the toolbar's end, in the M3 modal sheet it opens
+   *   (`NavSheet`): a bottom sheet from the phone bar, a modal navigation
+   *   drawer from the vertical rail. A 64px toolbar has no room for an
+   *   email address, so the toolbar carries the way *to* it instead.
+   *
+   * This used to read "not rendered below `lg`", and that was the whole
+   * of it: nothing replaced it there, so every consumer on the default
+   * mode built its own `fixed` chrome to reach Sign out on a phone — and
+   * vaam-apps/vpay's collided with the bottom toolbar (vaam-apps/ui#36).
+   *
+   * While a sheet is open this node is mounted twice — the sidebar's copy
+   * stays in the DOM under `display: none` — so it must not hardcode an
+   * `id`; derive one with `useId` if it needs one.
+   *
+   * `"off-canvas"` mode is unchanged: the account block sits in the
+   * off-canvas tree below `lg` and in the sidebar at `xl`. */
   accountSlot?: ReactNode;
   /**
    * How the nav behaves below `lg`. Defaults to `"floating"`.
@@ -631,6 +652,359 @@ function ToolbarLink({
 const TOOLBAR_CONTAINER = "fixed z-40 flex rounded-full p-2 gap-1";
 
 /**
+ * One labelled row in a `NavSheet` — M3's navigation-drawer item
+ * (`NavigationDrawerTokens.kt`, `NavigationDrawerItem` in
+ * `NavigationDrawer.kt`), used in both sheets because both hold the same
+ * thing: destinations, with their labels back.
+ *
+ * - **56px tall, fully round** — `ActiveIndicatorHeight` 56dp,
+ *   `ActiveIndicatorShape` `CornerFull`. Not the sidebar's `rounded-field`
+ *   rectangle (`NavLink`'s doc has why that one is locked): the sheet is
+ *   M3's component, and its current-page pill is the same shape as the
+ *   toolbar's that opened it.
+ * - **16px leading, 24px trailing, 12px from icon to label** — the item's
+ *   own `padding(start = 16.dp, end = 24.dp)` and `Spacer(12.dp)`.
+ * - **24px icon** — `IconSize`.
+ * - **Label 14px medium** — `LabelTextFont` is `LabelLarge` (14/20,
+ *   medium); `text-prose` (14/21) is this library's nearest rung.
+ * - **Colours** — inactive icon and label are `OnSurfaceVariant`
+ *   (`muted-foreground`); hover is the 8% state layer the toolbar items
+ *   use; the current page is M3's `SecondaryContainer` pill drawn in
+ *   `primary` instead — a library choice, the same one `Select`'s phone
+ *   sheet and the toolbar make, because a tonal container is a hue here
+ *   and would read as a status.
+ *
+ * A plain primary click closes the sheet before the browser follows the
+ * link — androidx's `ModalNavigationDrawerSample` (`DrawerSamples.kt`)
+ * closes the drawer in the item's `onClick` — so a client-side router
+ * that intercepts the navigation does not leave the sheet open over the
+ * new page. A modified click (new tab, new window) leaves it open,
+ * because the page it is over has not changed. It is still a real anchor either way, for the same reason the
+ * overflow menu's rows are (`HorizontalRail`'s doc).
+ */
+function NavSheetLink({
+  item,
+  active,
+  onNavigate,
+}: {
+  item: NavItem;
+  active: boolean;
+  onNavigate: () => void;
+}) {
+  const Icon = item.icon;
+  function onClick(event: MouseEvent<HTMLAnchorElement>) {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+    onNavigate();
+  }
+  return (
+    <a
+      href={item.href}
+      aria-current={active ? "page" : undefined}
+      onClick={onClick}
+      className={cn(
+        "flex min-h-14 items-center gap-3 rounded-full pr-6 pl-4 font-medium text-prose",
+        "transition-colors duration-[var(--dur-fast)] ease-[var(--ease-out)]",
+        active
+          ? "bg-primary text-primary-content"
+          : "text-muted-foreground hover:bg-foreground/8 hover:text-foreground",
+      )}
+    >
+      <Icon size={24} className="shrink-0" aria-hidden="true" />
+      <span className="min-w-0 truncate">{item.label}</span>
+    </a>
+  );
+}
+
+/** One run of rows in a `NavSheet`, with the small-caps header the sidebar
+ * gives the same group when it has one. */
+interface NavSheetSection {
+  key: string;
+  label?: string | undefined;
+  items: NavItem[];
+}
+
+function NavSheetList({
+  section,
+  currentPath,
+  onNavigate,
+}: {
+  section: NavSheetSection;
+  currentPath: string;
+  onNavigate: () => void;
+}) {
+  const headerId = useId();
+  return (
+    <div className="flex flex-col">
+      {section.label !== undefined && (
+        // The sidebar's own group header, not M3's `TitleSmall` headline
+        // (`NavigationDrawerTokens.HeadlineFont`) — a library choice: the
+        // same group should read the same in the sidebar and in the sheet
+        // that stands in for it.
+        <p
+          id={headerId}
+          className="truncate px-4 pt-3 pb-1.5 text-caption text-subtle-foreground uppercase tracking-wide"
+        >
+          {section.label}
+        </p>
+      )}
+      <ul
+        aria-labelledby={section.label !== undefined ? headerId : undefined}
+        className="flex flex-col"
+      >
+        {section.items.map((item) => (
+          <li key={item.href}>
+            <NavSheetLink
+              item={item}
+              active={isActive(item.href, currentPath)}
+              onNavigate={onNavigate}
+            />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * A pointer-down that belonged to a `Select` (or `DatePicker`) open inside
+ * the sheet must close that popup alone, not the sheet — `drawer.tsx`'s
+ * `keepOpenForSelect` has the measurement and the mechanism. Repeated here
+ * rather than imported because `drawer.tsx` is re-exported whole from the
+ * package root, and this handshake is not public API.
+ */
+function keepOpenForPopup(event: CustomEvent<{ originalEvent: PointerEvent }>) {
+  if (wasPointerDownUnderOpenSelect(event.detail.originalEvent)) event.preventDefault();
+}
+
+/**
+ * The two containers, per `NavSheet` presentation. Written out in full
+ * because Tailwind only generates classes it finds literally.
+ */
+const NAV_SHEET_SURFACE: Record<"bottom" | "side", string> = {
+  // M3's modal bottom sheet (`SheetBottomTokens.kt`, `SheetDefaults.kt`):
+  // top corners `CornerExtraLargeTop` (`--radius-sheet`, 28dp), a square
+  // bottom edge, and at most `BottomSheetDefaults.SheetMaxWidth` (640dp)
+  // wide, centred — which only matters if the window widens while it is
+  // open, since the bar that opens it exists below 640px only. Fill,
+  // height cap and elevation are the library's, and are `Select`'s phone
+  // sheet's exactly, so a select opened over this sheet is visibly the
+  // same material: `surface-2` rather than `SurfaceContainerLow`, `85dvh`,
+  // and no `Level1` shadow — the scrim separates it.
+  bottom: cn(
+    "fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[85dvh] w-full max-w-[640px] flex-col",
+    "rounded-t-sheet bg-surface-2 outline-none",
+  ),
+  // M3's modal navigation drawer (`NavigationDrawerTokens.kt`,
+  // `DrawerDefaults` in `NavigationDrawer.kt`), from the leading edge:
+  // full height; 360dp wide (`ContainerWidth`, `MaximumDrawerWidth`),
+  // never under 240dp (`MinimumDrawerWidth`); `CornerLargeEnd` — 16dp on
+  // the two trailing corners only, a literal because 16px is on no rung
+  // of `theme.css`'s radius register (the same call `Select`'s selected
+  // sheet row makes); and no shadow, which here *is* M3's —
+  // `DrawerDefaults.ModalDrawerElevation` is `Level0`. Fill `surface-2`
+  // rather than `ModalContainerColor`'s `SurfaceContainerLow`, as the
+  // bottom sheet above.
+  side: cn(
+    "fixed inset-y-0 left-0 z-50 flex h-full w-[360px] min-w-[240px] max-w-full flex-col",
+    "rounded-r-[16px] bg-surface-2 outline-none",
+  ),
+};
+
+/**
+ * What the floating toolbars open when there is something they cannot
+ * show — the M3 modal sheet behind the "More" control at the toolbar's
+ * end. It exists because `accountSlot` had nowhere to go below the
+ * sidebar (vaam-apps/ui#36): its markup is arbitrary — a radio group, a
+ * sign-out form, a theme switch — and a `role="menu"` may hold only
+ * `menuitem`s, so the dropdown the phone bar already had could not carry
+ * it. A sheet can hold anything.
+ *
+ * # Which sheet, and why they differ
+ *
+ * - **The phone bar opens a modal bottom sheet** (`presentation="bottom"`),
+ *   rising from the edge the bar sits on, under the thumb that tapped it.
+ *   It holds the destinations that did not fit in the bar, then
+ *   `footerItems`, then `accountSlot` — what the old menu held, plus the
+ *   account block.
+ * - **The vertical rail opens a modal navigation drawer from the leading
+ *   edge** (`presentation="side"`). A bottom sheet here would be a strip
+ *   capped at 640dp (`SheetMaxWidth`) and centred on the bottom edge — on
+ *   a 1100px window its nearest edge is 230px in from the side the rail,
+ *   and the control that opened it, are on.
+ *   androidx's own answer for a rail that needs more room is to expand it
+ *   modally from the edge it sits on: `ModalWideNavigationRail`
+ *   (`WideNavigationRail.kt`), which "blocks interaction with the rest of
+ *   an app's content with a scrim". The expanded form of *this* rail is
+ *   M3's modal navigation drawer, whose tokens it takes. It holds what the
+ *   sidebar holds, labelled — every destination under its group's header,
+ *   the footer rows, then `accountSlot` — because the rail shows every
+ *   destination already, but only as an icon, and a hover `title` does not
+ *   exist on a touch tablet. Which contents, and the drawer rather than a
+ *   bottom sheet, are this library's reading of those sources rather than
+ *   anything androidx states for a floating toolbar.
+ *
+ * # Engine: vaul, as `DetailDrawerContent` uses it
+ *
+ * `vaul`'s `Drawer` (Radix `Dialog` underneath) rather than Headless UI's
+ * `Dialog`, for two reasons already paid for elsewhere in this library:
+ *
+ * - **It is the engine the library's drawers already use.** A Headless UI
+ *   dialog inside a vaul drawer fights it for focus and cannot be operated
+ *   (`MoreDetailDrawer`'s doc); two Radix layers stack instead. That is
+ *   the mechanism, not something this component's tests exercise: what
+ *   they exercise is the containing-block half below, with `SideNav`
+ *   inside a `will-change: transform` wrapper. A `SideNav` mounted inside
+ *   an open *modal* drawer is a different question — its rails are
+ *   portalled out of that drawer and sit under its modality, before this
+ *   change as after — and is not measured here.
+ * - **It escapes containing blocks by portal.** `DrawerPrimitive.Portal`
+ *   puts the sheet in `document.body`, beside the rails. That is not
+ *   optional twice over: a consumer's `transform`/`will-change` ancestor
+ *   (vaul's own drawer — `SideNavProps.smallScreen`'s doc) would capture a
+ *   `fixed` sheet, and so would **the rail it opens from**, which is
+ *   itself `translate`d to centre it (`-translate-x-1/2`,
+ *   `-translate-y-1/2`) — a `fixed` sheet rendered inside the rail would
+ *   be laid out against the 64px toolbar.
+ *
+ * What that buys, as the library's other sheets do it: focus moves into
+ * the sheet on open (`autoFocus`) and is trapped there; Escape and a tap
+ * on the scrim close it; focus returns to the "More" control; the page
+ * behind is scroll-locked, `aria-hidden` and inert to the pointer; a
+ * `Select` inside closes alone (`keepOpenForPopup`). The bottom sheet
+ * drags from its handle only (`handleOnly`, as `DetailDrawerContent`), so
+ * a drag inside the account block — selecting the email — is not a
+ * dismissal. vaul's own release thresholds decide a drag, not androidx's
+ * 56dp/125dp (`SelectModalHandle` has those); a library choice, shared
+ * with `DetailDrawerContent`. The drawer has no handle and does not
+ * drag — M3's can be swiped shut; here the scrim and Escape close it, a
+ * library choice that keeps vaul's drag to the one sheet with a handle.
+ *
+ * The sheet is named "More", after the control, with a visually hidden
+ * title: M3 draws neither sheet with a headline.
+ */
+function NavSheet({
+  presentation,
+  sections,
+  accountSlot,
+  currentPath,
+  trigger,
+}: {
+  presentation: "bottom" | "side";
+  sections: NavSheetSection[];
+  accountSlot: ReactNode;
+  currentPath: string;
+  trigger: ReturnType<typeof toolbarItemClasses>;
+}) {
+  const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
+  const shown = sections.filter((section) => section.items.length > 0);
+
+  return (
+    <DrawerPrimitive.Root
+      open={open}
+      onOpenChange={setOpen}
+      // vaul's `direction` is not a CSS concern: it picks the entrance
+      // keyframes and the drag axis (`drawer.tsx`'s header has the
+      // detail), so each presentation passes its own.
+      direction={presentation === "bottom" ? "bottom" : "left"}
+      handleOnly
+      // vaul prevents Radix's open auto-focus unless asked; without this
+      // focus would stay on the toolbar, behind the scrim.
+      autoFocus
+    >
+      <DrawerPrimitive.Trigger aria-label="More" data-side-nav-more="" className={trigger.target}>
+        <span aria-hidden="true" data-toolbar-item="" className={trigger.container}>
+          <MoreVertical size={24} aria-hidden="true" />
+        </span>
+      </DrawerPrimitive.Trigger>
+      <DrawerPrimitive.Portal>
+        {/* `ScrimTokens`: M3 dims the page behind a modal sheet. `bg-scrim`
+            is the theme's own per-mode scrim, as every sheet here. */}
+        <DrawerPrimitive.Overlay className="fixed inset-0 z-50 bg-scrim" />
+        <DrawerPrimitive.Content
+          data-side-nav-sheet={presentation}
+          // No description: the rows are the content. Radix warns unless
+          // the attribute is opted out explicitly, which this does.
+          aria-describedby={undefined}
+          onPointerDownOutside={keepOpenForPopup}
+          // Focus lands on the sheet itself, not on its first control.
+          // Radix's default skips links (`removeLinks` in its `FocusScope`)
+          // and so put focus on the account block's first control — the
+          // radio group, halfway down the sheet, in `AccountSheetOnAPhone`
+          // — which a screen reader then starts reading from. On the
+          // sheet, it announces "More, dialog" and reads from the top, and
+          // the first Tab reaches the first row. Radix's `Content` is
+          // already `tabIndex={-1}`, so it can take focus.
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            (event.currentTarget as HTMLElement | null)?.focus({ preventScroll: true });
+          }}
+          className={NAV_SHEET_SURFACE[presentation]}
+        >
+          <DrawerPrimitive.Title className="sr-only">More</DrawerPrimitive.Title>
+          {presentation === "bottom" && (
+            // M3's `DragHandle` (`SheetDefaults.kt`): 32×4
+            // (`SheetBottomTokens.DockedDragHandleWidth`/`Height`) in
+            // `OnSurfaceVariant`, 22dp above and below
+            // (`DragHandleVerticalPadding`). Every property vaul's injected
+            // `[data-vaul-handle]` rule also sets is `!`, for the reason
+            // `DetailDrawerContent`'s handle records: that rule is
+            // unlayered, so it beats a plain utility. 18px of margin below
+            // plus the list's 4px of top padding make M3's 22dp to the
+            // first row; the 4px is where that row's focus ring (2px
+            // outline, 2px offset) draws, inside the list's scroll box
+            // rather than clipped by it.
+            <DrawerPrimitive.Handle className="mt-[22px] mb-[18px] h-1! w-8! shrink-0 bg-muted-foreground! opacity-100!" />
+          )}
+          <div
+            className={cn(
+              // `select-text`: vaul makes its drawer `user-select: none`
+              // under a fine pointer, which would leave the signed-in
+              // email uncopyable. Set on this child because vaul's rule
+              // on the drawer itself is unlayered and wins there.
+              "flex min-h-0 flex-1 select-text flex-col gap-2 overflow-y-auto overscroll-contain px-3",
+              // M3's `ItemPadding` is 12dp either side; the bottom inset
+              // keeps the last row clear of a home indicator.
+              presentation === "bottom"
+                ? "pt-1 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]"
+                : "py-3",
+            )}
+          >
+            {shown.map((section, index) => (
+              <div
+                key={section.key}
+                // A hairline before a run with no header of its own — the
+                // footer, or the overflow after nothing — and none before
+                // a group, whose header already separates it: the
+                // sidebar's own reading of the same sections.
+                className={cn(
+                  index > 0 && section.label === undefined && "border-edge-subtle border-t pt-2",
+                )}
+              >
+                <NavSheetList section={section} currentPath={currentPath} onNavigate={close} />
+              </div>
+            ))}
+            {accountSlot != null && (
+              // Rendered as-is, in the sidebar's own position — last, under
+              // a hairline — and inset to line up with the rows' icons
+              // (12px sheet padding + the row's 16px leading space).
+              <div
+                data-side-nav-account=""
+                className={cn("px-4 py-3", shown.length > 0 && "border-edge-subtle border-t")}
+              >
+                {accountSlot}
+              </div>
+            )}
+          </div>
+        </DrawerPrimitive.Content>
+      </DrawerPrimitive.Portal>
+    </DrawerPrimitive.Root>
+  );
+}
+
+/**
  * `smallScreen="floating"`'s replacement for the off-canvas accordion
  * below `lg`, and the whole nav when `collapsed`: M3 Expressive's
  * *vertical* floating toolbar, `fixed`, vertically centred, 16px from the
@@ -649,11 +1023,24 @@ const TOOLBAR_CONTAINER = "fixed z-40 flex rounded-full p-2 gap-1";
  * groups. The footer keeps its divider: it is the one grouping that
  * carries meaning here ("administrivia, not content").
  *
- * # Why `accountSlot` never appears here
+ * # Where `accountSlot` goes
  *
- * There is no room for an email address and a sign-out button at 64px.
- * A caller whose small-screen users need the account block keeps
- * `smallScreen="off-canvas"`, where it already works.
+ * Not into the toolbar: there is no room for an email address and a
+ * sign-out button at 64px. With an `accountSlot`, the toolbar ends in a
+ * "More" control instead, after the footer rows and under the same
+ * divider — the position the account block has at the foot of the
+ * sidebar, and the position the phone bar's own overflow control has at
+ * the end of its row. It opens `NavSheet`'s modal navigation drawer, which
+ * carries the whole nav labelled and then the account block (its doc has
+ * why a drawer, from this edge, with that content). Without an
+ * `accountSlot` there is nothing the toolbar cannot show, and no control
+ * is added — this toolbar is unchanged for a caller who passes none.
+ *
+ * This section used to be "Why `accountSlot` never appears here", and
+ * told a caller who needed the account block on a tablet to fall back to
+ * `smallScreen="off-canvas"` — which, for the default floating mode, left
+ * nothing between 640 and 1279px, nor at any width when `collapsed`
+ * (vaam-apps/ui#36).
  *
  * # Why it scrolls, and why the label survives that
  *
@@ -677,6 +1064,7 @@ function FloatingRail({
   groups,
   footerItems,
   currentPath,
+  accountSlot,
   collapsed,
   toolbarVariant,
 }: {
@@ -684,11 +1072,13 @@ function FloatingRail({
   groups: NavGroup[];
   footerItems: NavItem[];
   currentPath: string;
+  accountSlot: ReactNode;
   collapsed: boolean;
   toolbarVariant: SideNavToolbarVariant;
 }) {
   const palette = TOOLBAR_PALETTES[toolbarVariant];
   const destinations = [topItem, ...groups.flatMap((group) => group.items)];
+  const hasAccount = accountSlot != null;
 
   return (
     // A `<nav>` for the same reason `HorizontalRail` is one: between
@@ -747,19 +1137,38 @@ function FloatingRail({
           palette={palette}
         />
       ))}
-      {footerItems.length > 0 && (
-        <>
-          <div className={cn("my-1 h-px w-6 shrink-0", palette.divider)} aria-hidden="true" />
-          {footerItems.map((item) => (
-            <ToolbarLink
-              key={item.href}
-              item={item}
-              active={isActive(item.href, currentPath)}
-              axis="vertical"
-              palette={palette}
-            />
-          ))}
-        </>
+      {(footerItems.length > 0 || hasAccount) && (
+        <div className={cn("my-1 h-px w-6 shrink-0", palette.divider)} aria-hidden="true" />
+      )}
+      {footerItems.map((item) => (
+        <ToolbarLink
+          key={item.href}
+          item={item}
+          active={isActive(item.href, currentPath)}
+          axis="vertical"
+          palette={palette}
+        />
+      ))}
+      {hasAccount && (
+        <NavSheet
+          presentation="side"
+          // The sidebar's content, in the sidebar's order and with its
+          // group headers — `NavSheet`'s doc has why all of it.
+          sections={[
+            { key: "top", items: [topItem] },
+            ...groups.map((group) => ({
+              key: `group:${group.label}`,
+              label: group.label,
+              items: group.items,
+            })),
+            { key: "footer", items: footerItems },
+          ]}
+          accountSlot={accountSlot}
+          currentPath={currentPath}
+          // Never "current": every destination is on this toolbar already,
+          // so the current page always has its own pill.
+          trigger={toolbarItemClasses("vertical", false, palette)}
+        />
       )}
     </nav>
   );
@@ -813,24 +1222,50 @@ const HORIZONTAL_RAIL_SLOTS = 4;
  * Footer items are "administrivia, not content" per this file's own doc,
  * so they lose to any destination for a slot, and they keep their labels
  * in the menu where there is room for them.
+ *
+ * # With an `accountSlot`, the menu becomes a sheet
+ *
+ * The account block has to live behind the same control, and a
+ * `role="menu"` cannot hold it: its children may only be `menuitem`s (and
+ * groups of them), so a radio group or a sign-out form inside one is
+ * invalid ARIA and, in Headless UI's `Menu`, keyboard-unreachable: arrow
+ * keys move only between items, and Tab inside the items is
+ * `preventDefault`ed and closes the menu (`menu/menu.js`). So with an
+ * `accountSlot` the control is labelled "More" and opens `NavSheet`'s
+ * modal bottom sheet instead: the same overflow destinations and footer
+ * items as labelled rows, then the account block rendered as-is. The
+ * control is shown whenever there is overflow **or** an account block, so
+ * a nav of four destinations with an `accountSlot` gains it — the bar is
+ * then as wide as any bar with an overflow, 288px.
+ *
+ * Without an `accountSlot` it stays the dropdown menu it was, named "More
+ * destinations". That is deliberate rather than left over: for a list of
+ * links, an M3 menu is what androidx's own toolbar overflow uses
+ * (`AppBarRow`'s overflow indicator, above), `menu`/`menuitem` is the
+ * right semantics for it, and a consumer who passes no `accountSlot` sees
+ * no change at all. The sheet replaces it only when there is something a
+ * menu cannot hold.
  */
 function HorizontalRail({
   topItem,
   groups,
   footerItems,
   currentPath,
+  accountSlot,
   toolbarVariant,
 }: {
   topItem: NavItem;
   groups: NavGroup[];
   footerItems: NavItem[];
   currentPath: string;
+  accountSlot: ReactNode;
   toolbarVariant: SideNavToolbarVariant;
 }) {
   const palette = TOOLBAR_PALETTES[toolbarVariant];
   const destinations = [topItem, ...groups.flatMap((group) => group.items)];
   const slots = destinations.slice(0, HORIZONTAL_RAIL_SLOTS);
-  const overflow = [...destinations.slice(HORIZONTAL_RAIL_SLOTS), ...footerItems];
+  const overflowDestinations = destinations.slice(HORIZONTAL_RAIL_SLOTS);
+  const overflow = [...overflowDestinations, ...footerItems];
   // If the current page is behind the menu, the menu button is what is
   // "current" as far as anyone scanning the toolbar can tell — so it
   // takes the current page's pill rather than leaving nothing marked.
@@ -890,34 +1325,49 @@ function HorizontalRail({
           palette={palette}
         />
       ))}
-      {overflow.length > 0 && (
-        <DropdownMenu>
-          <DropdownMenuTrigger aria-label="More destinations" className={more.target}>
-            <span aria-hidden="true" data-toolbar-item="" className={more.container}>
-              <MoreVertical size={24} aria-hidden="true" />
-            </span>
-          </DropdownMenuTrigger>
-          {/* `anchor="top end"`: this toolbar is pinned to the bottom of
+      {accountSlot != null ? (
+        <NavSheet
+          presentation="bottom"
+          sections={[
+            { key: "overflow", items: overflowDestinations },
+            { key: "footer", items: footerItems },
+          ]}
+          accountSlot={accountSlot}
+          currentPath={currentPath}
+          trigger={more}
+        />
+      ) : (
+        overflow.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger aria-label="More destinations" className={more.target}>
+              <span aria-hidden="true" data-toolbar-item="" className={more.container}>
+                <MoreVertical size={24} aria-hidden="true" />
+              </span>
+            </DropdownMenuTrigger>
+            {/* `anchor="top end"`: this toolbar is pinned to the bottom of
               the viewport, so `DropdownMenuContent`'s own `bottom start`
               default would open the menu off-screen.
               `[--anchor-gap:12px]` rather than the menu's own 4px: the
               gap is measured from the trigger, and the trigger sits 8px
               inside the toolbar's padding, so 4px left the menu's bottom
               edge overlapping the bar by 4px. */}
-          <DropdownMenuContent anchor="top end" className="[--anchor-gap:12px]">
-            {overflow.map((item) => (
-              <DropdownMenuLinkItem
-                key={item.href}
-                href={item.href}
-                aria-current={isActive(item.href, currentPath) ? "page" : undefined}
-                className={isActive(item.href, currentPath) ? "bg-base-300 font-medium" : undefined}
-              >
-                <item.icon size={16} className="shrink-0" aria-hidden="true" />
-                <span className="min-w-0 truncate">{item.label}</span>
-              </DropdownMenuLinkItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+            <DropdownMenuContent anchor="top end" className="[--anchor-gap:12px]">
+              {overflow.map((item) => (
+                <DropdownMenuLinkItem
+                  key={item.href}
+                  href={item.href}
+                  aria-current={isActive(item.href, currentPath) ? "page" : undefined}
+                  className={
+                    isActive(item.href, currentPath) ? "bg-base-300 font-medium" : undefined
+                  }
+                >
+                  <item.icon size={16} className="shrink-0" aria-hidden="true" />
+                  <span className="min-w-0 truncate">{item.label}</span>
+                </DropdownMenuLinkItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )
       )}
     </nav>
   );
@@ -989,6 +1439,7 @@ function FloatingRailPortal({
   groups: NavGroup[];
   footerItems: NavItem[];
   currentPath: string;
+  accountSlot: ReactNode;
   collapsed: boolean;
   toolbarVariant: SideNavToolbarVariant;
 }) {
@@ -1051,6 +1502,11 @@ function FloatingRailPortal({
  *     that takes a lane. With `collapsed`, this band uses the vertical
  *     rail too, which is the only version that gives the content its
  *     width back.
+ *
+ * With an `accountSlot`, both toolbars end in a "More" control that opens
+ * an M3 modal sheet holding the account block — a bottom sheet from the
+ * phone bar, a navigation drawer from the vertical rail (`NavSheet`) — so
+ * the account block is reachable at every width, not only the sidebar's.
  *
  * Opt-in `smallScreen="off-canvas"` is unchanged: the off-canvas tree
  * below `lg` (full labels, collapsible accordion groups) for a caller
@@ -1195,6 +1651,7 @@ export function SideNav({
           groups={groups}
           footerItems={footerItems}
           currentPath={currentPath}
+          accountSlot={accountSlot}
           collapsed={collapsed === true}
           toolbarVariant={toolbarVariant}
         />
@@ -1241,12 +1698,12 @@ export function SideNav({
           ))}
         </div>
         {/* Hidden in the icon rail band (no room for the account block at
-            64px) and, in floating mode, below `lg` too (no room in a 64px toolbar
-            either, and floating mode has no off-canvas tree for it to
-            live in) — shown off-canvas (in `"off-canvas"` mode only) and
-            at the full-label desktop width, by the same `lg:hidden
-            xl:block` toggle technique as the rest of this file, not a JS
-            breakpoint check. */}
+            64px) and, in floating mode, everywhere below `xl` — there the
+            floating toolbars carry it instead, behind their "More" control
+            (`NavSheet`) — and shown off-canvas (in `"off-canvas"` mode
+            only) and at the full-label desktop width, by the same
+            `lg:hidden xl:block` toggle technique as the rest of this file,
+            not a JS breakpoint check. */}
         {accountSlot != null && (
           <div className={cn("px-3 lg:hidden xl:block", smallScreen === "floating" && "hidden")}>
             {accountSlot}

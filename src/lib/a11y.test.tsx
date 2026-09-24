@@ -834,6 +834,21 @@ describe("SideNav, including the portalled rails", () => {
     ["floating (default)", <SideNav key="a" {...NAV} />],
     ["collapsed", <SideNav key="b" {...NAV} collapsed />],
     ["off-canvas", <SideNav key="c" {...NAV} smallScreen="off-canvas" />],
+    // Both rails gain a "More" control that opens a dialog (vaam-apps/ui#36).
+    // Closed here; the open sheet is audited in Chromium, in
+    // `e2e/side-nav-account-sheet.spec.ts`, where it has a real layout.
+    [
+      "floating, with an accountSlot",
+      <SideNav
+        key="d"
+        {...NAV}
+        accountSlot={
+          <button type="button" className="text-left">
+            Sign out
+          </button>
+        }
+      />,
+    ],
   ])("%s", async (_name, element) => {
     const violations = await auditBody(element);
     expect(violations, `\n${describeViolations(violations)}\n`).toHaveLength(0);
