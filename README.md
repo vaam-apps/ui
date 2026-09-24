@@ -371,15 +371,22 @@ throws too, rather than being silently rounded.
 
 ## Dates
 
-`DatePicker` and `DateRangePicker` wrap `react-day-picker` in a popover
-and exchange **`YYYY-MM-DD` strings, not `Date` objects**. A `Date` is an
+`DatePicker` and `DateRangePicker` are M3's date pickers, built on
+`react-day-picker` as compound components like `Select`. They exchange
+**`YYYY-MM-DD` strings, not `Date` objects**. A `Date` is an
 instant, and an instant rendered in another zone is a different calendar
 day — which is how a filter for "today" quietly returns yesterday's rows
 for anyone west of the server. `Date` is confined to the internals.
 
 ```tsx
 const [range, setRange] = useState<IsoDateRange | undefined>();
-<DateRangePicker value={range} onValueChange={setRange} />
+<DateRangePicker value={range} onValueChange={setRange}>
+  <DatePickerTrigger aria-label="Created between">
+    <DatePickerValue placeholder="Any time" />
+    <DatePickerClear />
+  </DatePickerTrigger>
+  <DatePickerContent />
+</DateRangePicker>
 ```
 
 `Calendar` is the bare, themed `DayPicker` if you need a different shell.

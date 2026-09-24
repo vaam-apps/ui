@@ -213,12 +213,12 @@ test.describe("DatePicker — a Clear button layered over its own field", () => 
       const trigger = storyRoot(page).getByRole("button", { expanded: false });
       const clear = storyRoot(page).getByRole("button", { name: /^Clear / });
 
-      await expectOwnsItsCentre(page, clear, "Clear Pick a date", "the Clear button");
+      await expectOwnsItsCentre(page, clear, "Clear the date", "the Clear button");
       await expect
         .poll(async () => (await hitAtVisibleCentre(page, trigger)).control, {
           message: "the field itself",
         })
-        .toContain("Pick a date");
+        .toContain("2026-09-11");
 
       const regions = await tapRegions(page);
       const clearRegion = regions.find((r) => r.name.startsWith("Clear"));
@@ -262,7 +262,7 @@ test.describe("DatePicker — a Clear button layered over its own field", () => 
           async () => (await hitAt(page, labelBox.x + 4, trigger.y + trigger.height / 2)).control,
           { message: `${density}: the label's own pixels belong to the trigger` },
         )
-        .toContain("Pick a date");
+        .toContain("2026-09-11");
     }
   });
 });
@@ -270,11 +270,10 @@ test.describe("DatePicker — a Clear button layered over its own field", () => 
 test.describe("Calendar — prev/next nav beside a caption that is not a target", () => {
   for (const density of DENSITIES) {
     test(`nav owns its glyph and the caption owns its own at ${density}`, async ({ page }) => {
-      // The popover, not `BareCalendar`: that story has no positioned
-      // ancestor of its own, so RDP's absolutely positioned nav anchors to
-      // a full-width element and the geometry measured there is a fact
-      // about the fixture. Inside `DatePicker`'s panel the nav is anchored
-      // to the panel, which is how a consumer renders it.
+      // Inside `DatePicker`'s docked panel, which is how a consumer
+      // renders it, rather than `BareCalendar`: the panel is the edge a
+      // cover must not cross. The arrows sit together at the end of the
+      // month row, M3's layout, clear of the caption at its start.
       await openStory(page, STORY.datePickerSingle, { density });
       await storyRoot(page).getByRole("button", { expanded: false }).click();
       await settleTransitions(page);
@@ -285,7 +284,7 @@ test.describe("Calendar — prev/next nav beside a caption that is not a target"
       await expectOwnsItsCentre(page, next, "Go to the Next Month", "the next nav button");
 
       // The caption has no click action, and a nav button's target
-      // reaching across it must not give it one. `control: null` is the
+      // reaching toward it must not give it one. `control: null` is the
       // assertion — "no control claims this pixel" — rather than a
       // selector for the caption itself.
       const caption = page.getByText(/^September 2026$/).first();
@@ -300,17 +299,14 @@ test.describe("Calendar — prev/next nav beside a caption that is not a target"
         page,
         { x: captionBox.x + 2, y: captionBox.y + captionBox.height / 2 },
         null,
-        `${density}: not at its left edge either, which is the side the prev button reaches toward`,
+        `${density}: not at its left edge either`,
       );
 
-      // Inside the panel it is anchored to. This is the containment an
-      // anchored control has to get from somewhere other than flow — and
-      // it is the gate that replaced the non-binding `--tap-room-top` /
-      // `--tap-room-left` these two used to declare "in case the offsets
-      // change". A changed offset fails here whether or not anybody
-      // remembered to declare a room, which a declaration could not
-      // promise.
-      const panel = await box(page.locator('[id^="headlessui-popover-panel"]').first());
+      // Inside the panel. The arrows are in-flow targets in a `nav` that
+      // is itself absolutely placed 12px from the panel's end, so their
+      // covers' containment comes from that offset, not from flow — and a
+      // changed offset fails here.
+      const panel = await box(page.locator("[data-date-picker]"));
       const navRegions = await tapRegions(page);
       for (const name of ["Go to the Previous Month", "Go to the Next Month"] as const) {
         const region = navRegions.find((r) => r.name === name);

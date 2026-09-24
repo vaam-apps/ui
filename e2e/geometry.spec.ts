@@ -525,13 +525,13 @@ test.describe("D11 — comfortable tap-target floor (48dp) on icon-only affordan
     expectTapTarget(await tapTargetSize(clearComfortable));
   });
 
-  test("Calendar's prev/next nav: 28×28 visual box, unchanged; tap target reaches 48×48", async ({
+  test("Calendar's prev/next nav: M3's 40×40 icon button; tap target reaches 48×48", async ({
     page,
   }) => {
     await openStory(page, STORY.bareCalendar);
     const prev = storyRoot(page).getByRole("button", { name: "Go to the Previous Month" });
-    expectSize(await box(prev), { width: 28, height: 28 }, "compact visual box");
-    expectSize(await tapTargetSize(prev), { width: 28, height: 28 }, "compact tap target");
+    expectSize(await box(prev), { width: 40, height: 40 }, "compact visual box");
+    expectSize(await tapTargetSize(prev), { width: 40, height: 40 }, "compact tap target");
 
     await openStory(page, STORY.bareCalendar, { density: "comfortable" });
     const prevComfortable = storyRoot(page).getByRole("button", {
@@ -539,7 +539,7 @@ test.describe("D11 — comfortable tap-target floor (48dp) on icon-only affordan
     });
     expectSize(
       await box(prevComfortable),
-      { width: 28, height: 28 },
+      { width: 40, height: 40 },
       "comfortable visual box, unchanged",
     );
     expectTapTarget(await tapTargetSize(prevComfortable));
