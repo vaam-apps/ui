@@ -333,7 +333,6 @@ export function Select({
     return (
       <Combobox
         as="div"
-        className="relative"
         // `null`, not `""`, for "nothing picked": `""` can be a real
         // option's value, and Headless UI would mark that option selected
         // before anyone picked it.
@@ -370,15 +369,12 @@ export function Select({
   }
 
   return (
-    // `as="div"` + `relative`: with `SelectContent` no longer portaled
-    // (see its own comment), the options position themselves against this
-    // element. Headless UI's `Listbox` renders a fragment by default, which
-    // would leave `absolute` resolving against whatever ancestor happened
-    // to be positioned — usually the drawer, putting the dropdown in the
-    // wrong place entirely.
+    // `as="div"`: one element for the select in the caller's layout, rather
+    // than Headless UI's default fragment. It used to be `relative` too, to
+    // anchor an `absolute` dropdown; the dropdown is `fixed` now, placed by
+    // `useDropdownPlacement`, and nothing positions against this element.
     <Listbox
       as="div"
-      className="relative"
       // `null` for "nothing picked" — see the same line on `Combobox` above.
       value={currentValue ?? null}
       onChange={(next: string | null) => {
@@ -855,6 +851,12 @@ function flattenParts(node: ReactNode, prefix = ""): ReactNode[] {
   });
 }
 
+/** The shortest a dropdown shrinks to before it flips to the other side
+ * of its trigger instead — a library choice: a docked search view's 56px
+ * header, four of its 32px rows and the list's 8px of padding (192px,
+ * measured), rounded up. */
+const DROPDOWN_MIN_HEIGHT = 200;
+
 /**
  * Where the dropdown goes: under its trigger, by Floating UI, in
  * `position: fixed`, while staying rendered inline.
@@ -871,21 +873,18 @@ function flattenParts(node: ReactNode, prefix = ""): ReactNode[] {
  * `portal={false}` comment, and it has not changed.
  *
  * `size` hands the trigger's width and the height available to CSS, so
- * the dropdown shrinks to fit; `flip` opens it upward when even
- * `DROPDOWN_MIN_HEIGHT` does not fit below; `shift` keeps a docked search
- * view's 16rem on screen near the right edge.
+ * the dropdown shrinks to fit. `flip` opens it upward when it does not fit
+ * below and less than `DROPDOWN_MIN_HEIGHT` is left there — a short list
+ * that fits never flips — and, checking the horizontal edges too, aligns
+ * it to the trigger's right edge instead of its left when a docked search
+ * view's 16rem would run off the right of the window. `shift` only acts
+ * when neither alignment fits, on a window narrower than the view.
  *
  * The result goes out as custom properties, never as inline `top`/`left`:
  * below `sm` a `SelectContent` is a sheet or a full-screen view whose
  * `max-sm:` classes must win, and an inline style would beat them. The
  * classes decide whether to use the numbers; no breakpoint is read here.
  */
-/** The shortest a dropdown shrinks to before it flips to the other side
- * of its trigger instead — a library choice: a docked search view's 56px
- * header, four of its 32px rows and the list's 8px of padding (192px,
- * measured), rounded up. */
-const DROPDOWN_MIN_HEIGHT = 200;
-
 function useDropdownPlacement(
   presentation: SelectPresentation,
   triggerRef: RefObject<HTMLButtonElement | null>,

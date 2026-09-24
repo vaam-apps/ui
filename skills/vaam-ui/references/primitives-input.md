@@ -248,9 +248,14 @@ focus trap, where they never become usable. So they all work inside a
 `position: fixed`, placed under its trigger by Floating UI, so a scrolling
 or clipping ancestor — a `Dialog`'s body, a drawer's, a card with
 `overflow-hidden` — no longer cuts it off. It matches the trigger's width,
-shrinks to the room below it, and opens *above* the trigger when less
-than 200px is left below and more is above; with too little room either
-side it keeps the better side, shorter. Do not put a `Select` inside something that re-anchors
+shrinks to the room below it, and opens *above* the trigger only when it
+does not fit below and less than 200px is left there (a short list that
+fits never flips); with too little room either side it keeps the better
+side, shorter. Near the right edge of the window a docked search view
+aligns to its trigger's right edge instead of its left. Its placement is
+the library's: do not pass `top-*`, `left-*`, `inset-*` or `mt-*` in
+`className` (they replace or add to it), and know that a `max-h-*` there
+replaces the cap that keeps it inside the window. Do not put a `Select` inside something that re-anchors
 `position: fixed` children at phone width (a `transform`ed or
 `will-change`d ancestor that is *not* pinned to the bottom edge — the
 sheet anchors to that ancestor instead of the screen). A width you pass

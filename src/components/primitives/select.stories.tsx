@@ -924,10 +924,11 @@ export const SearchableInsideADrawer: Story = {
  * it is a pointer-only affordance (`aria-hidden`), because a listbox may own
  * options only.
  *
- * From `sm` up both selects here are dropdowns, and the dialog is far
- * shorter than either: they used to be clipped to one row by the dialog's
- * scrolling body. Now they float over it, under the trigger — or above it,
- * on a window too short to fit one below.
+ * From `sm` up both selects here are dropdowns that reach well past the
+ * dialog's bottom edge. The searchable one used to be clipped to one row
+ * by the dialog's scrolling body, and the plain one would have been cut
+ * off the same way. Now they float over it, under the trigger — or above
+ * it, on a window too short to fit one below.
  */
 export const SearchableInADialog: Story = {
   globals: { viewport: { value: "desktop" } },

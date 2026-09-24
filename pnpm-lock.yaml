@@ -170,7 +170,7 @@ importers:
   .:
     dependencies:
       '@floating-ui/react-dom':
-        specifier: ^2.1.9
+        specifier: ^2.1.2
         version: 2.1.9(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@headlessui/react':
         specifier: ^2.2.10

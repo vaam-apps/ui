@@ -9,7 +9,7 @@ import { cn } from "../../lib/cn";
  * `@floating-ui/react`) just to replace one Radix package with another
  * contradicts constraints 6–7.
  *
- * Since 2026-09-24 `@floating-ui/react-dom` *is* a direct dependency — a
+ * Since #32 `@floating-ui/react-dom` *is* a direct dependency — a
  * maintainer's call, for `Select`'s dropdown, which a `Dialog` clipped
  * (`useDropdownPlacement` in `select.tsx`). It positions; it is not a
  * behaviour library. This tooltip has not been moved onto it, so the

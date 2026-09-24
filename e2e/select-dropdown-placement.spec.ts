@@ -10,7 +10,8 @@ import { STORY } from "./story-ids";
  * clipped it — inside a `Dialog`, one row of a 346px search view showed.
  * Each test here reads the render: where the dropdown is relative to its
  * trigger, and whether its bottom edge is actually painted (a hit test
- * there lands inside it) rather than merely laid out.
+ * there lands inside it) rather than merely laid out. Every assertion
+ * message says what went wrong when it fails, prefixed "failed:".
  */
 
 const DESKTOP = { width: 1280, height: 800 };
@@ -47,9 +48,14 @@ for (const [engine, name] of [
   }) => {
     const trigger = await box(await openInDialog(page, DESKTOP, name));
     const rect = await box(surface(page));
-    expect(rect.y - (trigger.y + trigger.height), "4px under the trigger").toBeCloseTo(4, 0);
-    expect(rect.x, "aligned with the trigger").toBeCloseTo(trigger.x, 0);
-    expect(await paintedToItsBottom(page), "the dialog's body clipped the dropdown").toBe(true);
+    expect(rect.y - (trigger.y + trigger.height), "failed: not 4px under its trigger").toBeCloseTo(
+      4,
+      0,
+    );
+    expect(rect.x, "failed: not aligned with its trigger").toBeCloseTo(trigger.x, 0);
+    expect(await paintedToItsBottom(page), "failed: the dialog's body clipped the dropdown").toBe(
+      true,
+    );
   });
 }
 
@@ -68,16 +74,23 @@ test("with reasonable room below, it shrinks to fit there rather than flip above
   const triggerLocator = storyRoot(page).getByRole("button", { name: "Country" });
   const trigger = await box(triggerLocator);
   const roomBelow = DESKTOP.height - (trigger.y + trigger.height) - 4 - 8;
-  expect(roomBelow, "the setup no longer leaves 200–346px under the trigger").toBeGreaterThan(200);
+  expect(
+    roomBelow,
+    "failed: the setup no longer leaves 200–346px under the trigger",
+  ).toBeGreaterThan(200);
   expect(roomBelow).toBeLessThan(346);
   await triggerLocator.click();
   await expect(page.getByRole("combobox")).toBeFocused();
   await settleTransitions(page);
   const rect = await box(surface(page));
-  expect(rect.y, "it flipped above the trigger").toBeGreaterThan(trigger.y + trigger.height);
-  expect(rect.y + rect.height, "it runs past the window's bottom edge").toBeLessThanOrEqual(
-    DESKTOP.height - 8 + 1,
-  );
+  expect(
+    rect.y,
+    "failed: the dropdown flipped above its trigger instead of shrinking to fit below it",
+  ).toBeGreaterThan(trigger.y + trigger.height);
+  expect(
+    rect.y + rect.height,
+    "failed: the dropdown runs past the window's bottom edge",
+  ).toBeLessThanOrEqual(DESKTOP.height - 8 + 1);
 });
 
 test("with too little room below and enough above, it flips above its trigger", async ({
@@ -87,7 +100,7 @@ test("with too little room below and enough above, it flips above its trigger", 
   // the window's bottom edge, with ~240px above it.
   const trigger = await box(await openInDialog(page, { width: 1280, height: 420 }, "Channel"));
   const rect = await box(surface(page));
-  expect(trigger.y - (rect.y + rect.height), "4px above the trigger").toBeCloseTo(4, 0);
+  expect(trigger.y - (rect.y + rect.height), "failed: not 4px above its trigger").toBeCloseTo(4, 0);
   expect(await paintedToItsBottom(page)).toBe(true);
 });
 
@@ -98,7 +111,10 @@ test("with too little room on either side, it stays on the window, shorter", asy
   const trigger = await box(await openInDialog(page, { width: 1280, height: 420 }, "Country"));
   const rect = await box(surface(page));
   expect(rect.y).toBeGreaterThan(trigger.y + trigger.height);
-  expect(rect.y + rect.height, "past the window's bottom edge").toBeLessThanOrEqual(420 - 8 + 1);
+  expect(
+    rect.y + rect.height,
+    "failed: the dropdown runs past the window's bottom edge",
+  ).toBeLessThanOrEqual(420 - 8 + 1);
   expect(await paintedToItsBottom(page)).toBe(true);
 });
 

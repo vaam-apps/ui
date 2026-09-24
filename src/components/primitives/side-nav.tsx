@@ -195,7 +195,7 @@ function isActive(href: string, currentPath: string): boolean {
  *
  * There is no CSS-only way out: any flyout anchored inside a scroll
  * container is clipped by it, and escaping needs a portal, `position:
- * fixed` placed by script (Floating UI, a dependency since 2026-09-24 for
+ * fixed` placed by script (Floating UI, a dependency since #32 for
  * `Select`'s dropdown), or CSS anchor positioning, a feature not yet safe
  * to require — each more machinery than a label needs.
  * A native `title` is painted by the browser *outside* the page entirely,
