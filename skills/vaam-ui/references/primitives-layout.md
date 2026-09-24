@@ -375,6 +375,22 @@ server-rendered HTML — the sidebar, and the whole off-canvas tree. The
 rails cannot be, because a portal needs a `document`, so they mount
 after hydration.
 
+### One `aria-label="Primary"` landmark at every width
+
+All three shapes are `<nav aria-label="Primary">`, and exactly one is
+exposed to assistive technology at any width. Up to and including 0.3.0
+that was false below 1280px: the in-flow `<nav>` had no `display: none`
+there, so it was an empty, zero-width second "Primary" landmark beside
+the rail, and axe reported `landmark-unique`
+([vaam-apps/ui#16](https://github.com/vaam-apps/ui/issues/16)). If your
+app suppressed `landmark-unique` on a shell story or page because of
+`SideNav`, remove the suppression once you are on the fixed version.
+
+Do not pass `SideNav` a `className` that sets `display` (`flex`,
+`block`). It is merged last and replaces the `hidden` that keeps the
+in-flow `<nav>` out of the accessibility tree below 1280px, which brings
+the second landmark back. Width, height and position classes are fine.
+
 ## `ScreenStack` / `ScreenHeader`
 
 The page scaffold, so a screen does not rebuild it. `ScreenStack` is the

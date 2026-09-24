@@ -148,10 +148,13 @@ describe("the floating rail escapes its wrapper without duplicating the landmark
    * phone was therefore getting its navigation with no landmark at all.
    *
    * Three identically-named landmarks in the DOM is only safe because
-   * exactly one is ever displayed, which is what the previous case
-   * pins. This one pins the other half: that all three really do carry
-   * the landmark, so the fix cannot be half-reverted by someone turning
-   * one of them back into a `div`.
+   * exactly one is ever displayed. The previous case pins that for the
+   * two rails' gates only, as class strings; the in-flow `<nav>` was a
+   * second exposed `Primary` landmark below 1280px for two releases while
+   * it passed (vaam-apps/ui#16), so the real check is
+   * `e2e/side-nav-bands.spec.ts`, in Chromium. This one pins the other
+   * half: that all three really do carry the landmark, so the fix cannot
+   * be half-reverted by someone turning one of them back into a `div`.
    */
   it("makes every shape a Primary landmark, rails included", async () => {
     await mount(<SideNav {...PROPS} smallScreen="floating" />, () => {
