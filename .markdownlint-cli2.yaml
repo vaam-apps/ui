@@ -1,0 +1,25 @@
+# The org's Markdown gate, run here. Super-linter (vaam-apps/.github's
+# reusable lint.yml, pinned in .github/workflows/quality.yml) applies the
+# config below to the Markdown files a pull request changes. It never runs
+# the files a pull request leaves alone. So the vaam-ui skill carried 221
+# MD060 failures that no upstream check ever saw, and each consumer that
+# vendors the skill byte-for-byte (`npx skills add vaam-apps/ui`) found them
+# in its own CI and had to exclude the folder. `pnpm lint` runs this over
+# every tracked file instead.
+#
+# Copied from the org config on 2026-09-24. If the org config changes, this
+# copy has to follow it. AGENTS.md and CLAUDE.md are excluded because the org
+# workflow excludes them.
+config:
+  extends: markdownlint/style/prettier
+  default: true
+  MD060:
+    style: aligned
+  MD024:
+    siblings_only: true
+globs:
+  - "**/*.md"
+ignores:
+  - AGENTS.md
+  - CLAUDE.md
+gitignore: true
