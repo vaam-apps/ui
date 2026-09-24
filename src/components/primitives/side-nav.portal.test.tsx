@@ -225,6 +225,28 @@ describe("the floating rail escapes its wrapper without duplicating the landmark
   });
 
   /**
+   * `accountSlot={signedIn && <Account />}` passes `false` while signed
+   * out, and `false`, `true` and `""` render nothing in React. Compared
+   * with `!= null`, each of them counted as an account block: both rails
+   * gained a "More" control and the phone bar's menu became a sheet with
+   * no account in it.
+   */
+  it.each([
+    ["false", false],
+    ["true", true],
+    ["an empty string", ""],
+  ])("an accountSlot of %s is no account block", async (_name, slot) => {
+    await mount(<SideNav {...PROPS} accountSlot={slot} />, () => {
+      expect(document.querySelectorAll("[data-side-nav-more]")).toHaveLength(0);
+      expect(
+        document
+          .querySelector('button[aria-label="More destinations"]')
+          ?.getAttribute("aria-haspopup"),
+      ).toBe("menu");
+    });
+  });
+
+  /**
    * The sheet is `fixed`, and the rail it opens from is `translate`d to
    * centre it — so a sheet rendered inside the rail would be laid out
    * against the 64px toolbar, whatever the caller wrapped `SideNav` in.

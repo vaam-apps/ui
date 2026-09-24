@@ -175,6 +175,20 @@ function isActive(href: string, currentPath: string): boolean {
 }
 
 /**
+ * Whether `accountSlot` is an account block at all. `false`, `true` and
+ * `""` render nothing in React, and `accountSlot={signedIn && <Account />}`
+ * passes `false` while signed out. This used to be `!= null`, which was
+ * harmless while the slot only ever landed in the sidebar (an empty
+ * wrapper), and stopped being harmless once its presence decides the
+ * toolbars' shape: each of those values put a "More" control on both
+ * rails and turned the phone bar's menu into a sheet with no account in
+ * it (`side-nav.portal.test.tsx`).
+ */
+function hasAccountBlock(slot: ReactNode): boolean {
+  return slot !== null && slot !== undefined && typeof slot !== "boolean" && slot !== "";
+}
+
+/**
  * One nav row, in one of the two shapes the sidebar ever needs.
  *
  * **CSS-driven, not `useMediaQuery`-driven — found live, corrected after
@@ -1582,6 +1596,9 @@ export function SideNav({
   // floating rail. This file's own comment says this element "must not
   // draw a box of its own down here"; it was drawing a thin one.
   const inFlow = smallScreen === "floating" ? "hidden xl:flex" : "flex";
+  // Normalised once, so every `!= null` below — the rails', the sheet's,
+  // this sidebar's — means "there is an account block" (`hasAccountBlock`).
+  const account = hasAccountBlock(accountSlot) ? accountSlot : undefined;
 
   return (
     <nav
@@ -1651,7 +1668,7 @@ export function SideNav({
           groups={groups}
           footerItems={footerItems}
           currentPath={currentPath}
-          accountSlot={accountSlot}
+          accountSlot={account}
           collapsed={collapsed === true}
           toolbarVariant={toolbarVariant}
         />
@@ -1704,9 +1721,9 @@ export function SideNav({
             only) and at the full-label desktop width, by the same
             `lg:hidden xl:block` toggle technique as the rest of this file,
             not a JS breakpoint check. */}
-        {accountSlot != null && (
+        {account != null && (
           <div className={cn("px-3 lg:hidden xl:block", smallScreen === "floating" && "hidden")}>
-            {accountSlot}
+            {account}
           </div>
         )}
       </div>
