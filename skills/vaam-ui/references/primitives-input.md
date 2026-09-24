@@ -196,7 +196,7 @@ value, and everything visible is a part you nest inside it. You describe
 presentation at which width. Adding a `<SelectSearch />` is the whole
 switch from a plain picker to a searchable one.
 
-**The value and the trigger**
+### The value and the trigger
 
 - **`Select`** owns the value. `value` / `defaultValue` / `onValueChange`
   (all `string`), plus `disabled` and `aria-invalid`. Controlled when
@@ -216,7 +216,7 @@ switch from a plain picker to a searchable one.
   from inside your own wrapper component if the label differs from the
   value.
 
-**The container — pick one**
+### The container — pick one
 
 - **`SelectContent`** (use this by default) — a dropdown under the
   trigger from 640px up; **below 640px an M3 modal bottom sheet** (pinned
@@ -242,7 +242,7 @@ sheet anchors to that ancestor instead of the screen). A width you pass
 to `SelectContent`'s `className` (`w-64`) applies to the dropdown only;
 the phone sheet stays full-width unless you pass a `max-sm:` width.
 
-**The options**
+### The options
 
 - **`SelectItem`** takes a `value` and its label as children. Labels clamp
   to two lines. `textValue` is what search matches against — pass it when
@@ -251,7 +251,7 @@ the phone sheet stays full-width unless you pass a `max-sm:` width.
 - **`SelectGroup`** is semantic grouping only — a `contents` fieldset with
   no visual treatment of its own.
 
-**Search — a searchable select**
+### Search — a searchable select
 
 - **`SelectSearch`** — an M3 search field in the popup's header (write it
   first among the container's children; it is lifted into the header
@@ -268,7 +268,7 @@ the phone sheet stays full-width unless you pass a `max-sm:` width.
   ("No country matches", or "Searching…" while your fetch is in flight).
   It is announced politely (`role="status"`).
 
-**Chrome — public parts with defaults, so you rarely write them**
+### Chrome — public parts with defaults, so you rarely write them
 
 - **`SelectClose`** — closes the popup. The full-screen search view leads
   with one (a back arrow, named "Back") unless you place your own; add one
