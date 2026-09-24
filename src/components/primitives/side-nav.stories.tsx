@@ -173,7 +173,7 @@ const meta = {
           "a drawer and wants every band in flow.\n\n" +
           "Both toolbars are M3's own geometry, transcribed from androidx: 64px across, fully " +
           "round, 8px padding, 4px between 48px targets, 24px icons, and the current page drawn " +
-          "as a wide filled pill. `railColors` picks M3's `standard` or `vibrant` scheme — the " +
+          "as a wide filled pill. `toolbarVariant` picks M3's `standard` or `vibrant` scheme — the " +
           "two “Toolbar colours” stories render each over the same real content.\n\n" +
           "All of it is plain CSS — no `useMediaQuery`, no viewport read — so the bands are " +
           "server-rendered. The one exception is the floating rails themselves, which are " +
@@ -616,14 +616,15 @@ function BusyPage({ bottomPad }: { bottomPad: string }) {
 /**
  * **Toolbar colours — standard.** M3's default floating-toolbar scheme:
  * a `SurfaceContainer` bar (`surface-2`) with muted icons, and the current
- * page as a filled `primary` pill. Scroll the page: the bar's own fill is
- * close to the cards', and what keeps it readable is the shadow — the
- * one place this toolbar departs from androidx, which ships it at
- * elevation `Level0`. Compare with the vibrant story beside this one.
+ * page as a filled `primary` pill, with no shadow — androidx ships it at
+ * elevation `Level0`, and so does this. Scroll the page on the dark theme:
+ * where a `surface-2` card passes under it the bar's edge disappears and
+ * only its icons remain. That is the accepted cost of matching M3; the
+ * vibrant story is the answer for a screen where it matters.
  */
 export const ToolbarColorsStandard: Story = {
   globals: { viewport: { value: "tiny" } },
-  args: { currentPath: "/messages", railColors: "standard" },
+  args: { currentPath: "/messages", toolbarVariant: "standard" },
   render: (args) => (
     <>
       <SideNav {...args} />
@@ -642,7 +643,7 @@ export const ToolbarColorsStandard: Story = {
  */
 export const ToolbarColorsVibrant: Story = {
   globals: { viewport: { value: "tiny" } },
-  args: { currentPath: "/messages", railColors: "vibrant" },
+  args: { currentPath: "/messages", toolbarVariant: "vibrant" },
   render: (args) => (
     <>
       <SideNav {...args} />
@@ -656,7 +657,7 @@ export const ToolbarColorsVibrant: Story = {
  * which is androidx's vertical toolbar sample, turned. */
 export const VerticalToolbarVibrant: Story = {
   globals: { viewport: { value: "medium" } },
-  args: { currentPath: "/providers", railColors: "vibrant" },
+  args: { currentPath: "/providers", toolbarVariant: "vibrant" },
   render: (args) => (
     <div className="flex">
       <SideNav {...args} />

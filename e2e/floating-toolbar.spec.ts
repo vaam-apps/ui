@@ -46,6 +46,17 @@ test.describe("the horizontal floating toolbar, below 640px", () => {
     expect(radius, "fully round").toBeGreaterThanOrEqual(rect.height / 2);
     const border = await bar.evaluate((el) => getComputedStyle(el).borderTopWidth);
     expect(border, "M3's toolbar has no outline").toBe("0px");
+    // `ElevationTokens.Level0`, as androidx ships it — a maintainer's call
+    // (2026-09-24) over a soft shadow; `side-nav.tsx`'s `TOOLBAR_CONTAINER`
+    // has the trade-off. Tailwind composes empty ring layers into
+    // `box-shadow` whenever any shadow utility is present, so "every layer
+    // is transparent" is the honest reading, not `=== "none"`.
+    const shadow = await bar.evaluate((el) => getComputedStyle(el).boxShadow);
+    expect(
+      shadow === "none" ||
+        shadow.split(/,(?![^(]*\))/).every((layer) => /rgba\(0, 0, 0, 0\)/.test(layer)),
+      `M3's floating toolbar has no elevation (box-shadow: ${shadow})`,
+    ).toBe(true);
   });
 
   test("every target is 48×48 around a 40px container, and the current page is a 64×40 pill", async ({

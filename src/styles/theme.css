@@ -948,15 +948,6 @@
      layers (popover, dropdown, dialog, tooltip, sheet/drawer) get one. */
   --shadow-popover: 0 8px 24px -6px rgb(0 0 0 / 0.65), 0 0 0 1px var(--edge);
   --shadow-dialog: 0 24px 56px -12px rgb(0 0 0 / 0.75), 0 0 0 1px var(--edge);
-  /* `SideNav`'s floating toolbars: `--shadow-popover`'s own drop shadow
-     with its `0 0 0 1px var(--edge)` ring removed. The ring is a border
-     in all but name, and M3's floating toolbar has no outline
-     (`FloatingToolbarTokens.kt` declares none) — `side-nav.tsx`'s
-     `TOOLBAR_CONTAINER` doc has why a shadow survives at all when
-     androidx ships the toolbar at `Level0`. Not a new number: the same
-     blur, offset and alpha this theme already uses for a layer
-     floating over unknown content. */
-  --shadow-toolbar: 0 8px 24px -6px rgb(0 0 0 / 0.65);
 
   --edge-subtle: #1f232a;
   --edge: #2a2f37;
@@ -1159,7 +1150,6 @@
      depth. */
   --shadow-popover: 0 8px 24px -6px rgb(20 23 28 / 0.14), 0 0 0 1px var(--edge);
   --shadow-dialog: 0 24px 56px -12px rgb(20 23 28 / 0.2), 0 0 0 1px var(--edge);
-  --shadow-toolbar: 0 8px 24px -6px rgb(20 23 28 / 0.14);
 
   --edge-subtle: #e6e9ee;
   --edge: #d5dae2;

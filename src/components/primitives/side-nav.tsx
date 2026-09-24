@@ -128,7 +128,9 @@ export interface SideNavProps {
    *   androidx draws the other icons in `OnSurface` (the toolbar's
    *   content colour is `contentColorFor(SurfaceContainer)`); here they
    *   are `muted-foreground`, so the current page's pill is the one
-   *   full-contrast mark on the bar. Quiet until you look for it.
+   *   full-contrast mark on the bar. Quiet until you look for it — and,
+   *   with no shadow (M3's `Level0`; see `TOOLBAR_CONTAINER`), separated
+   *   from whatever scrolls under it by its fill alone.
    * - `"vibrant"` — a `PrimaryContainer` bar (`primary` here, so the bar
    *   is the inverse of the page: near-white on the dark theme,
    *   near-black on the light one) with the current page cut back out of
@@ -137,12 +139,12 @@ export interface SideNavProps {
    *   the only one whose contrast against the page does not depend on
    *   what happens to be scrolling underneath it.
    */
-  railColors?: RailColors | undefined;
+  toolbarVariant?: SideNavToolbarVariant | undefined;
   className?: string;
 }
 
-/** See `SideNavProps.railColors`. */
-export type RailColors = "standard" | "vibrant";
+/** See `SideNavProps.toolbarVariant`. */
+export type SideNavToolbarVariant = "standard" | "vibrant";
 
 function isActive(href: string, currentPath: string): boolean {
   if (href === "/") return currentPath === "/";
@@ -432,7 +434,7 @@ function GroupSection({
 
 /**
  * The two colour schemes of M3 Expressive's floating toolbar, as class
- * strings. See `SideNavProps.railColors` for where each role comes from.
+ * strings. See `SideNavProps.toolbarVariant` for where each role comes from.
  *
  * `idle` is a *state layer*, not a fill: M3 draws hover as the content
  * colour laid over the container at 8% (`StateTokens.HoverStateLayerOpacity`),
@@ -440,8 +442,8 @@ function GroupSection({
  * dark bar, darker on a light one, whichever scheme and theme that is —
  * from the same rule, without a second token for either.
  */
-const RAIL_PALETTES: Record<
-  RailColors,
+const TOOLBAR_PALETTES: Record<
+  SideNavToolbarVariant,
   { container: string; idle: string; selected: string; divider: string; ring: string }
 > = {
   standard: {
@@ -518,7 +520,7 @@ const TOOLBAR_ITEM_MOTION =
 function toolbarItemClasses(
   axis: "horizontal" | "vertical",
   active: boolean,
-  palette: (typeof RAIL_PALETTES)[RailColors],
+  palette: (typeof TOOLBAR_PALETTES)[SideNavToolbarVariant],
 ) {
   const along = axis === "horizontal";
   return {
@@ -558,7 +560,7 @@ function ToolbarLink({
   item: NavItem;
   active: boolean;
   axis: "horizontal" | "vertical";
-  palette: (typeof RAIL_PALETTES)[RailColors];
+  palette: (typeof TOOLBAR_PALETTES)[SideNavToolbarVariant];
 }) {
   const Icon = item.icon;
   const classes = toolbarItemClasses(axis, active, palette);
@@ -595,32 +597,34 @@ function ToolbarLink({
  *   `FloatingToolbarDefaults.ScreenOffset`. The bottom offset adds
  *   `env(safe-area-inset-bottom)` on top, because on a phone with a home
  *   indicator 16px from the *viewport* edge lands on the gesture bar.
- * - **Opaque, no outline, no blur.** The bar used to be `surface-2/90`
- *   with `backdrop-blur-md` and a hairline border; M3 has none of the
- *   three. The container colour is the separation.
+ * - **Opaque, no outline, no blur, no shadow.** The bar used to be
+ *   `surface-2/90` with `backdrop-blur-md`, a hairline border and
+ *   `--shadow-popover`; M3 has none of the four. androidx ships this
+ *   toolbar at `ElevationTokens.Level0` and has since the component was
+ *   introduced (checked against the history of `FloatingToolbar.kt`: the
+ *   value has been `Level0` in every revision, first as
+ *   `ContainerElevation` and, since the expanded/collapsed split, as
+ *   `ContainerExpandedElevation` with a `// TODO read from token`). Only
+ *   the with-FAB variant lifts to `Level1`, and this toolbar has no FAB.
  *
- * # The one deliberate departure: a shadow
+ * # What matching androidx costs, stated rather than hidden
  *
- * androidx ships this toolbar at `ElevationTokens.Level0` — no shadow at
- * all — and has since the component was introduced (checked against the
- * history of `FloatingToolbar.kt`: the value has been `Level0` in every
- * revision, first as `ContainerElevation` and, since the expanded/
- * collapsed split, as `ContainerExpandedElevation` with a
- * `// TODO read from token`). Only the with-FAB variant lifts to `Level1`.
- *
- * That is not carried over, for the reason this rail has always given for
- * being the one piece of permanent chrome in the library with a shadow
- * (`theme.css`: "borders, not shadows, for cards/tables/panels — only
- * floating layers get one"): it floats *unanchored* over content it knows
- * nothing about. On Android a Level0 toolbar sits over a `Surface` that
- * the same theme painted one tonal step darker; here it sits over
- * whatever a consumer's page happens to scroll under it, and on the dark
- * theme `surface-2` over a `surface-2` card is the same colour. With no
- * outline left to fall back on, the shadow is what remains of the edge.
- * `"vibrant"` does not need it — that is its whole case — and keeps it
- * only so the two schemes differ in exactly one thing.
+ * This bar is the one piece of permanent chrome in the library that
+ * floats *unanchored* over content it knows nothing about, which is why
+ * it used to carry the floating-layer shadow `theme.css` reserves for
+ * such layers ("borders, not shadows, for cards/tables/panels — only
+ * floating layers get one"). Without one, the container colour is the
+ * only separation. On Android a `Level0` toolbar sits over a `Surface`
+ * the same theme painted a tonal step darker; here it sits over whatever
+ * a consumer's page scrolls under it, and on the dark theme `surface-2`
+ * over a `surface-2` card is the same colour — over such a card the
+ * standard bar's edge disappears and only its icons remain. A shadow was
+ * weighed against that and dropped by the maintainer (2026-09-24) in
+ * favour of M3's `Level0` exactly. A screen that puts `surface-2` content
+ * under the bar has `toolbarVariant="vibrant"`, whose contrast with the
+ * page does not depend on what scrolls underneath.
  */
-const TOOLBAR_CONTAINER = "fixed z-40 flex rounded-full p-2 gap-1 shadow-[var(--shadow-toolbar)]";
+const TOOLBAR_CONTAINER = "fixed z-40 flex rounded-full p-2 gap-1";
 
 /**
  * `smallScreen="floating"`'s replacement for the off-canvas accordion
@@ -670,16 +674,16 @@ function FloatingRail({
   footerItems,
   currentPath,
   collapsed,
-  railColors,
+  toolbarVariant,
 }: {
   topItem: NavItem;
   groups: NavGroup[];
   footerItems: NavItem[];
   currentPath: string;
   collapsed: boolean;
-  railColors: RailColors;
+  toolbarVariant: SideNavToolbarVariant;
 }) {
-  const palette = RAIL_PALETTES[railColors];
+  const palette = TOOLBAR_PALETTES[toolbarVariant];
   const destinations = [topItem, ...groups.flatMap((group) => group.items)];
 
   return (
@@ -696,7 +700,7 @@ function FloatingRail({
       // `body > [data-floating-rail]` override). Selecting on the layout
       // classes instead would make a styling change silently break both.
       data-floating-rail=""
-      data-rail-colors={railColors}
+      data-toolbar-variant={toolbarVariant}
       className={cn(
         TOOLBAR_CONTAINER,
         palette.container,
@@ -803,15 +807,15 @@ function HorizontalRail({
   groups,
   footerItems,
   currentPath,
-  railColors,
+  toolbarVariant,
 }: {
   topItem: NavItem;
   groups: NavGroup[];
   footerItems: NavItem[];
   currentPath: string;
-  railColors: RailColors;
+  toolbarVariant: SideNavToolbarVariant;
 }) {
-  const palette = RAIL_PALETTES[railColors];
+  const palette = TOOLBAR_PALETTES[toolbarVariant];
   const destinations = [topItem, ...groups.flatMap((group) => group.items)];
   const slots = destinations.slice(0, HORIZONTAL_RAIL_SLOTS);
   const overflow = [...destinations.slice(HORIZONTAL_RAIL_SLOTS), ...footerItems];
@@ -836,7 +840,7 @@ function HorizontalRail({
       aria-label="Primary"
       data-floating-rail=""
       data-floating-rail-axis="horizontal"
-      data-rail-colors={railColors}
+      data-toolbar-variant={toolbarVariant}
       className={cn(
         TOOLBAR_CONTAINER,
         palette.container,
@@ -970,7 +974,7 @@ function FloatingRailPortal({
   footerItems: NavItem[];
   currentPath: string;
   collapsed: boolean;
-  railColors: RailColors;
+  toolbarVariant: SideNavToolbarVariant;
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -1084,7 +1088,7 @@ export function SideNav({
   accountSlot,
   smallScreen = "floating",
   collapsed,
-  railColors = "standard",
+  toolbarVariant = "standard",
   className,
 }: SideNavProps) {
   // In floating mode the in-flow tree exists only at `xl`. The `<nav>`
@@ -1151,7 +1155,7 @@ export function SideNav({
           footerItems={footerItems}
           currentPath={currentPath}
           collapsed={collapsed === true}
-          railColors={railColors}
+          toolbarVariant={toolbarVariant}
         />
       )}
 

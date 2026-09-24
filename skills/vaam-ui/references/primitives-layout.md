@@ -232,7 +232,7 @@ interface NavGroup { label: string; items: NavItem[] }
 | `accountSlot` | `React.ReactNode` | Rendered as-is; never built here. Shown only where there is room for it (the sidebar, and the off-canvas tree). |
 | `smallScreen` | `"floating" \| "off-canvas" \| undefined` | Default `"floating"`. |
 | `collapsed` | `boolean \| undefined` | Turns the sidebar back into the rail. |
-| `railColors` | `"standard" \| "vibrant" \| undefined` (the two values are exported as `RailColors`) | Default `"standard"`. Which M3 floating-toolbar colour scheme the rails wear; the sidebar ignores it. |
+| `toolbarVariant` | `"standard" \| "vibrant" \| undefined` (the two values are exported as `SideNavToolbarVariant`) | Default `"standard"`. Which M3 floating-toolbar colour scheme the rails wear; the sidebar ignores it. |
 
 ### The three shapes
 
@@ -261,14 +261,16 @@ own numbers (`FloatingToolbarTokens.kt`): 64px across, fully round, 8px
 padding, 4px between items, 16px from the screen edge (plus the safe
 area at the bottom). Every item is a 48×48 target around a 40px round
 container with a 24px icon, and the **current page is a filled pill 64px
-long** on the toolbar's own axis. No border, no blur; the one departure
-from androidx is a soft shadow (`--shadow-toolbar`), because the bar
-floats over content it knows nothing about.
+long** on the toolbar's own axis. No border, no blur and **no shadow**
+— androidx ships it at elevation level 0, and so does this — so the
+bar's fill is the only thing separating it from what scrolls under it.
 
-`railColors` picks M3's two schemes:
+`toolbarVariant` picks M3's two schemes:
 
 - `"standard"` (default) — a `surface-2` bar, muted icons, the current
-  page as a filled `primary` pill. Quiet.
+  page as a filled `primary` pill. Quiet — and on the dark theme, over a
+  `surface-2` card, its edge disappears (same colour, no shadow). If your
+  screen scrolls `surface-2` cards under the bar, use `"vibrant"`.
 - `"vibrant"` — a `primary` bar, i.e. the inverse of the page (near-white
   on dark, near-black on light), with the current page cut out in
   `surface-2`. Loud, and legible over any content.
@@ -279,7 +281,7 @@ sheet, so the sheet is never drawn under it whatever stacking context the
 
 Neither is a hue, on purpose — a tinted bar would read as a status. Do
 not restyle the rails with a status colour to make them "pop"; use
-`railColors="vibrant"`.
+`toolbarVariant="vibrant"`.
 
 Icons are rendered at `size={24}` in the rails (16 in the sidebar), so a
 `NavItem.icon` must honour its `size` prop — every lucide icon does.
