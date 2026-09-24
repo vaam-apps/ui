@@ -218,6 +218,8 @@ describe("every export the skill names is really exported", () => {
     Tailwind: "Prose — the framework's name.",
     Docs: "Prose — the Storybook sidebar section.",
     Storybook: "Prose — the tool's name.",
+    DialogFooter:
+      "The 0.2.x name DialogActions replaced, named in the Dialog section's migration note.",
   };
 
   /**
@@ -232,9 +234,17 @@ describe("every export the skill names is really exported", () => {
    *
    * The precise version of this check is the import assertion below,
    * which does not need a deny-list at all.
+   *
+   * `Dialog\w*` used to be in this pattern, for Headless UI's dialog
+   * parts — and so every one of this package's own `Dialog*` exports was
+   * exempt too: `DialogFooter` stayed named in the skill after it was
+   * renamed, and an invented `DialogBogusPart` passed (found in review,
+   * #33). The skill names no Headless UI dialog part, so the pattern
+   * goes; the one deliberate mention of a removed name is exempted above
+   * with its reason.
    */
   const FOREIGN =
-    /^(React|ReactNode|ReactElement|ComponentProps\w*|CSSProperties|Fragment|Suspense|Portal|createPortal|useState|useEffect|useMemo|useRef|useCallback|useId|useSyncExternalStore|Date|Intl|Promise|Record|Partial|Omit|Pick|Array|Object|String|Number|Boolean|Map|Set|JSON|Math|Error|HTML\w*|SVG\w*|Element|Node|Event|MutationObserver|ResizeObserver|IntersectionObserver|MediaQueryList|Headless\w*|Listbox\w*|Menu\w*|Radio|Field|Description|Label|Checkbox|Switch|Disclosure\w*|Transition|Dialog\w*|Vaul|Tailwind\w*|Storybook|Playwright|Vitest|TypeScript|JavaScript|GitHub|WCAG|ARIA|DOM|CSS|HTML|JSON|URL|API|UI|UX|OS|SSR|CLI)$/;
+    /^(React|ReactNode|ReactElement|ComponentProps\w*|CSSProperties|Fragment|Suspense|Portal|createPortal|useState|useEffect|useMemo|useRef|useCallback|useId|useSyncExternalStore|Date|Intl|Promise|Record|Partial|Omit|Pick|Array|Object|String|Number|Boolean|Map|Set|JSON|Math|Error|HTML\w*|SVG\w*|Element|Node|Event|MutationObserver|ResizeObserver|IntersectionObserver|MediaQueryList|Headless\w*|Listbox\w*|Menu\w*|Radio|Field|Description|Label|Checkbox|Switch|Disclosure\w*|Transition|Vaul|Tailwind\w*|Storybook|Playwright|Vitest|TypeScript|JavaScript|GitHub|WCAG|ARIA|DOM|CSS|HTML|JSON|URL|API|UI|UX|OS|SSR|CLI)$/;
 
   const claimed = claimedIdentifiers().filter((id) => !(id in NOT_EXPORTS) && !FOREIGN.test(id));
 

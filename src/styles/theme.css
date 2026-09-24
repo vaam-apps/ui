@@ -201,8 +201,12 @@
         had been a phone bottom sheet below `md` since D14, and `Select`
         is a second one below `sm` now. Both take M3's own 28dp as
         `--radius-sheet`, declared beside `--radius-xs` below as a
-        single-purpose corner rather than a fourth step. The objection
-        here is to *console* surfaces at that radius, and it stands.) A desktop
+        single-purpose corner rather than a fourth step — and so does
+        `Dialog`'s panel, M3's `DialogTokens.ContainerShape`, the same
+        `CornerExtraLarge`, by the maintainer's call when dialogs moved
+        to M3 (2026-09-24). The objection here is to *console* surfaces
+        at that radius — cards, tables, panels in the page — and it
+        stands.) A desktop
         operator console grounded in Polar's/Column's drawer and card
         corners has no reference screen calling for a fourth, larger step,
         and "one register, no fourth" (this comment's own opening line) is
@@ -229,7 +233,8 @@
         gap to fill for it either.
 
      So: three tiers plus two single-purpose outliers — the checkbox-only
-     `--radius-xs` and the phone-sheet-only `--radius-sheet` — already
+     `--radius-xs` and `--radius-sheet`, M3's corner for its sheets and
+     dialogs and nothing else — already
      say everything this component set needs said. Widening the register
      "to match the spec" without a reference screen or a real interaction
      calling for the extra step would be exactly the unargued change this
@@ -889,6 +894,15 @@
 :root,
 [data-theme="dark"] {
   --surface-3: #1c1f25;
+  /* One step past the top of the ladder, for `.surface-raised` only (see
+     that rule, in `@theme inline` below): a hover or selected fill on a
+     panel that is itself `surface-3` — a `Dialog`, M3's
+     `SurfaceContainerHigh`. Half the ladder's usual step, and not by
+     taste: `contrast.test.ts` measures every foreground on it, and the
+     ladder's own +6/+7/+8 step (`#22262d`) put `--subtle-foreground` at
+     4.36:1. `#202329` is the largest step that keeps every case at AA
+     (4.52:1, `--subtle-foreground`); one more (`#21242a`) fails it. */
+  --surface-4: #202329;
 
   /* The aurora ramp.
    *
@@ -1144,6 +1158,12 @@
  */
 [data-theme="light"] {
   --surface-3: #e1e5ea;
+  /* Dark's `--surface-4`, mirrored, and bounded the same way: the
+     ladder's own −11 step (`#d6dbe1`) put `--subtle-foreground` at 4.35:1
+     and the loud `progress` and `uncertain` pills under AA over their
+     tints. `#dce0e5` is the largest step that keeps every case at AA
+     (worst: loud `progress`, 4.51:1); one more (`#dbdfe4`) fails it. */
+  --surface-4: #dce0e5;
 
   /* Cooler and far softer than dark's. A near-black shadow on a light
      ground reads as dirt; the hue-matched slate at low alpha reads as
@@ -1328,6 +1348,53 @@
 }
 
 /*
+ * `.surface-raised` — every surface a component paints steps up one, for a
+ * subtree that sits on a `surface-3` panel.
+ *
+ * `surface-3` is two things in this library: the top of the surface ladder
+ * *and* the fill for row hover, pressed and selected (the ladder's own
+ * doc). A `Dialog`'s panel is `surface-3` because M3 fills a dialog with
+ * `SurfaceContainerHigh` — and on it, every hover and selection fill
+ * inside vanished or inverted: a `RadioGroup`'s checked row
+ * (`data-checked:bg-surface-3`) matched the panel while the unchecked
+ * ones (`bg-surface-2`) stood out, the selection signal reversed (found in
+ * review, #33; a maintainer's call to keep M3's fill and shift the fills
+ * inside). So inside this class `surface-1` reads as `surface-2`,
+ * `surface-2` as `surface-3` and `surface-3` as `--surface-4`, one step
+ * past the top of the ladder. Relative order — resting, hover, selected —
+ * is what components communicate with, and that is preserved; the step
+ * itself is half the ladder's (contrast 1.049 between `surface-3` and
+ * `--surface-4`, against 1.076 between `surface-2` and `surface-3`),
+ * because `--surface-4` is bounded by the contrast gate. daisyUI's own
+ * reads of `--color-base-200/300` move with it — a disabled input's fill
+ * and border, the ghost and secondary buttons' hover — in the same order.
+ *
+ * The tokens it moves are the ones the utilities actually read. This
+ * block is `@theme inline`, so `bg-surface-1` compiles to
+ * `var(--color-base-200)`, `bg-surface-2` to `var(--color-base-300)` and
+ * `bg-surface-3` to `var(--surface-3)` — redeclaring `--color-surface-*`
+ * reached nothing (measured: a checked radio inside a dialog still read
+ * `surface-3`). They cannot be redeclared on the element that reads their
+ * old values, either — `--color-base-300: var(--surface-3)` beside
+ * `--surface-3: var(--surface-4)` would read the new one — so the class
+ * captures the three values on its own element and redeclares them on
+ * its children. The element itself keeps the unshifted ladder; a panel
+ * that wants the unshifted `surface-3` for descendants of its own (a
+ * sticky header's fill) captures it on an ancestor first, as `Dialog`
+ * does with `--dialog-fill`.
+ */
+@utility surface-raised {
+  --raised-surface-1: var(--color-base-300);
+  --raised-surface-2: var(--surface-3);
+  --raised-surface-3: var(--surface-4);
+  & > * {
+    --color-base-200: var(--raised-surface-1);
+    --color-base-300: var(--raised-surface-2);
+    --surface-3: var(--raised-surface-3);
+  }
+}
+
+/*
  * Theme-invariant tokens: radius, fonts, type scale. Redeclaring Tailwind's
  * own `--radius-sm` / `--radius-md` / `--font-sans` / `--font-mono` /
  * `--text-*` keys overrides Tailwind's stock scale app-wide, which is the
@@ -1361,7 +1428,10 @@
   --radius-md: 20px;
   /*
    * `--radius-sheet` is not a fourth step of the register — it is the one
-   * corner a *phone bottom sheet* wears, and nothing else may use it.
+   * corner a *phone bottom sheet* and a *dialog* wear, and nothing else may
+   * use it: M3's `CornerExtraLarge`, which `SheetBottomTokens` puts on a
+   * sheet's top corners and `DialogTokens.ContainerShape` on all four of a
+   * dialog's (read as `rounded-sheet` there).
    * M3's `SheetBottomTokens.DockedContainerShape` is `CornerExtraLargeTop`,
    * 28dp on the top two corners only (`ShapeTokens.kt`). The shape-scale
    * audit in the daisyUI theme block above kept this value out on the

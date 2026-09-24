@@ -179,10 +179,13 @@ export function Toaster() {
                 writes `margin` itself, D11) against `p-1`: the same
                 hit-area idiom
                 used there, growing the click target without moving the
-                icon. `rounded-full` and `hover:bg-surface-3` match those
-                two as well — icon-only controls are circular in this
-                package (`button.tsx`'s `icon` size), and a background
-                shift gives hover a signal beyond text colour alone.
+                icon. `rounded-full` matches those two as well — icon-only
+                controls are circular in this package (`button.tsx`'s
+                `icon` size) — and `hover:bg-surface-3` matches the
+                drawer's: a background shift gives hover a signal beyond
+                text colour alone. (The dialog's close uses a
+                `foreground/8` state layer instead, because its panel is
+                `surface-3` itself.)
                 `PRESS_SHAPE_MORPH` (`press-shape.ts`) replaces the plain
                 `transition-colors` this used to carry with the M3
                 Expressive press morph in the same lockstep as `Button

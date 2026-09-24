@@ -71,6 +71,14 @@ surface step — most of the library), *floating* (a shadow, because it
 overlaps a ground it does not know), *instrument* (the aurora mesh; you
 scan it rather than read it).
 
+**`surface-3` is two things: the ladder's top step and the hover,
+pressed and selected fill.** A panel painted `surface-3` (a `Dialog`, M3's
+`SurfaceContainerHigh`) makes every such fill inside it vanish or invert —
+a checked radio row matched the panel while the unchecked ones stood out.
+Put `surface-raised` on such a panel (`theme.css` has the mechanism): it
+steps every surface inside up one, onto `--surface-4`. Do not paint a new
+`surface-3` panel without it.
+
 **Four type voices** — display, sans, italic, mono — declared in
 `theme.css`. Italic marks human prose written to the operator. The test is
 in that file: *could this string be a template that only fills in a value
