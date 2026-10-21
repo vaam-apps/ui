@@ -213,17 +213,25 @@ choice.
 
 ### One place `--subtle-foreground` is banned outright
 
-**Never put `text-subtle-foreground` on the aurora mesh.** A gradient ground
-breaks the assumption every contrast check in this system rests on — that a
-foreground sits on *one* known surface. Measured over `--surface-1` at each
-blob's peak alpha, worst case across the four, `--subtle-foreground` falls to
-**4.15:1 in dark and 4.25:1 in light**, below the bar, while
-`--muted-foreground` holds at 6.10:1 and 4.68:1.
+**Never put `text-subtle-foreground` on an `InstrumentPanel`.** A shaped
+ground breaks the assumption every contrast check in this system rests on —
+that a foreground sits on *one* known surface. The panel keeps the damage
+countable: its two M3 Expressive shapes are opaque mixes of `primary-container`
+into the container (`--instrument-shape`, `--instrument-shape-quiet`), so it
+has exactly three grounds, and `contrast.test.ts` measures every tier on each.
+On the clover, `--subtle-foreground` falls to **4.05:1 in dark and 4.28:1 in
+light**, below the bar, while `--muted-foreground` holds at 5.95:1 and 4.71:1
+and every status foreground at least as well. The gate also asserts subtle
+still *fails* there, so the ban is lifted the day it stops being needed.
 
 `InstrumentPanel` therefore renders its own caption at `muted` rather than
 documenting a rule and trusting every call site to follow it. `StatusPill`
 makes the identical move for the identical reason when a loud tint lands under
-its label. If you are building a surface on the mesh, do the same.
+its label. If you are building a surface on the panel, do the same.
+
+The old aurora mesh (`.aurora-mesh`, which the panel no longer uses) had the
+same ban for the same reason: 4.15:1 and 4.25:1 for subtle at the blobs' peak
+alpha.
 
 ## The state hues
 
@@ -535,8 +543,10 @@ what compact renders, which is a product decision rather than a token one.
 ## The aurora ramp
 
 Four stops, and they are the one place in the system where chrome carries hue:
-`--aurora-1` through `--aurora-4`, feeding `Skeleton`'s drift,
-`InstrumentPanel`'s mesh and `Card glow`.
+`--aurora-1` through `--aurora-4`, feeding `Skeleton`'s `instrument` drift,
+`Card glow` and the `.aurora-mesh` class. `InstrumentPanel` used to paint the
+mesh and now paints two `primary-container` shapes instead — chrome in the
+seed's own hue family, which needs none of the argument below.
 
 They are drawn from the system's own hues — `progress`, `parked`, a mix of
 `parked` and `danger`, and `success` — and bound to them by `color-mix` so they

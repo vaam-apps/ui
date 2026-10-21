@@ -414,3 +414,104 @@ describe("loud status pills clear AA over their own tint", () => {
     ).toBeGreaterThanOrEqual(AA_NORMAL);
   });
 });
+
+/**
+ * `color-mix(in srgb, <a> <p>%, <b>)` of two opaque colours — the one
+ * mix form `InstrumentPanel`'s ground is written in, chosen so this file
+ * can follow it. `in srgb` interpolates the gamma-encoded channels, so the
+ * mix is a straight per-channel lerp; `oklab` (the form the aurora ramp
+ * uses) would need a colour-space round trip this file does not carry.
+ * Anything else resolves to `undefined` and fails the roster check below
+ * rather than dropping silently out of the case list.
+ */
+function resolveColour(tokens: Map<string, string>, value: string | undefined): string | undefined {
+  const resolved = resolve(tokens, value);
+  if (HEX.test(resolved)) return resolved;
+  const mix = /^color-mix\(\s*in srgb,\s*(.+?)\s+([0-9.]+)%,\s*(.+?)\s*\)$/.exec(resolved);
+  if (mix === null) return undefined;
+  const a = resolveColour(tokens, mix[1]);
+  const b = resolveColour(tokens, mix[3]);
+  if (a === undefined || b === undefined) return undefined;
+  const share = Number(mix[2]) / 100;
+  const channels = (hex: string) =>
+    [0, 2, 4].map((i) => Number.parseInt(hex.replace("#", "").slice(i, i + 2), 16));
+  const [ca, cb] = [channels(a), channels(b)];
+  const mixed = ca.map((c, i) => Math.round(c * share + (cb[i] as number) * (1 - share)));
+  return `#${mixed.map((c) => c.toString(16).padStart(2, "0")).join("")}`;
+}
+
+/**
+ * `InstrumentPanel`'s ground: the container, and the two Expressive
+ * shapes painted on it (`--instrument-shape-quiet` for the cookie halo,
+ * `--instrument-shape` for the clover). All three are opaque, so every
+ * pixel under a caption is one of them or an antialiased edge between two
+ * of them — and on these pairs every channel moves the same way, so an
+ * edge pixel's luminance lies between its two ends and cannot be worse
+ * than both.
+ *
+ * What may sit on that ground directly: the panel's own title
+ * (`--color-base-content`) and caption (`--muted-foreground`), and any
+ * status foreground a caller drops in loose — a `StateChip`, a toned
+ * figure outside a tile. All of them must clear AA on all three.
+ *
+ * `--subtle-foreground` is the one tier the component's doc bans here,
+ * and the last block keeps that ban honest in both directions: it asserts
+ * subtle *fails* on the clover, so a future palette that lets it pass
+ * turns this red and the ban gets lifted rather than outliving its
+ * reason.
+ */
+describe("InstrumentPanel's ground holds every tier it allows", () => {
+  const GROUND = ["--instrument-container", "--instrument-shape-quiet", "--instrument-shape"];
+  const grounds = ["dark", "light"].map((name) => {
+    const tokens = themeTokens(name);
+    return {
+      name,
+      grounds: Object.fromEntries(
+        GROUND.map((key) => [key, resolveColour(tokens, tokens.get(key))]),
+      ),
+      theme: THEMES.find((t) => t.name === name),
+    };
+  });
+
+  it.each(grounds.map((g) => [g.name, g] as const))("%s declares all three grounds", (_n, g) => {
+    for (const key of GROUND) expect(g.grounds[key], `${key} resolves to a hex`).toMatch(HEX);
+  });
+
+  const cases = grounds.flatMap((g) =>
+    Object.entries(g.theme?.foregrounds ?? {})
+      .filter(([fgName]) => fgName !== "--subtle-foreground")
+      .flatMap(([fgName, fg]) =>
+        GROUND.map((key) => ({
+          label: `${g.name}: ${fgName} on ${key}`,
+          fg,
+          bg: g.grounds[key] ?? "",
+        })),
+      ),
+  );
+
+  it("has cases in both themes", () => {
+    expect(cases.length).toBe(2 * 10 * GROUND.length);
+  });
+
+  it.each(cases.map((c) => [c.label, c.fg, c.bg] as const))("%s", (_label, fg, bg) => {
+    const measured = contrast(fg, bg);
+    expect(
+      Number(measured.toFixed(2)),
+      `${fg} on ${bg} measures ${measured.toFixed(2)}:1. Lower the primary-container share in ` +
+        "that theme's --instrument-shape mix rather than relaxing this test.",
+    ).toBeGreaterThanOrEqual(AA_NORMAL);
+  });
+
+  it.each(grounds.map((g) => [g.name, g] as const))(
+    "%s: subtle still fails on the clover, so the ban is still buying something",
+    (_n, g) => {
+      const subtle = g.theme?.foregrounds["--subtle-foreground"] ?? "";
+      const measured = contrast(subtle, g.grounds["--instrument-shape"] ?? "");
+      expect(
+        Number(measured.toFixed(2)),
+        `--subtle-foreground now measures ${measured.toFixed(2)}:1 on the clover. If that is ` +
+          "deliberate, lift the ban in instrument-panel.tsx and delete this case.",
+      ).toBeLessThan(AA_NORMAL);
+    },
+  );
+});

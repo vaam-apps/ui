@@ -50,7 +50,13 @@ export interface StatTileProps {
    * a status that is not there. Leave unset on every tile in a row
    * except the one the reader should find first — a row where every
    * tile is emphasised has no emphasis, the same argument `Card`'s
-   * `glow` doc makes for its own register. */
+   * `glow` doc makes for its own register.
+   *
+   * Inside an `InstrumentPanel` it also steps the *size* up, from
+   * headline-medium (28/36) to display-small (36/44) — M3 Expressive's
+   * hero figure, which that panel exists to make findable. Outside one,
+   * the size is unchanged: a lone emphasised tile in a diagnostic pane
+   * has no row of panel-sized peers to be the hero of. */
   emphasized?: boolean | undefined;
   /** Top-right slot — a sparkline, a `StateChip`, a refresh button. */
   action?: ReactNode;
@@ -63,6 +69,16 @@ export interface StatTileProps {
  * Borders, not shadows, and no card chrome of its own beyond a hairline:
  * tiles appear in rows of three to six, and six shadowed boxes is visual
  * noise where six outlined ones read as one instrument panel.
+ *
+ * **Inside an `InstrumentPanel` it changes register with the panel.** The
+ * hairline goes, the tile is filled `surface-container-highest` with the
+ * large-increased (20px) corner and 20px of padding — an M3 nested
+ * container, tonal rather than outlined, because the panel around it has
+ * already done the grouping the outlines used to do. Written as
+ * `in-[.instrument-panel]:` variants on this element rather than as a
+ * context the panel provides: a context would make this a client
+ * component for the sake of a style, and every consumer that renders it
+ * from a server component would pay for that.
  *
  * `<dl>`/`<dt>`/`<dd>` rather than divs — a tile *is* a term and its
  * definition, and the semantics make a row of them navigable rather than
@@ -86,6 +102,10 @@ export function StatTile({
         // whole string — so without this a long label widens the track
         // and the row of tiles overflows instead of the label clipping.
         "relative flex min-w-0 flex-col rounded-box border border-edge bg-base-300 p-4",
+        // In a panel: tonal, not outlined (see the doc above). The border
+        // goes transparent rather than away so the tile's box does not
+        // change size between the two registers.
+        "in-[.instrument-panel]:rounded-xl in-[.instrument-panel]:border-transparent in-[.instrument-panel]:bg-surface-container-highest in-[.instrument-panel]:p-5",
         className,
       )}
     >
@@ -111,7 +131,7 @@ export function StatTile({
           className={cn(
             "min-w-0 break-words font-mono text-metric tabular-nums",
             tone === undefined ? "text-foreground" : HUE_CLASSES[tone].fg,
-            emphasized === true && "font-medium",
+            emphasized === true && "font-medium in-[.instrument-panel]:text-metric-lg",
           )}
         >
           {value}

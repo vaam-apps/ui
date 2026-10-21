@@ -159,8 +159,9 @@ export const InsideACardAndStill: Story = {
  * form fields most skeletons stand in for. Right: `instrument`, the same
  * geometry repainted onto the `--aurora-*` ramp, for a placeholder that
  * will itself render inside an `InstrumentPanel` — the one register that
- * chrome belongs to. `InstrumentPanel`'s own mesh matches the tone of
- * the `instrument` skeleton it stands in for.
+ * chrome belongs to. The panel itself no longer paints the aurora — its
+ * ground is an M3 container with two `primary-container` shapes — so the
+ * two now share a register rather than a palette: hued chrome, only here.
  */
 export const TonalVsInstrument: Story = {
   render: () => (

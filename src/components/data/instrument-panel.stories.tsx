@@ -16,9 +16,12 @@ const meta = {
           "The **instrument register** — the surface for scanning rather than reading. The " +
           "library has three: a hairline for diagnostic surfaces you work through row by row, " +
           "a shadow for layers that float over a ground they do not know, and this for " +
-          "dashboards, where the job is to make one number findable at a glance. The mesh " +
-          "carries no meaning: it is drawn from the `--aurora-*` ramp, bound to the system's " +
-          "own hues so it cannot drift, and nothing about a state can be expressed through it.",
+          "dashboards, where the job is to make one number findable at a glance. It is an M3 " +
+          "Expressive container — `surface-container`, the 28px extra-large corner, 24px of " +
+          "padding, no border, no shadow — with a 4-leaf clover and a 9-sided cookie from M3 " +
+          "Expressive's shape library in its top-right corner. The shapes carry no meaning: " +
+          "they are the seed's `primary-container`, the one hue family reserved for chrome, " +
+          "and nothing about a state can be expressed through them.",
       },
     },
   },
@@ -28,10 +31,12 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /** What it is for: a row of metrics reading as one instrument, without
- * six competing outlines doing the grouping by repetition.
+ * six competing outlines doing the grouping by repetition. The tiles drop
+ * their hairline inside the panel and become filled nested containers.
  *
  * `Delivered` carries `emphasized` — the one number in the row a reader
- * should find first, singled out by weight rather than colour, since
+ * should find first, singled out by weight and, inside a panel, by size
+ * (display-small, the Expressive hero figure) rather than colour, since
  * colour here is reserved for status and this tile is not reporting
  * one. See `stat-tile.tsx`'s `emphasized` prop doc for the M3 Expressive
  * source. */
@@ -57,13 +62,14 @@ export const AsADashboard: Story = {
 
 /**
  * The tier swap, shown rather than described. Both captions are 12px on
- * the mesh; the left is `muted` (what the component renders) and the
- * right is `subtle` (what it refuses to). Measured over `--surface-1` at
- * the shipped 14% cap, `subtle` falls to 4.41:1 in dark and 4.45:1 in
- * light — below AA — while `muted` holds above 5.29:1.
+ * the panel; the left is `muted` (what the component renders) and the
+ * right is `subtle` (what it refuses to), and the right one runs over the
+ * shapes. On the clover, `subtle` falls to 4.05:1 in dark and 4.28:1 in
+ * light — below AA — while `muted` holds 5.95:1 and 4.71:1.
  *
- * Switch the theme in the toolbar: it is worse in neither and marginal in
- * both, which is exactly the kind of "looks fine" that ships a failure.
+ * Switch the theme in the toolbar: it is marginal in both, and on the
+ * bare container it even passes, which is exactly the kind of "looks
+ * fine" that ships a failure the moment a caption runs into a corner.
  */
 export const WhySubtleIsBanned: Story = {
   render: () => (

@@ -1010,6 +1010,26 @@
   --skeleton-tonal-2: color-mix(in oklab, var(--color-base-content) 26%, transparent);
   --skeleton-tonal-3: color-mix(in oklab, var(--color-base-content) 22%, transparent);
   --skeleton-tonal-4: color-mix(in oklab, var(--color-base-content) 14%, transparent);
+
+  /* `InstrumentPanel`'s Expressive shapes: the seed's own primary-container,
+     mixed into the panel's fill. Opaque, so the ground under a caption is
+     one known colour and `contrast.test.ts` can measure it. Dark spends
+     less of the role than light: here `primary-container` is a light
+     lavender on a near-black container, so a little goes a long way.
+     The ceiling is measured, not felt: past a 23% share
+     `--muted-foreground` and the dimmest status foreground both drop under
+     4.5:1 on the clover; at 12% they hold 5.95:1. The halo is the same mix
+     at well under half the share, one tone quieter. */
+  --instrument-shape: color-mix(
+    in srgb,
+    var(--md-sys-color-primary-container) 12%,
+    var(--instrument-container)
+  );
+  --instrument-shape-quiet: color-mix(
+    in srgb,
+    var(--md-sys-color-primary-container) 5%,
+    var(--instrument-container)
+  );
 }
 
 /*
@@ -1198,6 +1218,23 @@
   --skeleton-tonal-2: color-mix(in oklab, var(--color-base-content) 17%, transparent);
   --skeleton-tonal-3: color-mix(in oklab, var(--color-base-content) 15%, transparent);
   --skeleton-tonal-4: color-mix(in oklab, var(--color-base-content) 10%, transparent);
+
+  /* More of the role than dark, for the reason the skeleton tokens above
+     give in reverse: light `primary-container` and the light container
+     are both pale, so a dark-theme share of one in the other is a shape
+     nobody can see. The ceiling is the same one — `--muted-foreground`
+     must still clear AA on the result, which it does up to a 46% share;
+     at 36% it holds 4.71:1. */
+  --instrument-shape: color-mix(
+    in srgb,
+    var(--md-sys-color-primary-container) 36%,
+    var(--instrument-container)
+  );
+  --instrument-shape-quiet: color-mix(
+    in srgb,
+    var(--md-sys-color-primary-container) 16%,
+    var(--instrument-container)
+  );
 }
 
 /*
@@ -1254,6 +1291,11 @@
 [data-theme] {
   --surface-3: var(--md-sys-color-surface-container-high);
   --surface-4: var(--md-sys-color-surface-container-highest);
+
+  /* `InstrumentPanel`'s fill: M3's `surface-container`, the container role
+     a filled card or a dashboard group sits in. Its decorative shapes are
+     `--instrument-shape`, declared per theme above. */
+  --instrument-container: var(--md-sys-color-surface-container);
 
   --edge-subtle: var(--md-sys-color-surface-container-highest);
   --edge: var(--md-sys-color-outline-variant);
@@ -1469,6 +1511,18 @@
   --md-sys-shape-corner-extra-large-increased: 32px;
   --md-sys-shape-corner-extra-extra-large: 48px;
   --md-sys-shape-corner-full: 9999px;
+
+  /* Two shapes from M3 Expressive's shape library, as masks: `9-sided
+     cookie` and `4-leaf clover`. Material publishes them as
+     `RoundedPolygon`s (androidx `graphics-shapes`, `MaterialShapes`), which
+     CSS cannot read; these are polar approximations of the same outlines,
+     sampled at 180 points into a 100×100 box — the cookie
+     r(θ) = 1 + 0.08·cos 9θ, the clover r(θ) = 1 − 0.32·(1 − |cos 2θ|)^1.3
+     (round lobes, pinched valleys). `instrument-shapes.test.ts` holds the
+     formulas and fails if a byte here differs, so regenerate from there
+     rather than editing the paths. Only `InstrumentPanel` paints them. */
+  --shape-cookie-9: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50.0 0.0L51.7 0.2L53.4 0.8L55.1 1.8L56.6 3.0L58.0 4.4L59.4 5.8L60.7 7.2L61.9 8.4L63.2 9.3L64.6 10.0L66.0 10.3L67.6 10.4L69.3 10.3L71.2 10.1L73.1 9.9L75.1 9.8L77.1 9.8L79.0 10.1L80.7 10.7L82.1 11.7L83.3 13.0L84.2 14.5L84.9 16.3L85.3 18.3L85.5 20.2L85.6 22.2L85.7 24.1L85.9 25.8L86.3 27.3L86.9 28.7L87.8 29.9L88.9 31.0L90.3 32.1L91.9 33.1L93.5 34.2L95.1 35.3L96.6 36.6L97.8 38.1L98.7 39.6L99.2 41.3L99.3 43.1L99.0 44.8L98.4 46.6L97.4 48.3L96.3 50.0L95.1 51.6L94.0 53.1L93.1 54.5L92.4 56.0L91.9 57.4L91.8 58.9L92.0 60.5L92.4 62.2L92.9 64.0L93.5 65.8L94.0 67.8L94.3 69.7L94.3 71.6L94.0 73.4L93.3 75.0L92.2 76.4L90.9 77.6L89.2 78.5L87.4 79.2L85.5 79.8L83.6 80.2L81.7 80.6L80.1 81.1L78.6 81.8L77.4 82.6L76.3 83.7L75.5 85.0L74.7 86.6L73.9 88.3L73.1 90.1L72.3 91.9L71.2 93.6L70.0 95.0L68.7 96.2L67.1 97.0L65.4 97.4L63.6 97.4L61.7 97.0L59.9 96.4L58.0 95.6L56.3 94.7L54.6 93.9L53.0 93.2L51.5 92.7L50.0 92.6L48.5 92.7L47.0 93.2L45.4 93.9L43.7 94.7L42.0 95.6L40.1 96.4L38.3 97.0L36.4 97.4L34.6 97.4L32.9 97.0L31.3 96.2L30.0 95.0L28.8 93.6L27.7 91.9L26.9 90.1L26.1 88.3L25.3 86.6L24.5 85.0L23.7 83.7L22.6 82.6L21.4 81.8L19.9 81.1L18.3 80.6L16.4 80.2L14.5 79.8L12.6 79.2L10.8 78.5L9.1 77.6L7.8 76.4L6.7 75.0L6.0 73.4L5.7 71.6L5.7 69.7L6.0 67.8L6.5 65.8L7.1 64.0L7.6 62.2L8.0 60.5L8.2 58.9L8.1 57.4L7.6 56.0L6.9 54.5L6.0 53.1L4.9 51.6L3.7 50.0L2.6 48.3L1.6 46.6L1.0 44.8L0.7 43.1L0.8 41.3L1.3 39.6L2.2 38.1L3.4 36.6L4.9 35.3L6.5 34.2L8.1 33.1L9.7 32.1L11.1 31.0L12.2 29.9L13.1 28.7L13.7 27.3L14.1 25.8L14.3 24.1L14.4 22.2L14.5 20.2L14.7 18.3L15.1 16.3L15.8 14.5L16.7 13.0L17.9 11.7L19.3 10.7L21.0 10.1L22.9 9.8L24.9 9.8L26.9 9.9L28.8 10.1L30.7 10.3L32.4 10.4L34.0 10.3L35.4 10.0L36.8 9.3L38.1 8.4L39.3 7.2L40.6 5.8L42.0 4.4L43.4 3.0L44.9 1.8L46.6 0.8L48.3 0.2Z'/%3E%3C/svg%3E");
+  --shape-clover-4: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M85.4 85.4L84.1 86.6L82.8 87.7L81.4 88.8L80.0 89.7L78.4 90.6L76.9 91.4L75.2 92.0L73.6 92.5L71.9 92.9L70.1 93.1L68.3 93.2L66.6 93.1L64.8 92.9L63.0 92.5L61.3 92.0L59.5 91.4L57.9 90.5L56.3 89.6L54.7 88.5L53.3 87.4L51.9 86.1L50.6 84.7L49.4 84.7L48.1 86.1L46.7 87.4L45.3 88.5L43.7 89.6L42.1 90.5L40.5 91.4L38.7 92.0L37.0 92.5L35.2 92.9L33.4 93.1L31.7 93.2L29.9 93.1L28.1 92.9L26.4 92.5L24.8 92.0L23.1 91.4L21.6 90.6L20.0 89.7L18.6 88.8L17.2 87.7L15.9 86.6L14.6 85.4L13.4 84.1L12.3 82.8L11.2 81.4L10.3 80.0L9.4 78.4L8.6 76.9L8.0 75.2L7.5 73.6L7.1 71.9L6.9 70.1L6.8 68.3L6.9 66.6L7.1 64.8L7.5 63.0L8.0 61.3L8.6 59.5L9.5 57.9L10.4 56.3L11.5 54.7L12.6 53.3L13.9 51.9L15.3 50.6L15.3 49.4L13.9 48.1L12.6 46.7L11.5 45.3L10.4 43.7L9.5 42.1L8.6 40.5L8.0 38.7L7.5 37.0L7.1 35.2L6.9 33.4L6.8 31.7L6.9 29.9L7.1 28.1L7.5 26.4L8.0 24.8L8.6 23.1L9.4 21.6L10.3 20.0L11.2 18.6L12.3 17.2L13.4 15.9L14.6 14.6L15.9 13.4L17.2 12.3L18.6 11.2L20.0 10.3L21.6 9.4L23.1 8.6L24.8 8.0L26.4 7.5L28.1 7.1L29.9 6.9L31.7 6.8L33.4 6.9L35.2 7.1L37.0 7.5L38.7 8.0L40.5 8.6L42.1 9.5L43.7 10.4L45.3 11.5L46.7 12.6L48.1 13.9L49.4 15.3L50.6 15.3L51.9 13.9L53.3 12.6L54.7 11.5L56.3 10.4L57.9 9.5L59.5 8.6L61.3 8.0L63.0 7.5L64.8 7.1L66.6 6.9L68.3 6.8L70.1 6.9L71.9 7.1L73.6 7.5L75.2 8.0L76.9 8.6L78.4 9.4L80.0 10.3L81.4 11.2L82.8 12.3L84.1 13.4L85.4 14.6L86.6 15.9L87.7 17.2L88.8 18.6L89.7 20.0L90.6 21.6L91.4 23.1L92.0 24.8L92.5 26.4L92.9 28.1L93.1 29.9L93.2 31.7L93.1 33.4L92.9 35.2L92.5 37.0L92.0 38.7L91.4 40.5L90.5 42.1L89.6 43.7L88.5 45.3L87.4 46.7L86.1 48.1L84.7 49.4L84.7 50.6L86.1 51.9L87.4 53.3L88.5 54.7L89.6 56.3L90.5 57.9L91.4 59.5L92.0 61.3L92.5 63.0L92.9 64.8L93.1 66.6L93.2 68.3L93.1 70.1L92.9 71.9L92.5 73.6L92.0 75.2L91.4 76.9L90.6 78.4L89.7 80.0L88.8 81.4L87.7 82.8L86.6 84.1Z'/%3E%3C/svg%3E");
 
   /* Type. M3 names two faces — *brand* (display, headline, title-large)
      and *plain* (everything else) — and the vaam-apps house face, Roboto
@@ -2347,7 +2401,7 @@
 }
 
 /* ---------------------------------------------------------------------------
- * The instrument register: aurora glow and aurora mesh.
+ * The instrument register: aurora glow, aurora mesh, and the panel.
  *
  * A third surface treatment, and it is a deliberate exception to "borders,
  * not shadows" rather than a loosening of it. The rule holds where it was
@@ -2358,10 +2412,15 @@
  * the job is to make one number findable rather than to keep forty rows
  * legible.
  *
- * Both draw from the `--aurora-*` ramp above, which is bound by
- * `color-mix` to the system's own hues. Neither carries meaning: no status
- * is inferable from a glow, and a caller cannot express one through it.
- * That is what keeps this out of the status vocabulary's way.
+ * The glow and the mesh draw from the `--aurora-*` ramp above, which is
+ * bound by `color-mix` to the system's own hues. Neither carries meaning:
+ * no status is inferable from a glow, and a caller cannot express one
+ * through it. That is what keeps this out of the status vocabulary's way.
+ * `InstrumentPanel` no longer uses the mesh — it is an M3 Expressive
+ * container with two shapes in the seed's `primary-container`
+ * (`.instrument-panel`, at the end of this layer) — so `.aurora-mesh`
+ * stays only as a class a consumer may have applied by hand; nothing in
+ * this package renders it.
  *
  * # No `filter: blur()` here either, and this heading used to say the
  * opposite
@@ -2389,9 +2448,9 @@
  * peak alpha (the generated M3 palette, oklab mixes as declared):
  * `--subtle-foreground` falls to 4.15:1 in dark and 4.25:1 in light —
  * *below* AA — while `--muted-foreground` holds at 6.10:1 and 4.68:1.
- * So `InstrumentPanel` steps its own caption tier up from subtle to
- * muted rather than leaving that to the caller, the same move `StatusPill`
- * already makes when a loud tint lands under its label.
+ * Those numbers are the mesh's, kept for anyone still applying it.
+ * `InstrumentPanel`'s own ground is measured by `contrast.test.ts`; its
+ * doc has the figures.
  * ------------------------------------------------------------------------- */
 @layer components {
   /*
@@ -2497,6 +2556,74 @@
         color-mix(in oklab, var(--aurora-4) 8%, transparent),
         transparent 68%
       );
+  }
+
+  /*
+   * `InstrumentPanel` — the instrument register as an M3 Expressive
+   * container. The component's own doc carries the reasoning; this is the
+   * paint.
+   *
+   * The fill is a token (`--instrument-container`) rather than a utility
+   * on the element so the two shapes below can be mixed from the same
+   * value and `contrast.test.ts` can follow the chain. A consumer's
+   * `bg-*` utility is unlayered and still wins, as it should.
+   *
+   * The shapes sit at `z-index: -1` inside the panel's own stacking
+   * context (`isolation: isolate`): above the panel's background, below
+   * every child, including a non-positioned one. A positioned pseudo-
+   * element with `z-index: auto` — what `.aurora-mesh` does — paints
+   * *over* in-flow content; harmless for a 14% gradient, wrong for a solid
+   * shape.
+   *
+   * Static, so there is nothing for `prefers-reduced-motion` to stop: the
+   * same argument the mesh made still holds for shapes — a figure you are
+   * reading does not get a moving ground.
+   */
+  .instrument-panel {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background-color: var(--instrument-container);
+  }
+
+  .instrument-panel::before,
+  .instrument-panel::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+    aspect-ratio: 1;
+  }
+
+  /* The figure: a 4-leaf clover, tucked into the top-right corner with
+     its outer lobes clipped. Clover rather than cookie because it is the
+     one shape that still reads as itself with a quarter of it missing —
+     a cropped cookie reads as a wobbly blob, and a whole small cookie
+     reads as a "verified" seal, which is a meaning this surface must not
+     carry. Both were tried and looked at. */
+  .instrument-panel::before {
+    z-index: -1;
+    width: 8.5rem;
+    top: -1.5rem;
+    right: -1rem;
+    rotate: 15deg;
+    background-color: var(--instrument-shape);
+    -webkit-mask: var(--shape-clover-4) center / contain no-repeat;
+    mask: var(--shape-clover-4) center / contain no-repeat;
+  }
+
+  /* The halo: a much larger 9-sided cookie behind the clover, one tone
+     quieter, so the corner reads as two layered shapes rather than one
+     sticker. Two opaque tones of the same role, never transparency, so
+     every point on the panel is one of three known colours, or an
+     antialiased edge between two of them. */
+  .instrument-panel::after {
+    z-index: -2;
+    width: 16rem;
+    top: -6.5rem;
+    right: -5.5rem;
+    background-color: var(--instrument-shape-quiet);
+    -webkit-mask: var(--shape-cookie-9) center / contain no-repeat;
+    mask: var(--shape-cookie-9) center / contain no-repeat;
   }
 }
 

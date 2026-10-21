@@ -19,8 +19,9 @@ doing on that surface**.
   toasts) plus an `outline-variant` hairline, because a black shadow on a
   near-black page is invisible.
 - **Instrument** — dashboards and metrics. You *scan* these. The job is
-  to make one number findable in a glance. These get an aurora:
-  `InstrumentPanel`'s mesh ground, or `Card glow`.
+  to make one number findable in a glance. These get chrome no other
+  register wears: `InstrumentPanel`'s Expressive shapes, or `Card glow`'s
+  aurora.
 
 `theme.css` states the default directly: borders, not shadows, for
 cards, tables and panels; only floating layers get one. The instrument
@@ -64,16 +65,23 @@ the screen is also outlined.
 
 <Canvas of={InstrumentPanelStories.AsADashboard} />
 
-`InstrumentPanel` draws **no border**. The mesh *is* the edge; a hairline
-on top of it reads as two competing boundaries, and not needing one is
-the entire point of a different ground.
+`InstrumentPanel` is an M3 Expressive container: `surface-container`, the
+extra-large (28px) corner, 24px of padding, and **no border** and no
+shadow. The hairline is what makes a `Card` an outlined card and the
+diagnostic register's mark — a panel with one would be a big card — and a
+shadow would say it floats. What tells it apart instead is the corner, a
+4-leaf clover over a quieter 9-sided cookie (two of M3 Expressive's shapes)
+tucked into its top-right corner, and what happens to the tiles inside: a
+`StatTile` in a panel drops its hairline for a filled
+`surface-container-highest` with a 20px corner, and an `emphasized` one
+grows its figure to display-small, the Expressive hero size.
 
 `Card glow` is the same register at card scale, and it is the same
 discipline: a glow on every card is a glow on none.
 
 <Canvas of={InstrumentPanelStories.GlowAndPlainTogether} />
 
-## The aurora carries no meaning
+## The chrome carries no meaning
 
 This is the load-bearing constraint of the whole register, and without it
 the register could not exist here at all.
@@ -82,14 +90,19 @@ The library's premise is that **colour means status**. A coloured surface
 in such a system is a contradiction waiting to be read as one — unless
 the colour is provably incapable of carrying a state. So:
 
-- The mesh and the glow are drawn from the `--aurora-*` ramp, which is
-  bound by `color-mix` to the system's own hues, so it cannot drift away
-  from the palette.
+- `InstrumentPanel`'s shapes are the seed's own `primary-container`,
+  mixed into the container — the one hue family this system reserves for
+  chrome. Not `secondary` or `tertiary`: Expressive rotates those toward
+  the status greens at this seed. And a clover, not a small whole cookie,
+  because a scalloped disc beside a figure reads as a "verified" seal.
+- `Card glow` (and the `.aurora-mesh` class the panel used to paint) is
+  drawn from the `--aurora-*` ramp, which is bound by `color-mix` to the
+  system's own hues, so it cannot drift away from the palette.
 - There is **no per-state variant** and **no way for a caller to tint
   it**. `InstrumentPanel` takes a title, a caption and children. Nothing
   else.
-- Nothing infers a state from a glow, and no caller can express one
-  through it.
+- Nothing infers a state from a shape or a glow, and no caller can
+  express one through either.
 
 The hue vocabulary stays entirely with `StatusHue`. That is the only
 reason a coloured surface is safe here, and it is why the ramp is closed
@@ -108,13 +121,15 @@ between `parked`'s fuchsia and `danger`, with the stop alphas raised
 The ramp is deliberately not the seed's `primary`: that hue is the
 interactive one, and a glow is not a control.
 
-## `--subtle-foreground` is banned on the mesh
+## `--subtle-foreground` is banned on the panel
 
-A gradient ground breaks the assumption every contrast check in this
-system rests on: that a foreground sits on **one** known surface.
-
-Measured over `--surface-1` at each blob's peak alpha (14/12/12/8%),
-worst case across the four, with the generated M3 palette:
+A shaped ground breaks the assumption every contrast check in this
+system rests on: that a foreground sits on **one** known surface. The
+panel keeps the damage countable. Its shapes are opaque mixes of
+`primary-container` into the container — `--instrument-shape` for the
+clover, `--instrument-shape-quiet` for the halo — never transparency, so
+there are exactly three grounds, and `contrast.test.ts` resolves the mixes
+and measures every tier on each. The worst of the three is the clover:
 
 <table style={{ borderCollapse: "collapse", width: "100%", margin: "1rem 0" }}>
   <thead>
@@ -128,14 +143,20 @@ worst case across the four, with the generated M3 palette:
   <tbody>
     <tr>
       <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}><code>--subtle-foreground</code></td>
-      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>4.15:1</td>
-      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>4.25:1</td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>4.05:1</td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>4.28:1</td>
       <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>4.5:1</td>
     </tr>
     <tr>
       <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}><code>--muted-foreground</code></td>
-      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>6.10:1</td>
-      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>4.68:1</td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>5.95:1</td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>4.71:1</td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>4.5:1</td>
+    </tr>
+    <tr>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}><code>dimmest status foreground</code></td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>5.95:1</td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>4.76:1</td>
       <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>4.5:1</td>
     </tr>
   </tbody>
@@ -145,17 +166,26 @@ So `InstrumentPanel` renders its own caption at `muted` and says so in
 its module doc, rather than documenting a rule and trusting every call
 site to follow it. `StatusPill` makes the identical move for the
 identical reason when a loud tint lands under its label. **Do not put
-`text-subtle-foreground` on this surface** — it is the one tier the mesh
-can swallow.
+`text-subtle-foreground` on this surface** — it is the one tier the
+clover can swallow. The gate asserts it still fails there, so the ban is
+lifted the day it stops being needed rather than outliving its reason.
+
+The shares are measured ceilings, not taste: `--muted-foreground` stays
+above 4.5:1 on the clover up to a 23% share of `primary-container` in
+dark and 46% in light; the panel ships 12% and 36%. The old aurora mesh
+had the same ban for the same reason — subtle at 4.15:1 and 4.25:1 at the
+blobs' peak alpha.
 
 <Canvas of={InstrumentPanelStories.WhySubtleIsBanned} />
 
-Switch the theme in the toolbar while looking at that story. It is worse
-in neither and marginal in both, which is exactly the kind of "looks
-fine" that ships a failure. The 14% cap and the tier swap are the two
+Switch the theme in the toolbar while looking at that story. It is
+marginal in both, and on the bare container subtle even passes, which is
+exactly the kind of "looks fine" that ships a failure the moment a caption
+runs into the corner. The capped share and the tier swap are the two
 halves of one decision; neither survives alone.
 
-The mesh is also **static**. A drifting field behind a number you are
+The panel is also **static**, and not interactive — no state layer,
+nothing for reduced motion to stop. A drifting ground behind a number you are
 trying to read is a different thing from one standing in for a number
 that has not arrived — that is `Skeleton`'s job, and its own drift is
 transform-only on coprime periods for reasons of its own.
@@ -177,7 +207,7 @@ text. The ramp had inherited a type constraint that does not apply to it.
 The obvious fix is to mix each stop toward white, freeing it from that
 constraint. Rendered, that is **strictly worse**: a tint mixed toward
 white sits *closer* to a white ground, so every stop lost the contrast
-that made it visible at all, and the mesh went from green-and-lilac to
+that made it visible at all, and the aurora went from green-and-lilac to
 flat grey. On a light ground, saturation against the ground is the entire
 budget.
 

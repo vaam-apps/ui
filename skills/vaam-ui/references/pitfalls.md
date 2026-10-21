@@ -75,10 +75,13 @@ Two causes, both real:
 
 ## Text over an `InstrumentPanel` or a glowing card is hard to read
 
-`text-subtle-foreground` is banned on the aurora mesh — measured, it falls
-to 4.15:1 in dark and 4.25:1 in light, below the 4.5:1 AA bar, while
-`text-muted-foreground` holds at 6.10:1 and 4.68:1. `InstrumentPanel`
-already steps its own caption up; do not push it back down.
+`text-subtle-foreground` is banned on an `InstrumentPanel` — on the
+panel's clover shape it measures 4.05:1 in dark and 4.28:1 in light, below
+the 4.5:1 AA bar, while `text-muted-foreground` holds at 5.95:1 and
+4.71:1. On the bare container beside it subtle passes, which is why it
+looks fine until a caption runs into the corner. `InstrumentPanel` already
+steps its own caption up; do not push it back down. The same ban applies
+to the `.aurora-mesh` class, if you apply it by hand.
 
 ## My content sits under the nav rail
 
