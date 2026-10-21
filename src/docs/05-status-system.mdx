@@ -163,6 +163,14 @@ three hand-written, near-identical pills that differed only in which
 table they indexed and had already drifted (one set `role="img"`, one did
 not; one supported `interactive`, two did not).
 
+**Two sizes.** `md`, the default, is M3's chip: 32px tall when loud, a
+14px `label-large` label and an 18px glyph. `sm` is the dense pill —
+20px, a 12px caption, a 14px glyph — and it is what a table row wants: a
+column of `md` pills makes every loud row taller than its quiet
+neighbours. `StateChip` takes the same `size`, at 28px and 20px.
+
+<Canvas of={StatusPillStories.Sizes} />
+
 **`StateMark`** is the SVG underneath it: silhouette × interior mark ×
 fill, parameterised on the same `StatusMeta`, pure, and `aria-hidden`.
 The accessible name belongs to the pill, which has the words. Below 12px
