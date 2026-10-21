@@ -84,9 +84,22 @@
  * ship two different icon-affordance shapes. The press morph is the same
  * lockstep move one layer further: whichever control the reader presses,
  * the shape answers the same way.
+ *
+ * # The resting circle is `50%`, not `rounded-full`
+ *
+ * This constant carries its own resting radius, and every call site
+ * dropped its `rounded-full` for it. `rounded-full` is `calc(infinity *
+ * 1px)` — 3.35544e+07px computed — and a spring from there down to a 2.4px
+ * press target does not animate: it holds round, overshoots to 0 (a
+ * square), rebounds to ~300000px (round again) and lands, the strobe
+ * `button.tsx` and `side-nav.tsx`'s toolbar each measured. All four
+ * call sites are square boxes (a fixed icon in `p-1`, or `size-6`/
+ * `size-12`), so `50%` of the box is exactly the circle `rounded-full`
+ * drew, and a percentage interpolates against a length like any other
+ * `<length-percentage>`.
  */
 export const PRESS_SHAPE_MORPH =
-  "active:[border-radius:var(--btn-press-radius)] " +
+  "rounded-[50%] active:[border-radius:var(--btn-press-radius)] " +
   "[transition-property:color,background-color,opacity,border-radius] " +
   "[transition-duration:var(--dur-effects-fast),var(--dur-effects-fast),var(--dur-effects-fast),var(--dur-spatial-fast)] " +
   "[transition-timing-function:var(--ease-effects),var(--ease-effects),var(--ease-effects),var(--ease-spatial-fast)]";

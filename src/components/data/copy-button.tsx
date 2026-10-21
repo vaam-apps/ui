@@ -143,7 +143,7 @@ export function CopyButton({
         // site. Doesn't collide with the `opacity-*` utilities below for
         // the same reason `transition` didn't: those set `opacity`'s
         // *value*, this sets which properties transition and how fast.
-        "relative shrink-0 rounded-full p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
+        "relative shrink-0 p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
         // D11: see `pressRadiusStyle` above for `--tap-size`, and
         // `theme.css`'s own header on `.tap-target` for the whole rule.
         // `[--tap-rest:-4px]` is the `-m-1` this class string used to

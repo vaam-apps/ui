@@ -73,7 +73,7 @@ export function DropdownMenuItem({
       type="button"
       className={cn(
         "flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-body text-foreground outline-none",
-        "data-focus:bg-surface-3",
+        "data-focus:bg-surface-3 transition-colors duration-[var(--dur-effects-fast)] ease-[var(--ease-effects)]",
         "data-disabled:pointer-events-none data-disabled:opacity-50",
         className,
       )}
@@ -150,7 +150,7 @@ export function DropdownMenuLinkItem({
       as="a"
       className={cn(
         "flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-body text-foreground outline-none",
-        "data-focus:bg-surface-3",
+        "data-focus:bg-surface-3 transition-colors duration-[var(--dur-effects-fast)] ease-[var(--ease-effects)]",
         "data-disabled:pointer-events-none data-disabled:opacity-50",
         className,
       )}
@@ -193,7 +193,7 @@ export function DropdownMenuCheckboxItem({
       // depend on winning an argument with the library.
       className={cn(
         "flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-body text-foreground outline-none",
-        "data-focus:bg-surface-3",
+        "data-focus:bg-surface-3 transition-colors duration-[var(--dur-effects-fast)] ease-[var(--ease-effects)]",
         className,
       )}
       {...omitUndefined(props)}

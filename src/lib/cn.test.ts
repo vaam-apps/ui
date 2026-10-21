@@ -116,7 +116,12 @@ describe("daisyUI button size and shape are orthogonal", () => {
   it("survives the real `buttonVariants` output, and resolves to a round radius", () => {
     const merged = cn(buttonVariants({ variant: "ghost", size: "icon" }));
     expect(merged).toContain("btn-circle");
-    expect(merged).toContain("rounded-full");
+    // The resting radius is half the button's own `--size`, not
+    // `rounded-full` — a finite length, so the press morph animates
+    // (`theme.css`'s `--btn-rest-radius`). On `btn-circle`'s square box
+    // that is exactly a circle.
+    expect(merged).toContain("rounded-(--btn-rest-radius)");
+    expect(merged).not.toContain("rounded-full");
     expect(merged).not.toContain("rounded-field");
   });
 });

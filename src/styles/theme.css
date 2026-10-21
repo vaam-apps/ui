@@ -453,6 +453,33 @@
 }
 
 /*
+ * The resting radius every `.btn` morphs *from*: half its own height,
+ * which draws exactly the stadium (and, on `.btn-circle`, exactly the
+ * disc) `rounded-full` draws — but as a finite length.
+ *
+ * That is the whole point. `rounded-full` is `calc(infinity * 1px)`, which
+ * computes to 3.35544e+07px, and a transition between that and the 8px
+ * press radius is a transition across seven orders of magnitude: measured
+ * frame by frame on `Button` before this existed, the radius stayed
+ * clamped round for six frames, overshot past 8 to *zero* on the spring's
+ * bounce (square corners for nine frames), leapt back to 294905px (round
+ * again) on the rebound and only then landed on 8 — round, square, round,
+ * rounded, in under half a second, which reads as no animation at all.
+ * Release was a one-frame jump. `side-nav.tsx`'s toolbar found the same
+ * thing ("round → square → round again") and fixed it with a literal
+ * `rounded-[20px]`; this is the same fix for a control whose height is a
+ * custom property.
+ *
+ * `Button`'s class string reads it as `rounded-(--btn-rest-radius)`, so a
+ * caller's own `rounded-*` still overrides it through `cn()`. A caller
+ * who resizes a button with a height utility instead of `size` should
+ * pass a matching radius too; `--size` is what this follows.
+ */
+.btn {
+  --btn-rest-radius: calc(var(--size) / 2);
+}
+
+/*
  * The rest of an M3 Expressive button's anatomy, per size bucket, through
  * daisyUI's own `.btn` hooks (`--btn-p` is its inline padding, `--fontsize`
  * its label size) so nothing else about `.btn` has to be restated.

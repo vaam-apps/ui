@@ -38,7 +38,19 @@ import { cn } from "../../lib/cn";
 // Shape: every M3 Expressive button is round at rest
 // (`ContainerShapeRound` is `CornerFull` in `ButtonXSmallTokens`,
 // `ButtonSmallTokens` and `ButtonMediumTokens`), so the base string carries
-// `rounded-full`, and squares off while held — the press shape morph.
+// a full corner, and squares off while held — the press shape morph.
+//
+// The full corner is `rounded-(--btn-rest-radius)` — half the button's own
+// `--size` (`theme.css`) — and **not** `rounded-full`, which this used to
+// be and which is why buttons did not visibly animate. `rounded-full` is
+// `calc(infinity * 1px)`, 3.35544e+07px computed, and a spring between that
+// and 8px is a spring across seven orders of magnitude: sampled frame by
+// frame on a real press, the radius stayed clamped round, overshot to 0
+// (square), rebounded to ~295000px (round) and only then settled — round,
+// square, round, rounded in under 400ms, which reads as a glitch rather
+// than a morph, and release was a one-frame snap. A finite half-height
+// draws the identical stadium and interpolates as a radius.
+// `e2e/button-motion.spec.ts` samples it mid-flight.
 // `active:[border-radius:var(--btn-press-radius)]` steps the radius down to
 // M3's `PressedContainerShape` for the control's size and density
 // (`theme.css` derives `--btn-press-radius`: `small` on `sm`, `small` →
@@ -46,10 +58,10 @@ import { cn } from "../../lib/cn";
 // box on the circular icon button) and springs back on release via
 // `--ease-spatial-fast`/`--dur-spatial-fast`, the "signature bounce" spring.
 //
-// `rounded-full` and the `active:` rule are plain Tailwind utilities with
+// The resting radius and the `active:` rule are plain Tailwind utilities with
 // no shared merge group across the `active:` modifier (see `cn.ts`'s note
-// on modifier-scoped groups), so they coexist: `rounded-full` paints at
-// rest, the `active:` rule only while held. Both are utilities, which
+// on modifier-scoped groups), so they coexist: the resting radius paints
+// at rest, the `active:` rule only while held. Both are utilities, which
 // matters here: daisyUI emits `.btn`'s own `border-radius` in a nested
 // cascade layer, and an unlayered utility outranks it — the trap that once
 // let `rounded-field` defeat `.btn-circle`.
@@ -67,7 +79,7 @@ import { cn } from "../../lib/cn";
 // button reaches for the class string directly:
 // `<a className={buttonVariants({ variant: "secondary" })}>`.
 export const buttonVariants = cva(
-  "btn font-sans font-medium rounded-full " +
+  "btn font-sans font-medium rounded-(--btn-rest-radius) " +
     "active:[border-radius:var(--btn-press-radius)] " +
     "[transition-property:color,background-color,border-color,box-shadow,border-radius] " +
     "[transition-duration:var(--dur-effects-fast),var(--dur-effects-fast),var(--dur-effects-fast),var(--dur-effects-fast),var(--dur-spatial-fast)] " +
@@ -107,12 +119,13 @@ export const buttonVariants = cva(
         // bare `<button>`s for layout reasons and don't run through `cva`,
         // but share the shape.
         //
-        // `btn-circle` is not belt-and-braces with the base `rounded-full`:
+        // `btn-circle` is not belt-and-braces with the base resting radius:
         // it is what makes the box square (daisyUI sets `width` from
         // `--size`), and a rounded *square* was once shipped and reported
-        // as a circle. `rounded-full` is restated here so `cn()` keeps it
-        // last whatever a caller's `className` merges in.
-        icon: "btn-circle btn-sm rounded-full",
+        // as a circle. The resting radius is restated here so `cn()` keeps
+        // it last whatever a caller's `className` merges in; on a square
+        // box, half of `--size` is exactly a circle.
+        icon: "btn-circle btn-sm rounded-(--btn-rest-radius)",
       },
     },
     defaultVariants: { variant: "primary", size: "md" },

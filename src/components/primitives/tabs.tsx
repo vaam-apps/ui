@@ -239,7 +239,14 @@ export function ValueTabsTrigger({
         "relative -mb-px shrink-0 whitespace-nowrap px-1 py-3 text-on-surface-variant text-title-small",
         "transition-colors duration-[var(--dur-effects-fast)] ease-[var(--ease-effects)] hover:text-on-surface",
         "after:absolute after:inset-x-0 after:bottom-0 after:h-[3px] after:rounded-t-[3px] after:bg-primary after:opacity-0",
-        "data-selected:text-primary data-selected:after:opacity-100",
+        // The indicator used to snap: `transition-colors` above is on the
+        // tab, and a pseudo-element has its own computed `transition`, so
+        // `after:opacity-*` changed with nothing to animate it. It now
+        // fades on the effects spring and grows from the middle on the
+        // spatial one — the selected tab's underline arriving rather than
+        // appearing.
+        "after:scale-x-50 after:[transition-property:opacity,scale] after:[transition-duration:var(--dur-effects-fast),var(--dur-spatial-fast)] after:[transition-timing-function:var(--ease-effects),var(--ease-spatial-fast)]",
+        "data-selected:text-primary data-selected:after:scale-x-100 data-selected:after:opacity-100",
         className,
       )}
     >

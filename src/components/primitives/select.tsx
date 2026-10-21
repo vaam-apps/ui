@@ -1366,9 +1366,9 @@ export interface SelectItemProps {
 // on the `auto` entry.
 const ROW: Record<SelectPresentation, string> = {
   dropdown:
-    "relative flex cursor-pointer items-center rounded-sm py-1.5 pr-2 pl-7 text-body text-foreground outline-none data-focus:bg-surface-3",
+    "relative flex cursor-pointer items-center rounded-sm py-1.5 pr-2 pl-7 text-body text-foreground outline-none data-focus:bg-surface-3 [transition-property:background-color] [transition-duration:var(--dur-effects-fast)] [transition-timing-function:var(--ease-effects)]",
   auto: cn(
-    "relative flex cursor-pointer items-center rounded-sm py-1.5 pr-2 pl-7 text-body text-foreground outline-none data-focus:bg-surface-3",
+    "relative flex cursor-pointer items-center rounded-sm py-1.5 pr-2 pl-7 text-body text-foreground outline-none data-focus:bg-surface-3 [transition-property:background-color] [transition-duration:var(--dur-effects-fast)] [transition-timing-function:var(--ease-effects)]",
     // Below `sm`, a row of `SelectContent`'s bottom sheet: an M3
     // Expressive list item (`ListTokens.kt`). 56px one-line height
     // (`ItemOneLineContainerHeight`), 16px of leading and trailing

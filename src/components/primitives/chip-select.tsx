@@ -130,13 +130,16 @@ export function ChipSelect<T extends string>({
                     : "border-on-surface-variant bg-transparent",
                 )}
               >
-                {checked && (
-                  <Check
-                    className="size-3 text-primary-content"
-                    strokeWidth={2.5}
-                    aria-hidden="true"
-                  />
-                )}
+                {/* Always mounted, faded: a mark that mounts on check can
+                    only appear, never transition in. */}
+                <Check
+                  className={cn(
+                    "size-3 text-primary-content transition-opacity duration-[var(--dur-effects-fast)] ease-[var(--ease-effects)]",
+                    checked ? "opacity-100" : "opacity-0",
+                  )}
+                  strokeWidth={2.5}
+                  aria-hidden="true"
+                />
               </span>
               <span className="flex min-w-0 flex-col gap-0.5">
                 {/* `data-disabled:` works here because the `Field` above is

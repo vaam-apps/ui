@@ -277,19 +277,19 @@ export function DialogClose<T extends ElementType = "button">({
 const CLOSE_INLINE = cn(
   // `size-6`: an explicit 24px box. Content-sized, it was stretched by a
   // flex column — in `DialogHeader`, a 516×24 pill (found in review).
-  "relative inline-flex size-6 shrink-0 items-center justify-center rounded-full p-1 text-subtle-foreground hover:bg-foreground/8 hover:text-foreground",
+  "relative inline-flex size-6 shrink-0 items-center justify-center p-1 text-subtle-foreground hover:bg-foreground/8 hover:text-foreground",
   "[--btn-press-radius:calc(24px*0.1)] [--tap-rest:-4px] [--tap-size:24px] tap-target",
   PRESS_SHAPE_MORPH,
 );
 
 const CLOSE_CHROME: Record<DialogPresentation, string> = {
   basic: cn(
-    "-m-1 absolute top-4 right-4 z-20 rounded-full p-1 text-subtle-foreground hover:bg-foreground/8 hover:text-foreground",
+    "-m-1 absolute top-4 right-4 z-20 p-1 text-subtle-foreground hover:bg-foreground/8 hover:text-foreground",
     "[--btn-press-radius:calc(24px*0.1)] [--tap-size:24px] tap-target-anchored",
     PRESS_SHAPE_MORPH,
   ),
   fullscreen: cn(
-    "-m-1 absolute top-4 right-4 z-20 rounded-full p-1 text-subtle-foreground hover:bg-foreground/8 hover:text-foreground",
+    "-m-1 absolute top-4 right-4 z-20 p-1 text-subtle-foreground hover:bg-foreground/8 hover:text-foreground",
     "[--btn-press-radius:calc(24px*0.1)] [--tap-size:24px] tap-target-anchored",
     PRESS_SHAPE_MORPH,
     "max-sm:top-[calc(env(safe-area-inset-top,0px)+0.5rem)] max-sm:right-auto max-sm:left-[calc(env(safe-area-inset-left,0px)+0.25rem)] max-sm:m-0 max-sm:flex max-sm:size-12 max-sm:items-center max-sm:justify-center max-sm:p-0 max-sm:text-foreground",

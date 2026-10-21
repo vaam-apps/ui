@@ -199,7 +199,7 @@ export function Toaster() {
               onClick={() => dismissToast(item.id)}
               aria-label="Dismiss"
               className={cn(
-                "relative shrink-0 rounded-full p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
+                "relative shrink-0 p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
                 "[--btn-press-radius:calc(24px*0.1)]",
                 // D11 (`theme.css`'s own header on `.tap-target`): in
                 // normal flow like the drawer close button, so `relative`
