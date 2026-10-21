@@ -13,6 +13,21 @@ decision the way the prose below does. The tradeoff is recorded in the
 pull request that made this change.
 -->
 
+## [0.5.0](https://github.com/vaam-apps/ui/compare/v0.4.0...v0.5.0) (2026-10-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* M3 Expressive polish: pill fields that round in on focus, real state motion, M3 switch, sheets and bigger status pills ([#43](https://github.com/vaam-apps/ui/issues/43))
+* Material 3 Expressive replaces the palette, corner radii, type scale and fonts; see above.
+
+### Features
+
+* adopt Material 3 Expressive colour, shape and type ([#41](https://github.com/vaam-apps/ui/issues/41)) ([b56186e](https://github.com/vaam-apps/ui/commit/b56186e394556df4ca6996bb033887198b2d170f))
+* **instrument-panel:** an M3 Expressive container with clover and cookie shapes ([#44](https://github.com/vaam-apps/ui/issues/44)) ([2000993](https://github.com/vaam-apps/ui/commit/200099331a437cfe123a9656c4ba8f37cfa64e7a))
+* **instrument-panel:** make it an M3 Expressive container with Expressive shapes ([2000993](https://github.com/vaam-apps/ui/commit/200099331a437cfe123a9656c4ba8f37cfa64e7a))
+* M3 Expressive polish: pill fields that round in on focus, real state motion, M3 switch, sheets and bigger status pills ([#43](https://github.com/vaam-apps/ui/issues/43)) ([3a96f1f](https://github.com/vaam-apps/ui/commit/3a96f1fed49166ffc95d04c3b9c2cd7729d2b953))
+
 ## [0.4.0](https://github.com/vaam-apps/ui/compare/v0.3.0...v0.4.0) (2026-09-24)
 
 
