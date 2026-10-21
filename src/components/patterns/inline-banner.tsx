@@ -38,7 +38,7 @@ export interface InlineBannerProps {
    * quiet status hues — see `isQuietHue` in `../status/status-tokens`, the
    * same fact `StateChip` had to account for, and the same shape of bug
    * `RadioGroup`/`ChipSelect` had on the selection side, fixed in
-   * `be63a70`). `success` now renders through the same achromatic
+   * `be63a70`). `success` now renders through the same neutral
    * `border-edge`/`bg-surface-2` chrome as `neutral`, keeping only its
    * own `text-state-success-fg`, so it reads as a member of the same
    * family instead of a rendering bug. */
@@ -58,7 +58,7 @@ export function InlineBanner({ variant = "neutral", children, className }: Inlin
           "rounded-sm border border-state-danger-border bg-state-danger-bg px-3 py-2 text-state-danger-fg",
         variant === "warning" &&
           "rounded-sm border border-state-warning-border bg-state-warning-bg px-3 py-2 text-state-warning-fg",
-        // `success` draws the achromatic quiet-hue box, not its own.
+        // `success` draws the neutral quiet-hue box, not its own.
         // `--state-success-bg`/`-border` are declared `transparent` on
         // purpose (see `isQuietHue` in `../status/status-tokens`), so
         // painting them here rendered a bare line of green text between

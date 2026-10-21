@@ -83,7 +83,7 @@ export function StateChip({ className, tone = "uncertain", ...props }: StateChip
     <span
       className={cn(
         "rounded-sm border px-1.5 py-0.5 text-caption",
-        // Quiet tones borrow the same achromatic bordered surface the
+        // Quiet tones borrow the same neutral bordered surface the
         // rest of the library uses for a quiet box (`border-edge` +
         // `bg-surface-2`, the same pair `InlineBanner`'s `neutral`
         // variant already uses) instead of the hue's own transparent

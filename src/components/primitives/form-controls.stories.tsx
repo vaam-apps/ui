@@ -310,7 +310,7 @@ export const FieldsAndErrors: Story = {
  * This is also the `--font-italic` story: the group's hint, the
  * "Marketing" chip's description and the radio options' descriptions are
  * all a person's sentence explaining something the control cannot say on
- * its own, so all three render `font-italic italic tracking-normal` —
+ * its own, so all three render `font-italic italic` —
  * see `FormField`'s `hint` prop doc for the line being drawn. The plain
  * count beside the chips ("2 of 4 selected") is the contrast case: it is
  * a value the system already has, so it stays `font-sans`, the same as

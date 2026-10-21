@@ -8,19 +8,21 @@ import { REGISTERED_FONT_SIZES } from "../lib/cn";
 <Meta title="Docs/Typography" />
 
 export const SIZES = [
-  ["micro", "11px", "16px", "Densest metadata, rail labels"],
-  ["caption", "12px", "18px", "Captions, hints, option descriptions"],
-  ["body", "13px", "20px", "The default. Rows, values, controls"],
-  ["prose", "14px", "21px", "Running text a person reads in sentences"],
-  ["title-sm", "16px", "24px", "Card and panel titles"],
-  ["title", "20px", "28px", "Screen titles"],
-  ["metric", "28px", "34px", "A headline figure"],
-  ["metric-lg", "40px", "44px", "The one figure a screen is about"],
+  ["micro", "label-small", "11px", "16px", "Densest metadata, rail labels"],
+  ["caption", "body-small", "12px", "16px", "Captions, hints, option descriptions"],
+  ["body", "body-medium", "14px", "20px", "The default. Rows, values, controls"],
+  ["prose", "body-large", "16px", "24px", "Input text and running prose"],
+  ["title-sm", "title-medium", "16px", "24px", "Card and panel titles"],
+  ["title", "title-large", "22px", "28px", "Section titles"],
+  ["metric", "headline-medium", "28px", "36px", "A headline figure"],
+  ["metric-lg", "display-small", "36px", "44px", "The one figure a screen is about"],
 ];
 
 # Typography
 
-Four voices and eight steps. The roles are the point rather than the faces —
+Material 3 Expressive's type scale — fifteen roles, each with an *emphasized*
+variant — set in **Roboto Flex**, the vaam-apps house face, and four voices
+that say who is speaking. The roles are the point rather than the faces —
 substitute the faces and the system still works, drop a role and it does not.
 
 The specimens on this page carry their own `data-theme="dark"` wrapper. A
@@ -33,12 +35,10 @@ attribute on `<html>` never runs here — see
 <div data-theme="dark" className="flex flex-col gap-4 rounded-box bg-background p-5">
   <div>
     <code className="font-mono text-micro text-muted-foreground">--font-display</code>
-    <p className="font-display font-medium text-foreground text-title">
-      Settlement exceptions
-    </p>
+    <p className="font-display text-foreground text-headline-small">Settlement exceptions</p>
     <p className="text-caption text-muted-foreground">
-      IBM Plex Serif. Screen titles, card and dialog headings. A serif gives a
-      dense console one calm anchor per surface without reading as a magazine.
+      Roboto Flex, as M3's *brand* face. Screen titles, card and dialog
+      headings — the display, headline and title-large roles.
     </p>
   </div>
   <div>
@@ -47,17 +47,17 @@ attribute on `<html>` never runs here — see
       Everything else — labels, controls, table cells, emitted facts.
     </p>
     <p className="text-caption text-muted-foreground">
-      IBM Plex Sans. The body face carries 11–14px text almost exclusively, so
-      it is chosen for density and legibility, not personality.
+      Roboto Flex, as M3's *plain* face. One family, so what separates the two
+      voices is the role: size, weight, tracking.
     </p>
   </div>
   <div>
     <code className="font-mono text-micro text-muted-foreground">--font-italic</code>
-    <p className="font-italic text-foreground text-prose italic tracking-normal">
+    <p className="font-italic text-foreground text-prose italic">
       Sent, but no receipt ever arrived; it will not be resubmitted.
     </p>
     <p className="text-caption text-muted-foreground">
-      IBM Plex Serif, slanted. A person wrote this — see the rule below.
+      Roboto Flex on its slant axis. A person wrote this — see the rule below.
     </p>
   </div>
   <div>
@@ -69,44 +69,83 @@ attribute on `<html>` never runs here — see
   </div>
 </div>
 
-IBM Plex is one superfamily drawn to work together, which is worth more here
-than four individually optimal faces. `--font-mono` is the deliberate
-exception: it stays JetBrains Mono because this system leans on its slashed
-zero — an operator tells `0` from `O` in a `cs_cuid()` at 12px only because of
-the slash — and Plex Mono would be more coherent on paper and a worse
-instrument for that job.
+`--font-mono` is the deliberate exception to the one-family rule: it stays
+JetBrains Mono because this system leans on its slashed zero — an operator
+tells `0` from `O` in a `cs_cuid()` at 12px only because of the slash — and no
+M3 role has a monospace opinion to override that with.
 
 Everywhere `.font-mono` applies, `font-variant-numeric: tabular-nums
 slashed-zero` comes with it, globally, so a column of figures aligns and a zero
 is never a letter.
 
 These are **stacks, not `@font-face` rules**; the package ships no font files.
-See [Installation](?path=/docs/docs-installation--docs) for loading them and
-for exactly what is lost if you do not: display and italic collapse into the
-same system serif, and the four-voice distinction goes with them.
+See [Installation](?path=/docs/docs-installation--docs) for loading Roboto Flex
+and for what is lost if you do not: the stacks fall back to `system-ui`, which
+keeps every role's size and weight and loses the face.
 
-One global correction worth knowing about: `html` carries
-`letter-spacing: -0.011em`, tuned for the sans body face. The serif slots are
-the ones that suffer from it, most of all at 12px, so `CardHeader`,
-`FormField`'s hint and `StateTimeline`'s annotation all set `tracking-normal`
-explicitly.
+There is no global letter-spacing any more. The old `-0.011em` on `html` was
+tuned for IBM Plex Sans; M3 tracks per role, and every `--text-*` utility
+carries its role's tracking.
+
+## The M3 roles
+
+Each role is a set of tokens — `--md-sys-typescale-<role>-font`, `-size`,
+`-line-height`, `-tracking`, `-weight` — and a Tailwind utility,
+`text-<role>`, that applies size, line height, tracking and weight together.
+The *emphasized* variant is the same size and line height one weight up
+(Regular → Medium, Medium → Bold), as
+`--md-sys-typescale-emphasized-<role>-weight`; write it as the role plus a
+weight utility, which wins over the role's own weight:
+
+```tsx
+<span className="text-label-large font-bold">Emphasized label</span>
+```
+
+<div data-theme="dark" className="flex flex-col gap-1 rounded-box bg-background p-5 text-foreground">
+  <p className="text-display-small">display-small 36/44</p>
+  <p className="text-headline-medium">headline-medium 28/36</p>
+  <p className="text-headline-small">headline-small 24/32</p>
+  <p className="text-title-large">title-large 22/28</p>
+  <p className="text-title-medium">title-medium 16/24</p>
+  <p className="text-title-small">title-small 14/20</p>
+  <p className="text-body-large">body-large 16/24</p>
+  <p className="text-body-medium">body-medium 14/20</p>
+  <p className="text-body-small">body-small 12/16</p>
+  <p className="text-label-large">label-large 14/20</p>
+  <p className="text-label-medium">label-medium 12/16</p>
+  <p className="text-label-small">label-small 11/16</p>
+</div>
+
+Sizes, line heights and tracking are transcribed from androidx's
+`TypeScaleTokens.kt`. The emphasized entries there are flagged upstream as
+provisional ("update with the generated tokens once available"), so they are
+Google's current intent rather than a frozen spec.
 
 ## The size scale
+
+The library's own eight steps predate the M3 roles and every component uses
+them, so they stay — as aliases. Each one *is* an M3 role now (size, line
+height and tracking; weight stays the component's own), where it used to be a
+near neighbour that several components apologised for.
 
 <table>
   <thead>
     <tr>
       <th>Step</th>
+      <th>M3 role</th>
       <th>Size</th>
       <th>Line height</th>
       <th>Where it is used</th>
     </tr>
   </thead>
   <tbody>
-    {SIZES.map(([name, size, leading, use]) => (
+    {SIZES.map(([name, role, size, leading, use]) => (
       <tr key={name}>
         <td>
           <code className="font-mono text-caption">text-{name}</code>
+        </td>
+        <td>
+          <code className="font-mono text-caption">{role}</code>
         </td>
         <td>
           <code className="font-mono text-caption">{size}</code>
@@ -133,12 +172,14 @@ explicitly.
 
 Declaring these under Tailwind's own `--text-*` keys overrides its stock scale
 app-wide, which is the point: `text-sm` is not a step in this system, and there
-is one ladder rather than two competing ones.
+is one ladder rather than two competing ones. `body` and `prose` grew in the
+move (13→14px and 14→16px): M3 has no 13px role, and `prose` is the input and
+reading text M3 sets in `body-large`.
 
 ### The bug the scale is registered for
 
-`cn()` is `clsx` plus `tailwind-merge`, and it registers these eight steps
-under `tailwind-merge`'s `text` theme key. That registration is not
+`cn()` is `clsx` plus `tailwind-merge`, and it registers these steps — the
+library's eight and M3's fifteen — under `tailwind-merge`'s `text` theme key. That registration is not
 configuration polish — it fixes a live, silent bug.
 
 Stock `tailwind-merge` only knows Tailwind's *default* theme. `text-caption` is
@@ -197,7 +238,10 @@ If yes, it is an emitted fact. It stays `font-sans`, however small and however
 muted it is. The role only carries meaning because things are excluded from it.
 
 Set it with `italic` beside `font-italic`: the token names the *family*, not the
-style. In practice the full trio is `font-italic italic tracking-normal`.
+style. In practice the pair is `font-italic italic`. M3's type roles say how
+big and how heavy a string is, never whether it is a fact or a sentence, so
+the voice survives the move to M3 unchanged: it is an orthogonal channel, not
+a competing role.
 
 ### Worked examples: these take italic
 

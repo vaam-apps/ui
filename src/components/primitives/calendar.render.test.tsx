@@ -138,8 +138,8 @@ describe("Calendar renders its selection styling onto real elements", () => {
 });
 
 /**
- * `today` is M3's 1dp ring and label in `Primary`, the palette's one
- * achromatic accent — a calendar fact marked by shape, never by a status
+ * `today` is M3's 1dp ring and label in `Primary`, the seed's hue —
+ * a calendar fact marked by shape, never by a status
  * hue. It once was `font-semibold text-state-uncertain-fg` — a status
  * hue on a calendar fact. `day_button` (the element the digit actually
  * renders in) sets its own `text-foreground`, and an inherited colour

@@ -13,16 +13,25 @@ reaches nobody.
 
 ## Button
 
-Four variants and no more: `primary` (the achromatic inverse fill),
-`secondary` (outline), `ghost`, `destructive`. There is deliberately **no
-success or warning button** — those hues belong to the status system, and
-a button that borrows one erodes the state language on every screen where
-both appear.
+M3 Expressive's common buttons: `primary` (M3 *filled*, the seed's
+indigo), `secondary` (*outlined*), `ghost` (*text*), `elevated`
+(*elevated*: a `primary` label on `surface-container-low` with a level-1
+shadow), plus `destructive` (filled, in M3's `error` role). All are round
+(full pill) at rest and square off while pressed — the M3 press morph. There
+is deliberately **no success or warning button** — those hues belong to the
+status system, and a button that borrows one erodes the state language on
+every screen where both appear — and **no tonal button**: M3 paints it
+`secondary-container`, which Expressive rotates toward olive at this seed,
+next to `success`.
 
-| Prop      | Type                                                   | Default     |
-| --------- | ------------------------------------------------------ | ----------- |
-| `variant` | `"primary" \| "secondary" \| "ghost" \| "destructive"` | `"primary"` |
-| `size`    | `"sm" \| "md" \| "icon"`                               | `"md"`      |
+| Prop      | Type                                                                 | Default     |
+| --------- | -------------------------------------------------------------------- | ----------- |
+| `variant` | `"primary" \| "secondary" \| "ghost" \| "elevated" \| "destructive"` | `"primary"` |
+| `size`    | `"sm" \| "md" \| "icon"`                                             | `"md"`      |
+
+`elevated` is new with the M3 release; the other four kept their names and
+changed only how they look (a `ghost` label is `primary`-coloured now, M3's
+text button).
 
 Everything else is `<button>`'s own attributes, and the ref lands on the
 element. `ButtonVariant` and `ButtonSize` are exported if you need to
@@ -504,8 +513,8 @@ per option, which registers the description through context while keeping
 the whole card clickable. Write the description as a description; do not
 fold it into the label.
 
-Selection is spelled achromatically — a filled `primary` glyph on a
-`surface-3` row — not with a status hue. Status hues answer "what did the
+Selection is spelled in the seed's colour — an M3 radio (a `primary` ring
+and dot) on a `surface-3` row — not with a status hue. Status hues answer "what did the
 system decide"; these answer "what did you pick". An earlier version used
 the success tokens, and since `success` is a quiet hue whose background
 and border are declared `transparent`, the chosen option rendered with no

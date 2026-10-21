@@ -23,10 +23,12 @@ import { describe, expect, it } from "vitest";
  * would have shipped a status vocabulary nobody could read, and nothing
  * in the build would have said a word.
  *
- * So the gate came before the colours. The light values in `theme.css`
- * were derived *against this test* — searched for maximum pairwise
- * separation among candidates that already cleared the bar — rather than
- * picked and then spot-checked.
+ * So the gate came before the colours, and it still outranks them. The
+ * palette is generated now (`scripts/generate-md3-colors.ts`, M3
+ * Expressive from one seed), and where Material's own recipe would have
+ * failed this file the generator departs from the recipe rather than this
+ * file relaxing: the light status foregrounds sit at tone 38, not M3's 40,
+ * because a loud `progress` label measured 4.46:1 at 40.
  *
  * # The case that is easy to miss
  *
@@ -50,7 +52,8 @@ import { describe, expect, it } from "vitest";
  * wrong opening brace, and returned the daisyUI block — which declares
  * no `--surface-3`. The test failed for a reason that had nothing to do
  * with any colour. A comment is documentation, not a declaration, so it
- * must not be scanned at all.
+ * must not be scanned at all. (It matters twice now: a `{` or `;` inside a
+ * comment would also throw off the top-level block scan below.)
  */
 const THEME_CSS = readFileSync(
   fileURLToPath(new URL("../styles/theme.css", import.meta.url)),
@@ -77,51 +80,92 @@ function contrast(a: string, b: string): number {
 }
 
 /**
- * The body of a `@plugin "daisyui/theme"` block, found by its `name:`.
- * Brace-counted rather than matched with a lazy `[^}]*`, because these
- * blocks contain no nested braces today and would silently truncate if
- * one were ever added.
+ * The stylesheet's top-level rule blocks, in source order, with the
+ * selector each one applies to. A `@plugin "daisyui/theme"` block counts as
+ * `[data-theme="<name>"]`, which is what daisyUI emits it as.
+ *
+ * Brace-counted rather than matched with a lazy `[^}]*`, so a nested
+ * block (`@layer`, `@media`) is skipped whole rather than truncating the
+ * scan. Only top-level blocks can declare a theme's tokens.
  */
-function daisyThemeBlock(name: string): string {
-  const start = THEME_CSS.indexOf(`name: "${name}"`);
-  if (start === -1) return "";
-  const open = THEME_CSS.lastIndexOf("{", start);
+function topLevelBlocks(): { selectors: string[]; body: string }[] {
+  const blocks: { selectors: string[]; body: string }[] = [];
   let depth = 0;
-  for (let i = open; i < THEME_CSS.length; i += 1) {
-    if (THEME_CSS[i] === "{") depth += 1;
-    if (THEME_CSS[i] === "}") {
+  let preludeStart = 0;
+  let open = -1;
+  for (let i = 0; i < THEME_CSS.length; i += 1) {
+    const ch = THEME_CSS[i];
+    if (ch === ";" && depth === 0) preludeStart = i + 1;
+    if (ch === "{") {
+      if (depth === 0) open = i;
+      depth += 1;
+    }
+    if (ch === "}") {
       depth -= 1;
-      if (depth === 0) return THEME_CSS.slice(open, i);
+      if (depth === 0) {
+        const prelude = THEME_CSS.slice(preludeStart, open).trim();
+        const body = THEME_CSS.slice(open + 1, i);
+        const daisy = /^@plugin\s+"daisyui\/theme"$/.test(prelude)
+          ? /name:\s*"([a-z]+)"/.exec(body)?.[1]
+          : undefined;
+        const selectors =
+          daisy !== undefined
+            ? [`[data-theme="${daisy}"]`]
+            : prelude.startsWith("@")
+              ? []
+              : prelude.split(",").map((sel) => sel.trim());
+        blocks.push({ selectors, body });
+        preludeStart = i + 1;
+      }
     }
   }
-  return "";
+  return blocks;
 }
 
-/** The body of the `[data-theme="X"]` custom-property block. */
-function dataThemeBlock(name: string): string {
-  const marker = `[data-theme="${name}"]`;
-  const start = THEME_CSS.indexOf(marker);
-  if (start === -1) return "";
-  const open = THEME_CSS.indexOf("{", start);
-  let depth = 0;
-  for (let i = open; i < THEME_CSS.length; i += 1) {
-    if (THEME_CSS[i] === "{") depth += 1;
-    if (THEME_CSS[i] === "}") {
-      depth -= 1;
-      if (depth === 0) return THEME_CSS.slice(open, i);
+/**
+ * Every custom property `<html data-theme="name">` ends up with: the
+ * declarations of each top-level block whose selector matches that element
+ * (`:root`, `[data-theme]`, `[data-theme="name"]`), applied in source
+ * order — the cascade, for the one element that matters, with every
+ * selector here at the same specificity.
+ *
+ * This replaced two helpers that each read one block by name. They stopped
+ * being enough the day the palette became a mapping: daisyUI's
+ * `--color-base-100` is now `var(--md-sys-color-surface)`, declared in a
+ * different block, and the library's own `--surface-3` lives in a third
+ * that both themes share. A gate that only read literal hex values out of
+ * the block it expected would have found no surfaces at all — and, worse,
+ * a hex literal left behind in one block would have been measured while
+ * the `var()` that actually wins went unchecked.
+ */
+function themeTokens(name: string): Map<string, string> {
+  const matches = (sel: string) =>
+    sel === ":root" || sel === "[data-theme]" || sel === `[data-theme="${name}"]`;
+  const tokens = new Map<string, string>();
+  for (const block of topLevelBlocks()) {
+    if (!block.selectors.some(matches)) continue;
+    for (const m of block.body.matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/g)) {
+      tokens.set(m[1] as string, (m[2] as string).trim().replace(/\s+/g, " "));
     }
   }
-  return "";
+  return tokens;
 }
 
-/** `--token: rgb(R G B / A);` — the form every status tint and aurora uses. */
-function rgbaTokens(block: string): Map<string, [number, number, number, number]> {
-  const found = new Map<string, [number, number, number, number]>();
-  const re = /(--[a-z0-9-]+)\s*:\s*rgb\((\d+)\s+(\d+)\s+(\d+)\s*\/\s*([0-9.]+)\)\s*;/g;
-  for (const m of block.matchAll(re)) {
-    found.set(m[1] as string, [Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5])]);
-  }
-  return found;
+/** Follows `var(--x)` (with or without a fallback) to a literal value. */
+function resolve(tokens: Map<string, string>, value: string | undefined, depth = 0): string {
+  if (value === undefined || depth > 20) return "";
+  const ref = /^var\((--[a-z0-9-]+)(?:\s*,\s*(.+))?\)$/.exec(value);
+  if (ref === null) return value;
+  const target = tokens.get(ref[1] as string);
+  return target !== undefined
+    ? resolve(tokens, target, depth + 1)
+    : resolve(tokens, ref[2], depth + 1);
+}
+
+/** `rgb(R G B / A)` — the form every status tint is generated in. */
+function parseRgba(value: string): [number, number, number, number] | undefined {
+  const m = /^rgb\((\d+)\s+(\d+)\s+(\d+)\s*\/\s*([0-9.]+)\)$/.exec(value);
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])] : undefined;
 }
 
 /** Source-over composite of a translucent tint on an opaque hex ground. */
@@ -132,13 +176,7 @@ function composite(tint: [number, number, number, number], ground: string): stri
   return `#${mixed.map((c) => c.toString(16).padStart(2, "0")).join("")}`;
 }
 
-function hexTokens(block: string): Map<string, string> {
-  const found = new Map<string, string>();
-  for (const match of block.matchAll(/(--[a-z0-9-]+)\s*:\s*(#[0-9a-fA-F]{6})\s*;/g)) {
-    found.set(match[1] as string, match[2] as string);
-  }
-  return found;
-}
+const HEX = /^#[0-9a-fA-F]{6}$/;
 
 interface Theme {
   name: string;
@@ -149,38 +187,44 @@ interface Theme {
 }
 
 function readTheme(name: string): Theme {
-  const daisy = hexTokens(daisyThemeBlock(name));
-  const custom = hexTokens(dataThemeBlock(name));
+  const tokens = themeTokens(name);
+  const hex = (key: string) => {
+    const value = resolve(tokens, tokens.get(key));
+    return HEX.test(value) ? value : undefined;
+  };
 
-  const surfaces: Record<string, string> = {};
-  for (const key of ["--color-base-100", "--color-base-200", "--color-base-300"]) {
-    const value = daisy.get(key);
-    if (value !== undefined) surfaces[key] = value;
-  }
   // `--surface-4` is not a ladder step of its own: it is what `surface-3`
   // becomes inside `.surface-raised` (a `Dialog`'s panel), so every
   // foreground that can land on a hover or selected fill there has to
   // clear it too.
-  for (const key of ["--surface-3", "--surface-4"]) {
-    const value = custom.get(key);
+  const surfaces: Record<string, string> = {};
+  for (const key of [
+    "--color-base-100",
+    "--color-base-200",
+    "--color-base-300",
+    "--surface-3",
+    "--surface-4",
+  ]) {
+    const value = hex(key);
     if (value !== undefined) surfaces[key] = value;
   }
 
   const foregrounds: Record<string, string> = {};
-  const baseContent = daisy.get("--color-base-content");
-  if (baseContent !== undefined) foregrounds["--color-base-content"] = baseContent;
-  for (const key of ["--muted-foreground", "--subtle-foreground"]) {
-    const value = custom.get(key);
+  for (const key of ["--color-base-content", "--muted-foreground", "--subtle-foreground"]) {
+    const value = hex(key);
     if (value !== undefined) foregrounds[key] = value;
   }
-  for (const [key, value] of custom) {
-    if (/^--state-[a-z]+-fg$/.test(key)) foregrounds[key] = value;
+  for (const key of tokens.keys()) {
+    if (!/^--state-[a-z]+-fg$/.test(key)) continue;
+    const value = hex(key);
+    if (value !== undefined) foregrounds[key] = value;
   }
 
   const tints: Record<string, [number, number, number, number]> = {};
-  for (const [key, value] of rgbaTokens(dataThemeBlock(name))) {
+  for (const key of tokens.keys()) {
     const hue = /^--state-([a-z]+)-bg$/.exec(key)?.[1];
-    if (hue !== undefined) tints[hue] = value;
+    const tint = hue === undefined ? undefined : parseRgba(resolve(tokens, tokens.get(key)));
+    if (hue !== undefined && tint !== undefined) tints[hue] = tint;
   }
 
   return { name, surfaces, foregrounds, tints };
@@ -222,10 +266,11 @@ describe("every theme declares a full set of surfaces and foregrounds", () => {
 
   /**
    * The three non-status foregrounds need their own roster check, and
-   * `--subtle-foreground` is the reason why. `hexTokens` only matches
-   * `#rrggbb`; rewrite a token as `rgb(91 99 113)` — a form this very
-   * stylesheet uses for the aurora and the status tints — and it drops
-   * silently out of the case list with every guard still green. The one
+   * `--subtle-foreground` is the reason why. `readTheme` only keeps a
+   * token that resolves to `#rrggbb`; rewrite one as `rgb(91 99 113)` — a
+   * form this very stylesheet uses for the status tints — or point its
+   * `var()` at a role that does not exist, and it drops silently out of
+   * the case list with every guard still green. The one
    * token whose historical AA failure this file's header cites as its
    * reason to exist is the one that could vanish unnoticed.
    */

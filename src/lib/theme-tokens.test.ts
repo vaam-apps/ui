@@ -28,11 +28,15 @@ const declaredColours = new Set(
   [...THEME_CSS.matchAll(/^\s*--color-([a-z0-9-]+)\s*:/gm)].map((m) => m[1] as string),
 );
 
-/** Every `--text-<step>:` key, ignoring the paired `--line-height` entries. */
+/**
+ * Every `--text-<step>:` key, ignoring its paired sub-keys
+ * (`--text-<step>--line-height`, `--letter-spacing`, `--font-weight`) —
+ * Tailwind's own `--` separator, which no step name contains.
+ */
 const declaredFontSizes = new Set(
   [...THEME_CSS.matchAll(/^\s*--text-([a-z0-9-]+)\s*:/gm)]
     .map((m) => m[1] as string)
-    .filter((step) => !step.endsWith("--line-height")),
+    .filter((step) => !step.includes("--")),
 );
 
 /**

@@ -583,13 +583,11 @@ export function DialogActions({ className, children }: DialogPartProps) {
 }
 
 /**
- * The headline. M3's `AlertDialog` sets it at 20/26 for a precise pointer
- * and at `HeadlineSmall`, 24/32 (`DialogTokens.HeadlineFont`), otherwise.
- * This library's type scale tops out at `text-title`, 20/28, for headings
- * in a dense console, and uses it for both — M3's size with a mouse, a
- * library choice on touch. `font-display`: `theme.css`'s own
- * doc on `--font-display` names dialog headings; `tracking-normal` undoes
- * the global tracking tuned for the sans face (see `card.tsx`).
+ * The headline: `DialogTokens.HeadlineFont`, M3's `headline-small` (24/32),
+ * in the brand face (`font-display`; `theme.css`'s doc on the four voices
+ * names dialog headings). M3's `AlertDialog` drops to 20/26 for a precise
+ * pointer; this library has no pointer-precision signal to key that off,
+ * so it takes the token.
  */
 export function DialogTitle({
   className,
@@ -597,24 +595,21 @@ export function DialogTitle({
 }: ComponentPropsWithoutRef<typeof HeadlessDialogTitle>) {
   return (
     <HeadlessDialogTitle
-      className={cn(
-        "font-display font-medium text-foreground text-title tracking-normal",
-        className,
-      )}
+      className={cn("font-display text-foreground text-headline-small", className)}
       {...props}
     />
   );
 }
 
 /** The supporting text: M3's `BodyMedium` in `OnSurfaceVariant`
- * (`DialogTokens.SupportingText*`) — `text-prose` in `muted-foreground`. */
+ * (`DialogTokens.SupportingText*`) — `text-body` in `muted-foreground`. */
 export function DialogDescription({
   className,
   ...props
 }: ComponentPropsWithoutRef<typeof HeadlessDialogDescription>) {
   return (
     <HeadlessDialogDescription
-      className={cn("text-muted-foreground text-prose", className)}
+      className={cn("text-body text-muted-foreground", className)}
       {...props}
     />
   );

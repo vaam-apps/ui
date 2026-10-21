@@ -171,33 +171,31 @@ test("the dialog's close button is a real target, not just an icon", async ({ pa
  * real browser proves the radius actually changes and actually reverts.
  */
 test.describe("the press-shape morph steps the radius down while held", () => {
-  test("a text button steps from --radius-field to a fifth of its own height", async ({ page }) => {
+  test("a text button steps from a full stadium to M3's small corner", async ({ page }) => {
     await openStory(page, STORY.buttonVariants);
     const button = storyRoot(page).getByRole("button", { name: "Primary" });
+    const rect = await box(button);
 
     const resting = await cornerRadii(button);
     for (const radius of resting) {
-      // `rounded-field` — see `theme.css`'s D8 comment.
-      expect(radius, "resting corner radius").toBeCloseTo(12, 0);
+      // `ContainerShapeRound`, `CornerFull` — a stadium, so every corner
+      // reaches at least half the height.
+      expect(radius, "resting corner radius, a stadium").toBeGreaterThanOrEqual(rect.height / 2);
     }
 
     const pressed = await pressAndSettle(page, button);
     try {
       for (const radius of pressed) {
-        // D10: no longer `--radius-selector` by name — `--btn-press-radius`
-        // now computes `calc(var(--size) * 0.2)` per `theme.css`'s
-        // "Density register" section, and this button's compact/`md`
-        // `--size` is 40px, so 40 * 0.2 = 8, the exact same number the
-        // flat constant produced here before. Compact stays
-        // byte-identical; `density.spec.ts` covers the comfortable
-        // register, where this button is 56px and the target is ~11.2.
+        // `ButtonSmallTokens.PressedContainerShape` is `CornerSmall`, 8px:
+        // a compact `md` button is M3's Small (40px). The next test covers
+        // comfortable, where it is Medium.
         expect(radius, "pressed corner radius").toBeCloseTo(8, 0);
       }
     } finally {
       await page.mouse.up();
     }
-    // The release is itself a transition (the spring bouncing back to
-    // `--radius-field`), so the first paint after `mouse.up()` is still
+    // The release is itself a transition (the spring bouncing back to the
+    // stadium), so the first paint after `mouse.up()` is still
     // mid-flight — reading immediately reads whatever frame happened to
     // land, not the settled shape. Same reasoning as this file's own
     // `settleTransitions` calls elsewhere.
@@ -205,7 +203,26 @@ test.describe("the press-shape morph steps the radius down while held", () => {
 
     const released = await cornerRadii(button);
     for (const radius of released) {
-      expect(radius, "corner radius after release").toBeCloseTo(12, 0);
+      expect(radius, "corner radius after release").toBeGreaterThanOrEqual(rect.height / 2);
+    }
+  });
+
+  test("at comfortable density the same button is M3's Medium and presses to CornerMedium", async ({
+    page,
+  }) => {
+    await openStory(page, STORY.buttonVariants, { density: "comfortable" });
+    const button = storyRoot(page).getByRole("button", { name: "Primary" });
+    const rect = await box(button);
+    // `ButtonMediumTokens.ContainerHeight`, 56dp — the premise.
+    expect(rect.height, "comfortable md height").toBeCloseTo(56, 0);
+    const pressed = await pressAndSettle(page, button);
+    try {
+      for (const radius of pressed) {
+        // `ButtonMediumTokens.PressedContainerShape`: `CornerMedium`, 12px.
+        expect(radius, "pressed corner radius").toBeCloseTo(12, 0);
+      }
+    } finally {
+      await page.mouse.up();
     }
   });
 

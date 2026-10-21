@@ -21,10 +21,11 @@ const meta = {
     docs: {
       description: {
         component:
-          "One dark theme, registered under daisyUI's own `dark` name. Everything daisyUI " +
-          "has no vocabulary for — the fourth surface step, the three-tier edge and text " +
-          "ladders, the focus ring, and the seven-hue status palette — lives beside it as " +
-          "plain custom properties, re-exposed as utilities through `@theme inline`.",
+          "Material 3 Expressive, generated from one seed (`#4f46e5`) for dark (the default) " +
+          "and light. Every M3 colour role is a `--md-sys-color-*` custom property; daisyUI's " +
+          "theme tokens and this library's own (the surface ladder, the edge and text tiers, " +
+          "the focus ring and the eight-hue status palette) are mappings onto those roles, " +
+          "re-exposed as utilities through `@theme inline`.",
       },
     },
   },
@@ -57,10 +58,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 /**
- * Four surface steps and three edge tiers. The surfaces are close
- * together on purpose — this is a near-black theme, and a ladder with big
- * jumps between steps reads as a set of unrelated panels rather than one
- * page with depth.
+ * The surface ladder is M3's: `surface`, then the container steps, each a
+ * few tones apart in the seed's own neutral — close together on purpose, so
+ * the page reads as one surface with depth rather than a set of panels.
  */
 export const Surfaces: Story = {
   render: () => (
@@ -73,6 +73,18 @@ export const Surfaces: Story = {
           <Swatch className="bg-surface-3" name="bg-surface-3" note="hover, pressed, selected" />
         </div>
       </Section>
+      <Section title="M3 roles components paint with">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Swatch className="bg-primary" name="bg-primary" note="filled controls, the seed" />
+          <Swatch
+            className="bg-primary-container"
+            name="bg-primary-container"
+            note="selected rows and pills"
+          />
+          <Swatch className="bg-inverse-surface" name="bg-inverse-surface" note="plain tooltips" />
+          <Swatch className="bg-outline-variant" name="bg-outline-variant" note="= border-edge" />
+        </div>
+      </Section>
       <Section title="Edges">
         <div className="grid gap-4 sm:grid-cols-3">
           <Swatch className="bg-edge-subtle" name="border-edge-subtle" note="row dividers" />
@@ -82,7 +94,7 @@ export const Surfaces: Story = {
       </Section>
       <Section title="Selection and destruction">
         <div className="grid gap-4 sm:grid-cols-3">
-          <Swatch className="bg-ring" name="bg-ring" note="focus, selection — the only blue" />
+          <Swatch className="bg-ring" name="bg-ring" note="focus — primary, the seed's hue" />
           <Swatch className="bg-ring-subtle" name="bg-ring-subtle" note="selection fill" />
           <Swatch className="bg-destructive" name="bg-destructive" note="delete, revoke" />
         </div>
@@ -92,13 +104,13 @@ export const Surfaces: Story = {
 };
 
 /**
- * Three text tiers, and the reason the dimmest one is not dimmer.
- * `--subtle-foreground` used to be `#6b727d`, which failed WCAG AA on
- * every surface in the system — 4.06:1 on the page, 3.40:1 on a hovered
- * row. It is used in 38 places, all at 11px or 12px, so the normal-text
- * bar is the right one. The current value is the *minimum* that clears
- * AA on the worst case, which does compress the ladder — and a design
- * system cannot ship text below AA and call the contrast a style choice.
+ * Three text tiers, and the reason the dimmest one is not dimmer. The
+ * first two are M3's `on-surface` and `on-surface-variant`; M3 has no
+ * third, so `--subtle-foreground` is `on-surface-variant` at the dimmest
+ * tone that still clears WCAG AA on every surface — the generator searches
+ * for it. It used to be a hand-picked `#6b727d` that failed AA everywhere
+ * (3.40:1 on a hovered row), at 11–12px in 38 places, and a design system
+ * cannot ship text below AA and call the contrast a style choice.
  */
 export const Text: Story = {
   render: () => (
@@ -118,14 +130,22 @@ export const Text: Story = {
       </Section>
       <Section title="Type scale">
         <div className="flex flex-col gap-3">
-          <p className="text-micro">text-micro · 11px — enum literals, table column heads</p>
-          <p className="text-caption">text-caption · 12px — captions, metadata</p>
-          <p className="text-body">text-body · 13px — the default</p>
-          <p className="text-prose">text-prose · 14px — form controls, dialog copy</p>
-          <p className="text-title-sm">text-title-sm · 16px — card and drawer titles</p>
-          <p className="text-title">text-title · 20px — the screen h1</p>
-          <p className="font-mono text-metric tabular-nums">text-metric · 28px</p>
-          <p className="font-mono text-metric-lg tabular-nums">text-metric-lg · 40px</p>
+          <p className="text-micro">text-micro · label-small 11/16 — enum literals, column heads</p>
+          <p className="text-caption">text-caption · body-small 12/16 — captions, metadata</p>
+          <p className="text-body">text-body · body-medium 14/20 — the default</p>
+          <p className="text-prose">text-prose · body-large 16/24 — form input text</p>
+          <p className="text-title-sm">text-title-sm · title-medium 16/24 — card titles</p>
+          <p className="text-title">text-title · title-large 22/28</p>
+          <p className="text-headline-small">
+            text-headline-small · 24/32 — screen and dialog titles
+          </p>
+          <p className="font-mono text-metric tabular-nums">text-metric · headline-medium 28/36</p>
+          <p className="font-mono text-metric-lg tabular-nums">
+            text-metric-lg · display-small 36/44
+          </p>
+          <p className="text-label-large font-bold">
+            text-label-large font-bold — an emphasized role: same size, one weight up
+          </p>
         </div>
       </Section>
       <Section title="Mono is the voice of data">
@@ -145,16 +165,16 @@ export const Text: Story = {
        * worked example: a `StateTimeline` annotation, the one case
        * `--font-italic` exists for. `font-mono`'s line has no companion
        * `italic` utility next to it — the token names a *family*, and
-       * mono's family does not shift for emphasis the way the serif
-       * does.
+       * mono's family does not shift for emphasis the way the italic
+       * voice does.
        */}
       <Section title="Four voices">
         <div className="flex flex-col gap-3">
-          <p className="font-display text-title-sm tracking-normal">
+          <p className="font-display text-title-sm">
             font-display — Payout batch #4128 failed validation
           </p>
           <p className="text-body">font-sans — 212 of 240 messages delivered in the last hour</p>
-          <p className="font-italic text-body italic tracking-normal">
+          <p className="font-italic text-body italic">
             font-italic — sent, but no receipt ever arrived; it will not be resubmitted
           </p>
           <p className="font-mono text-body">font-mono — cs_msg_8f21c0bd4e1a9f3c77e</p>
@@ -166,6 +186,7 @@ export const Text: Story = {
 
 const HUES: { hue: StatusHue; means: string }[] = [
   { hue: "neutral", means: "nothing to do — quiet, no fill" },
+  { hue: "progress", means: "running, outcome not yet known" },
   { hue: "success", means: "it worked — quiet, no fill" },
   { hue: "warning", means: "recoverable, needs a human" },
   { hue: "danger", means: "it failed" },
@@ -175,7 +196,9 @@ const HUES: { hue: StatusHue; means: string }[] = [
 ];
 
 /**
- * Seven status hues, each with a foreground, a fill and a border.
+ * Eight status hues, each with a foreground, a fill and a border — M3
+ * custom colours harmonized toward the seed, and held at least ΔE2000 13
+ * apart (and from `primary`) by `hct-neutrals.test.ts`.
  *
  * Two of them — `neutral` and `success` — declare `transparent` for the
  * fill and the border, and that is deliberate: they are the *quiet*
@@ -218,23 +241,28 @@ export const StatusHues: Story = {
 };
 
 /**
- * A four-step radius register, each step visibly distinct from its
- * neighbour. `--radius-xs` is the newest and exists because of a fact
- * about how `border-radius` resolves rather than a change of taste: a
- * radius larger than half the box is clamped to half, so
- * `--radius-selector` (8px) on the 16px checkbox every form renders
- * produced a perfect circle — a checkbox indistinguishable from a radio,
- * in a library that ships both.
+ * M3 Expressive's corner scale, as Tailwind's radius steps in order, plus
+ * daisyUI's three tiers mapped onto it. A radius larger than half the box
+ * is clamped to half, which is why the 16px checkbox takes `rounded-xs`:
+ * `rounded-sm` (8px) on it draws a circle — a checkbox indistinguishable
+ * from a radio, in a library that ships both.
  */
 export const Radius: Story = {
   render: () => (
     <div className="flex flex-wrap gap-4">
       {[
-        ["rounded-xs", "4px — checkbox, the smallest box"],
-        ["rounded-selector", "8px — badges, small controls"],
-        ["rounded-field", "12px — buttons, inputs, nav rows"],
-        ["rounded-box", "20px — cards, drawers, toasts"],
-        ["rounded-full", "pill — switches, avatars"],
+        ["rounded-xs", "extra-small 4px — checkbox, text fields, tooltips"],
+        ["rounded-sm", "small 8px — chips, table chrome"],
+        ["rounded-md", "medium 12px — cards, menu items"],
+        ["rounded-lg", "large 16px — menus, selected list items"],
+        ["rounded-xl", "large-increased 20px"],
+        ["rounded-2xl", "extra-large 28px — dialogs, sheets"],
+        ["rounded-3xl", "extra-large-increased 32px"],
+        ["rounded-4xl", "extra-extra-large 48px"],
+        ["rounded-full", "full — buttons, nav pills, switches"],
+        ["rounded-selector", "daisyUI selector → small"],
+        ["rounded-field", "daisyUI field → extra-small"],
+        ["rounded-box", "daisyUI box → medium"],
       ].map(([cls, note]) => (
         <div key={cls} className="flex w-40 flex-col gap-2">
           <div className={`h-16 w-full border border-edge-strong bg-surface-2 ${cls}`} />
@@ -247,22 +275,27 @@ export const Radius: Story = {
 };
 
 /**
- * The motion tokens, as durations you can watch. Nothing in this system
- * is slower than `--dur-enter`, and the two rules around them are: an
- * in-place state change never moves anything, and every animation has a
- * reduced-motion answer that keeps the signal and drops the movement.
+ * The motion tokens. Everything that moves or fades is one of M3
+ * Expressive's six springs (`SpringTrack` below shows the two spatial
+ * ones); the clock-timed tokens are what the springs fall back to without
+ * `linear()`, and the timed status wash that holds and decays rather than
+ * settles. Every animation has a reduced-motion answer that keeps the
+ * signal and drops the movement.
  */
 export const Motion: Story = {
   render: () => (
     <div className="flex flex-col gap-2 font-mono text-body">
       {[
-        ["--dur-instant", "90ms", "row hover, press"],
-        ["--dur-fast", "150ms", "popover, dialog enter"],
-        ["--dur-state", "240ms", "the live-row status wash"],
-        ["--dur-enter", "400ms", "the slowest thing here"],
+        ["--dur-spatial-fast", "360ms", "z 0.6 · k 800 — press morph, switch, small panels"],
+        ["--dur-spatial", "435ms", "z 0.8 · k 380 — default spatial"],
+        ["--dur-spatial-slow", "599ms", "z 0.8 · k 200"],
+        ["--dur-effects-fast", "150ms", "z 1 · k 3800 — colour, state layers"],
+        ["--dur-effects", "231ms", "z 1 · k 1600"],
+        ["--dur-effects-slow", "327ms", "z 1 · k 800"],
+        ["--dur-state", "240ms", "the live-row status wash (timed)"],
       ].map(([token, value, use]) => (
         <div key={token} className="flex flex-wrap items-baseline gap-3">
-          <span className="w-40 shrink-0 text-foreground">{token}</span>
+          <span className="w-44 shrink-0 text-foreground">{token}</span>
           <span className="w-16 shrink-0 text-muted-foreground tabular-nums">{value}</span>
           <span className="min-w-0 truncate text-caption text-subtle-foreground">{use}</span>
         </div>

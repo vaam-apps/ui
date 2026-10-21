@@ -27,7 +27,24 @@ uncoloured text. The real names:
   … `bg-surface-3`
 - edges: `border-edge-subtle`, `border-edge`, `border-edge-strong`
 - text: `text-foreground`, `text-muted-foreground`, `text-subtle-foreground`
+- M3 roles with utilities: `bg-primary` / `text-primary-content`
+  (daisyUI's), `bg-primary-container`, `text-on-primary-container`,
+  `bg-surface-container-low`, `bg-surface-container-highest`,
+  `text-on-surface`, `text-on-surface-variant`, `bg-inverse-surface`,
+  `border-outline-variant`
 - other: `bg-scrim`, `ring-ring`
+
+Every other M3 role exists only as a custom property —
+`bg-[var(--md-sys-color-tertiary-container)]` works, `bg-tertiary-container`
+does not.
+
+## I upgraded and everything is indigo and rounder
+
+That is the Material 3 Expressive release: colour from a seed, buttons and
+nav indicators as full pills, M3's corner and type scales. `text-body` is
+14px and `text-prose` 16px now (M3's `body-medium` and `body-large`), so a
+screen that budgeted for 13px rows may need a look. Nothing was renamed —
+the same components and class names, re-skinned.
 
 ## My class didn't apply to a component
 
@@ -43,8 +60,8 @@ Two causes, both real:
 ## Text over an `InstrumentPanel` or a glowing card is hard to read
 
 `text-subtle-foreground` is banned on the aurora mesh — measured, it falls
-to 4.41:1 in dark and 4.45:1 in light, below the 4.5:1 AA bar, while
-`text-muted-foreground` holds at 5.29:1 and above. `InstrumentPanel`
+to 4.15:1 in dark and 4.25:1 in light, below the 4.5:1 AA bar, while
+`text-muted-foreground` holds at 6.10:1 and 4.68:1. `InstrumentPanel`
 already steps its own caption up; do not push it back down.
 
 ## My content sits under the nav rail

@@ -23,16 +23,11 @@ export interface CardProps extends HTMLAttributes<HTMLDivElement> {
 // some presets — explicitly opted out here rather than stripped after the
 // fact, since this is a hand-built component, not a generated one.
 //
-// D8: the previous `rounded-sm` override is dropped, not swapped for
-// `rounded-box` — daisyUI's own `.card` rule already sets
-// `border-radius: var(--radius-box)` (confirmed by reading
-// `daisyui/components/card.css` directly), so an explicit override was
-// fighting the component's own class at equal specificity for no reason.
-// This *is* the deliberate D8 value change §5's inventory calls for
-// ("new radius (`--radius-box`)") — the previous `rounded-sm` resolved to
-// `--radius-field` (12px) once Phase 0 rewrote the alias, one tier tighter
-// than the box-tier corners the reference lock (§1.1/§1.2/§1.5) shows for
-// card/drawer/panel chrome.
+// Radius: none set here. daisyUI's own `.card` rule reads `--radius-box`,
+// which `theme.css` maps to M3's `medium` corner (12px) —
+// `FilledCardTokens`/`OutlinedCardTokens.ContainerShape`. An explicit
+// `rounded-*` here would fight the component's own class at equal
+// specificity for no reason (it once did, as a `rounded-sm` override).
 /**
  * `min-w-0` is load-bearing, and the reason is worth spelling out because
  * the symptom appears three levels away from the cause.
@@ -100,12 +95,10 @@ export function CardHeader({
   return (
     <div className={cn("flex items-start justify-between gap-4 p-4", className)} {...props}>
       <div className="min-w-0">
-        {/* `font-display`/`tracking-normal`: same pairing and the same
-            reason as `ScreenHeader`'s `<h1>` — see that component's doc
-            comment. `text-title-sm` (16px) is closer to body size than
-            the screen title is, which makes the sans-tuned global
-            tracking's crowding *more* visible here, not less. */}
-        <Heading className="truncate font-display font-medium text-foreground text-title-sm tracking-normal">
+        {/* `font-display`: the brand face for a card heading, as for
+            `ScreenHeader`'s `<h1>`. `text-title-sm` is M3's
+            `title-medium`, the card-title role. */}
+        <Heading className="truncate font-display font-medium text-foreground text-title-sm">
           {title}
         </Heading>
         {meta != null && (

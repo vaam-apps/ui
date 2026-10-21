@@ -87,9 +87,11 @@ type ExtraClassGroupId =
   | "daisy-loading-size";
 
 /**
- * The `--text-*` steps declared in `styles/theme.css`. Kept in sync with
- * that file by `theme-tokens.test.ts`, which parses the stylesheet rather
- * than trusting this list.
+ * The `--text-*` steps declared in `styles/theme.css`: the library's own
+ * eight, and the fifteen M3 type roles they are now aliases of. Kept in sync
+ * with that file by `theme-tokens.test.ts`, which parses the stylesheet
+ * rather than trusting this list — an M3 role missing here is
+ * `text-body-medium text-foreground` losing its size, point 1 below again.
  */
 const FONT_SIZES = [
   "micro",
@@ -100,6 +102,21 @@ const FONT_SIZES = [
   "title",
   "metric",
   "metric-lg",
+  "display-large",
+  "display-medium",
+  "display-small",
+  "headline-large",
+  "headline-medium",
+  "headline-small",
+  "title-large",
+  "title-medium",
+  "title-small",
+  "body-large",
+  "body-medium",
+  "body-small",
+  "label-large",
+  "label-medium",
+  "label-small",
 ] as const;
 
 /** daisyUI's radius tiers, which its own components read from — plus

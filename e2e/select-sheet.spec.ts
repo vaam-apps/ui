@@ -264,10 +264,12 @@ test.describe("the phone bottom sheet", () => {
     await page.keyboard.press("Escape");
     await expect(storyRoot(page).getByRole("listbox")).toHaveCount(0);
     const clear = brightest(await paintedColors(page, behind));
-    // `--scrim` is 50% black on the dark theme, so the brightest pixel
-    // (the trigger's text) roughly halves. 0.75 leaves room for
-    // antialiasing without accepting "no scrim at all".
-    expect(dimmed, "brightest pixel behind the open sheet").toBeLessThan(clear * 0.75);
+    // `--scrim` is M3's scrim, black at 32% (`ScrimTokens`), so the
+    // brightest pixel (the trigger's text) should fall to about 0.68 of
+    // its clear value; measured 544 of 714, 0.76, the rest antialiasing.
+    // This read 0.75 when the scrim was 50% black and the expected drop
+    // was a half. 0.85 still rejects "no scrim at all", which reads 1.0.
+    expect(dimmed, "brightest pixel behind the open sheet").toBeLessThan(clear * 0.85);
   });
 
   test("inside a drawer, the sheet still lands on the viewport's bottom edge", async ({ page }) => {

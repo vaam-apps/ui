@@ -122,10 +122,14 @@ the time. So each state differs in silhouette, interior mark and fill as
 well as hue: three channels, none of them load-bearing on its own.
 
 That redundancy is doing measurable work rather than being a gesture. The
-closest two hues in the system, `neutral` and `expired`, are **ΔE00 8.7**
-apart — inside a 14px glyph the *mark* is carrying much of the job of
-telling them apart, and `expired`'s `clock` against `neutral`'s absence
-of one is what the reader actually resolves.
+closest two hues in the system, `warning` and `uncertain`, are **ΔE00 14.2**
+apart in light (15.3 in dark) — `hct-neutrals.test.ts` holds every pair to
+13, and to the seed's `primary` as well — so inside a 14px glyph the *mark*
+is still carrying much of the job of telling them apart. The two greys,
+`neutral` and `expired`, were once the closest pair at 8.7; hue cannot
+separate two greys, so the generator separates them by tone (16.1 dark,
+16.2 light), and `expired`'s `clock` against `neutral`'s absence of one
+still does the rest.
 
 `filled` is the same argument on a different axis: fill answers "is it
 over?" with no colour at all. A terminal state is solid and its mark
@@ -207,10 +211,11 @@ The cost of `loud` is contrast budget, and it is measured rather than
 assumed:
 
 - A **quiet** glyph is a non-text graphic, so its bar is 3:1. Across the
-  palette and all four surface steps they run **6.34:1 to 13.65:1**.
+  palette, both themes and all five surface steps they run **5.01:1 to
+  13.46:1**.
 - A **loud** pill's label is 12px text on a composited tint, so its bar
-  is 4.5:1. They run **5.53:1 to 11.71:1**, worst case `expired`, loud,
-  on a hovered row.
+  is 4.5:1. They run **4.80:1 to 10.57:1**, worst case `danger`, loud,
+  on the light theme's top container step.
 
 Those numbers are current because a gate was extended to find where they
 were not. `contrast.test.ts` originally measured foregrounds on *bare*
@@ -224,13 +229,12 @@ comfortable; in light it darkens the ground under an already-dark one,
 which is why the same palette logic does not transfer between themes.
 
 `StatusPill` makes one more concession to the tint: once a pill is loud,
-its `literal` and `detail` step from `--subtle-foreground` up to
-`--muted-foreground`. `subtle` does not reach 4.5:1 on a tint over
-anything lighter than the page — 4.36:1 over a card, 3.85:1 over a
-hovered row — and the value that *would* clear AA on a tint sits ΔE 2
-from `--muted-foreground`, which collapses the three-tier text ladder
-into two. So the tier changes with the background instead of the token
-changing for everyone.
+its `literal` and `detail` leave the grey tiers for the pill's own hue.
+Neither grey survives every tint on the M3 palette — `--subtle-foreground`
+falls to 3.33:1 and `--muted-foreground` to 4.40:1 on the top container
+step — while the hue's foreground is the one colour the gate already holds
+to 4.5:1 over its own tint everywhere (worst 4.80:1). So the colour changes
+with the background instead of a token changing for everyone.
 
 ### `pending` is a border, not opacity
 

@@ -4,13 +4,10 @@ import { cn } from "../../lib/cn";
 
 export type InputProps = InputHTMLAttributes<HTMLInputElement>;
 
-// D8: no explicit `rounded-*` class needed or added — daisyUI's own
-// `.input` rule already sets every corner from `--radius-field`
-// (confirmed by reading `daisyui/components/input.css` directly), and
-// Phase 0 already rewrote that token to the new register. The class
-// string here is unchanged from before the redesign; the rendered radius
-// changed anyway, entirely from the token, with zero component code to
-// touch — the intended effect of constraint 7 ("DaisyUI does the work").
+// No explicit `rounded-*` class: daisyUI's own `.input` rule sets every
+// corner from `--radius-field`, which `theme.css` maps to M3's
+// `extra-small` corner (4px) — `OutlinedTextFieldTokens.ContainerShape`.
+// The rendered radius follows the token with no component code to touch.
 //
 // No `input-bordered`: it is a daisyUI v4 modifier that v4's own `.input`
 // rule needed to turn a border on at all. daisyUI 5 does not have it —

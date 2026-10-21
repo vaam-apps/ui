@@ -211,18 +211,9 @@ export function FormField({
         <Label htmlFor={htmlFor}>{label}</Label>
       )}
       {hasHint && (
-        // `font-italic italic tracking-normal`: see the `hint` prop doc
-        // above for why this is `--font-italic`'s test case rather than
-        // an exception. `tracking-normal` for the same reason
-        // `card.tsx`'s `CardHeader` and `StateTimeline`'s
-        // `AnnotationNode` carry it — the global `html { letter-spacing:
-        // -0.011em }` is tuned for the sans body face, and at 12px this
-        // is the smallest serif slot in the system, where that
-        // sans-tuned negative tracking crowds the letterforms most.
-        <p
-          id={hintId(htmlFor)}
-          className="font-italic text-caption text-muted-foreground italic tracking-normal"
-        >
+        // `font-italic italic`: see the `hint` prop doc above for why this
+        // is `--font-italic`'s test case rather than an exception.
+        <p id={hintId(htmlFor)} className="font-italic text-caption text-muted-foreground italic">
           {hint}
         </p>
       )}

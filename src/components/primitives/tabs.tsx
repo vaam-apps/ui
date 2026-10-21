@@ -191,18 +191,13 @@ export function ValueTabsList({
   );
 }
 
-// Underline variant only (design doc §5.2: "no pill/segmented variant — pill
-// tabs are consumer furniture"). 2px bottom rule in --foreground on the
-// active tab.
-//
-// M3 Expressive shape audit: nothing to morph. A shape-morph needs a
-// shape to morph, and §5.2 already rules out the one M3 gives its own
-// tabs (a pill/segmented active indicator) for this component — the
-// active state here is a border width and a colour, not a corner radius,
-// so there is no register value for `data-selected` to step between.
-// Porting a pill indicator just to have something to morph would be
-// widening the visual language to manufacture a use for the motion
-// tokens, backwards from how every other decision in this file works.
+// M3's *primary* tabs (`PrimaryNavigationTabTokens`): a 3dp `Primary`
+// active indicator with 3dp top corners (`ActiveIndicatorHeight`,
+// `ActiveIndicatorShape`), the active label in `Primary`, inactive labels
+// in `OnSurfaceVariant`, `title-small` throughout. Drawn as an `::after`
+// rather than a bottom border because a border cannot carry the rounded
+// top corners. Still the underline family only — no pill or segmented
+// variant — so there is no corner for a press morph to act on.
 export function ValueTabsTrigger({
   value,
   className,
@@ -241,8 +236,10 @@ export function ValueTabsTrigger({
         // one, driven by `@react-aria/focus`'s keyboard-only
         // `isFocusVisible`, as a fallback if the plain deletion had turned
         // out not to fire — it did fire, so that fallback is unused here.)
-        "-mb-px shrink-0 whitespace-nowrap border-b-2 border-transparent px-1 py-2 font-medium text-body text-muted-foreground",
-        "data-selected:border-foreground data-selected:text-foreground",
+        "relative -mb-px shrink-0 whitespace-nowrap px-1 py-3 text-on-surface-variant text-title-small",
+        "transition-colors duration-[var(--dur-effects-fast)] ease-[var(--ease-effects)] hover:text-on-surface",
+        "after:absolute after:inset-x-0 after:bottom-0 after:h-[3px] after:rounded-t-[3px] after:bg-primary after:opacity-0",
+        "data-selected:text-primary data-selected:after:opacity-100",
         className,
       )}
     >

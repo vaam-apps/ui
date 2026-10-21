@@ -119,10 +119,11 @@ site, which publishes no numbers in a fetchable form:
 
 **`toolbarVariant`** picks M3's two schemes. `"standard"` (the default) is a
 `surface-2` bar with muted icons and the current page as a filled
-`primary` pill. `"vibrant"` is a `primary` bar — the inverse of the page,
-near-white on dark and near-black on light — with the current page cut
-back out of it in `surface-2`. Neither is a hue: §1.3's one-accent rule
-still holds, and a tinted bar would read as a status.
+`primary` pill. `"vibrant"` is M3's `primary-container` bar with
+`on-primary-container` icons, the current page cut back out of it in
+`surface-2`. Both use the seed's hue and nothing else: `secondary` and
+`tertiary` rotate toward the status hues at this seed, so no navigation
+chrome paints them.
 
 **No shadow, exactly as androidx.** Compose ships this toolbar at
 elevation `Level0`, and so does this one — no border, no blur, no
@@ -132,8 +133,8 @@ and the standard bar is `surface-2` — the same fill as `Card` and
 `StatTile`, in both themes — so over those its edge disappears and only
 its icons remain. A soft shadow was weighed against that and dropped in
 favour of M3's `Level0`. A screen that scrolls cards or stat tiles under
-the bar should use `toolbarVariant="vibrant"`, whose fill (the page's own
-foreground) no surface uses.
+the bar should use `toolbarVariant="vibrant"`, whose fill (the seed's
+`primary-container`) no surface uses.
 
 [**Story: Toolbar colours — standard**](?path=/story/primitives-sidenav--toolbar-colors-standard) and [**vibrant**](?path=/story/primitives-sidenav--toolbar-colors-vibrant) — both at 375px, over an instrument panel and scrolling cards, which is where the difference matters.
 

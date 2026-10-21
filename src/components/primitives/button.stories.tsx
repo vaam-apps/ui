@@ -10,9 +10,11 @@ const meta = {
     docs: {
       description: {
         component:
-          "Four variants and no more. There is deliberately no success or warning button: " +
-          "those hues belong to status, and a button that borrows them erodes the status " +
-          "language wherever both appear.",
+          "M3 Expressive's common buttons — filled (`primary`), outlined (`secondary`), " +
+          "text (`ghost`) and elevated — plus a filled `destructive` in the error role. " +
+          "Round at rest, squaring off while pressed. There is deliberately no success or " +
+          "warning button, and no tonal one: those hues belong to status, and a button that " +
+          "borrows them erodes the status language wherever both appear.",
       },
     },
   },
@@ -27,6 +29,7 @@ export const Variants: Story = {
       <Button variant="primary">Primary</Button>
       <Button variant="secondary">Secondary</Button>
       <Button variant="ghost">Ghost</Button>
+      <Button variant="elevated">Elevated</Button>
       <Button variant="destructive">Destructive</Button>
     </div>
   ),
@@ -50,6 +53,9 @@ export const Disabled: Story = {
       <Button disabled>Primary</Button>
       <Button variant="secondary" disabled>
         Secondary
+      </Button>
+      <Button variant="elevated" disabled>
+        Elevated
       </Button>
       <Button variant="destructive" disabled>
         Destructive

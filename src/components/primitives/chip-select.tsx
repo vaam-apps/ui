@@ -37,7 +37,7 @@ import { cn } from "../../lib/cn";
  * something outside the vocabulary, which is exactly the property being
  * removed.
  *
- * # Checked chips are achromatic, not green
+ * # Checked chips are primary and neutral, not green
  *
  * They used to be styled with the `state-success-*` trio, which is the
  * same latent bug `RadioGroup`'s own doc records in full: `success` is a
@@ -45,8 +45,9 @@ import { cn } from "../../lib/cn";
  * `--state-success-border` are both declared `transparent`, and a
  * checked chip therefore rendered with no fill and no outline — less
  * present than the chips nobody had picked. Same fix, same reason:
- * selection is not a status, so it is spelled in the achromatic
- * `primary`/`surface-3` vocabulary every other checked control in this
+ * selection is not a status, so it is spelled in the `primary` (the
+ * seed's hue, gated away from every status hue) and neutral `surface-3`
+ * vocabulary every other checked control in this
  * library uses, and the filled box carries the signal rather than a
  * tint.
  */
@@ -124,7 +125,9 @@ export function ChipSelect<T extends string>({
               <span
                 className={cn(
                   "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-xs border transition-colors",
-                  checked ? "border-primary bg-primary" : "border-edge-strong bg-surface-2",
+                  checked
+                    ? "border-primary bg-primary"
+                    : "border-on-surface-variant bg-transparent",
                 )}
               >
                 {checked && (
@@ -151,13 +154,9 @@ export function ChipSelect<T extends string>({
                   // wrap into rows and stretch to the tallest member, so
                   // one long description pads the whole row.
                   //
-                  // `font-italic italic tracking-normal`: see the
-                  // `ChipOption.description` doc above. `tracking-normal`
-                  // for the same reason as `StateTimeline`'s
-                  // `AnnotationNode` and `FormField`'s hint — the global
-                  // sans-tuned negative letter-spacing crowds a 12px serif
-                  // more than a 12px sans.
-                  <span className="line-clamp-2 font-italic text-caption text-subtle-foreground italic tracking-normal">
+                  // `font-italic italic`: see the `ChipOption.description`
+                  // doc above.
+                  <span className="line-clamp-2 font-italic text-caption text-subtle-foreground italic">
                     {option.description}
                   </span>
                 )}

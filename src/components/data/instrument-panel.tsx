@@ -88,7 +88,7 @@ export function InstrumentPanel({
       {(title != null || caption != null) && (
         <div className="mb-4 flex min-w-0 flex-col gap-1">
           {title != null && (
-            <h3 className="truncate font-display font-medium text-foreground text-title-sm tracking-normal">
+            <h3 className="truncate font-display font-medium text-foreground text-title-sm">
               {title}
             </h3>
           )}

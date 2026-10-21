@@ -55,10 +55,11 @@ import { cn } from "../../lib/cn";
  *
  * It is fixed by not using a status hue at all. Status hues answer "what
  * did the system decide"; this control answers "what did *you* pick",
- * and those are different vocabularies — mixing them is what §1.3's
- * "one accent, never a hue" rule exists to prevent. Selection is spelled
- * the way every other checked control in this library spells it: the
- * achromatic `primary` fill in a real radio glyph, on a `surface-3` row
+ * and those are different vocabularies — mixing them is what the status
+ * system's "colour means something" rule exists to prevent. Selection is
+ * spelled the way every other checked control in this library spells it:
+ * the `primary` fill in a real radio glyph (the seed's hue, which
+ * `hct-neutrals.test.ts` keeps away from every status hue), on a `surface-3` row
  * with a `edge-strong` border. That also makes it legible with no colour
  * at all, which a tint alone never was.
  *
@@ -66,9 +67,7 @@ import { cn } from "../../lib/cn";
  * (`rounded-full`, below) is already at the top of the register in both
  * states — nothing to morph into, same as `Switch`'s thumb and track.
  * The option row itself (`rounded-sm`) *could* morph on `data-checked`,
- * but doesn't: unlike `NavLink`'s active indicator, this row's shape
- * carries no reference-lock decision to preserve, so the reason to
- * decline is different — a wrapped `flex-wrap` group of these sits side
+ * but doesn't — a wrapped `flex-wrap` group of these sits side
  * by side, and letting only the checked one change shape would read as a
  * layout glitch in the row it shares a baseline with, not as a selection
  * signal. The existing `border-edge` → `border-edge-strong` and
@@ -167,15 +166,18 @@ export function RadioGroup<T extends string>({
               fill, colour) apply to a control whose entire job is to say
               which one is chosen: a reader looking at a greyscale
               screenshot, or anyone who does not perceive the surface-2 →
-              surface-3 step, can still see the filled dot. */}
+              surface-3 step, can still see the filled dot. Drawn as M3's
+              radio button: a 2px `OnSurfaceVariant` ring, turning
+              `Primary` with a `Primary` dot when selected
+              (`RadioButtonTokens`), at this library's 16px. */}
             <span
               aria-hidden="true"
               className={cn(
-                "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border border-edge-strong bg-surface-2 transition-colors",
-                "group-data-checked:border-primary group-data-checked:bg-primary",
+                "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border-2 border-on-surface-variant transition-colors",
+                "group-data-checked:border-primary",
               )}
             >
-              <span className="size-1.5 rounded-full bg-primary-content opacity-0 transition-opacity group-data-checked:opacity-100" />
+              <span className="size-2 scale-0 rounded-full bg-primary transition-transform duration-[var(--dur-spatial-fast)] ease-[var(--ease-spatial-fast)] group-data-checked:scale-100" />
             </span>
             <span className="flex min-w-0 flex-col gap-0.5">
               <Label className="truncate font-medium">{option.label}</Label>
@@ -186,12 +188,9 @@ export function RadioGroup<T extends string>({
                 // sibling — measured at 112px against 94px for the pair in
                 // this component's own story before the clamp.
                 //
-                // `font-italic italic tracking-normal`: see the
-                // `RadioGroupOption.description` doc above. `tracking-normal`
-                // for the same reason as `StateTimeline`'s `AnnotationNode`
-                // and `FormField`'s hint — the global sans-tuned negative
-                // letter-spacing crowds a 12px serif more than a 12px sans.
-                <Description className="line-clamp-2 font-italic text-caption text-subtle-foreground italic tracking-normal">
+                // `font-italic italic`: see the
+                // `RadioGroupOption.description` doc above.
+                <Description className="line-clamp-2 font-italic text-caption text-subtle-foreground italic">
                   {option.description}
                 </Description>
               )}

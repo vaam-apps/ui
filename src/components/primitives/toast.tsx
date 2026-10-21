@@ -98,17 +98,18 @@ export function toast(item: Omit<ToastItem, "id">): string {
 }
 
 // D11: `cva()` replaces the previous `Record<ToastVariant, string>` lookup,
-// same three class strings per variant, keyed identically. One deliberate
-// D8 diff lives in the base string below, not here: the shared "toast card"
-// classes move off `rounded-sm` (`--radius-field`, 12px) onto `rounded-box`
-// (`--radius-box`, 20px) — a toast shares `--shadow-popover` with
-// dialog/popover/dropdown/drawer (see `theme.css`'s own "only floating
-// layers... get one [shadow]" comment), i.e. it's the same family of
-// floating panel those get, not a field-scale control, and D14's own
-// drawer sketch (§6.4) already uses `rounded-t-box` for exactly that
-// family. `variant` classes themselves are untouched.
+// same three class strings per variant, keyed identically.
+//
+// The card is M3's snackbar in shape and lift — `SnackbarTokens`:
+// `ContainerShape` `CornerExtraSmall` (4px), `ContainerElevation` level 3
+// (`--shadow-dialog`), supporting text in `body-medium` — but not in
+// colour. M3 paints a snackbar `inverse-surface`, and these toasts carry
+// the theme's own text tiers and, for `success`/`danger`, status
+// foregrounds whose contrast `contrast.test.ts` measures against the
+// theme's surfaces, not its inverse; on an inverse ground every one of
+// them would flip. So the ground stays `surface-2`.
 const toastVariants = cva(
-  "pointer-events-auto rounded-box border p-3 text-body shadow-[var(--shadow-popover)]",
+  "pointer-events-auto rounded-xs border p-3 text-body shadow-[var(--shadow-dialog)]",
   {
     variants: {
       variant: {

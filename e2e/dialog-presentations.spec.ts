@@ -128,7 +128,7 @@ test("DialogContent on a phone stays the basic dialog: centred, 16px from each s
   ).toBe("28px");
 });
 
-test("M3's fill and type: SurfaceContainerHigh is surface-3, the headline 20px display", async ({
+test("M3's fill and type: SurfaceContainerHigh is surface-3, the headline headline-small's 24px", async ({
   page,
 }) => {
   await openStory(page, STORY.dialogBasicPhone, PHONE);
@@ -147,7 +147,9 @@ test("M3's fill and type: SurfaceContainerHigh is surface-3, the headline 20px d
     };
   });
   expect(style.fill, "failed: the panel is not surface-3").toBe(style.surface3);
-  expect(style.headlineSize, "failed: the headline is not text-title's 20px").toBe("20px");
+  // `DialogTokens.HeadlineFont` is `HeadlineSmall`, 24/32. This read 20px
+  // (`text-title`) before the library's type steps became M3 roles.
+  expect(style.headlineSize, "failed: the headline is not headline-small's 24px").toBe("24px");
 });
 
 test.describe("padding follows the pointer: 20dp for a precise one, 24dp for touch", () => {

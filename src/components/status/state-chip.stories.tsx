@@ -37,7 +37,7 @@ type Story = StoryObj<typeof meta>;
  * chip used to paint them unconditionally, so those two rendered as bare
  * text with no box while the others were bordered chips — legible only as
  * "two of these are broken" once shown together. They now fall back to
- * the same achromatic `border-edge`/`bg-surface-2` chrome
+ * the same neutral `border-edge`/`bg-surface-2` chrome
  * `InlineBanner`'s `neutral` variant uses (see `isQuietHue` in
  * `../status/status-tokens`), so all eight read as chips.
  */

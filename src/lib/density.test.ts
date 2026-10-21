@@ -25,17 +25,15 @@ const THEME_CSS = readFileSync(join(SRC, "styles/theme.css"), "utf8");
 /**
  * Transcribed, not derived, from `androidx/androidx`'s
  * `compose/material3/material3/src/commonMain/kotlin/androidx/compose/
- * material3/tokens/` (`ButtonSmallTokens.kt`, `ButtonMediumTokens.kt`,
- * `ButtonLargeTokens.kt`, `ShapeTokens.kt`), tag `v0_11_0`, read via
- * `gh api repos/androidx/androidx/contents/<path>` on 2026-09-22 — the
- * same route `motion-tokens.test.ts`'s own header describes for the
- * spring constants. If these five numbers are wrong, every assertion
- * below is.
+ * material3/tokens/` (`ButtonSmallTokens.kt`, `ButtonMediumTokens.kt`),
+ * first read at tag `v0_11_0` via `gh api` on 2026-09-22 and re-checked
+ * against androidx-main 4611dbdb89a41bbe5d61199c155ca67da4987d81 (raw file
+ * download) when the press morph moved onto the corner scale — unchanged.
+ * If these two numbers are wrong, every height assertion below is.
  */
 const ANDROIDX_BUTTON_TOKENS = {
-  small: { containerHeightDp: 40, pressedCornerDp: 8 },
-  medium: { containerHeightDp: 56, pressedCornerDp: 12 },
-  large: { containerHeightDp: 96, pressedCornerDp: 16 },
+  small: { containerHeightDp: 40 },
+  medium: { containerHeightDp: 56 },
 } as const;
 
 describe("the density axis is declared once and defaults to compact", () => {
@@ -160,34 +158,62 @@ describe(".btn-sm overrides --size directly — the one non-proportional excepti
   });
 });
 
-describe("the press-morph radius is proportional to size, not a flat constant", () => {
-  it(".btn's ratio (0.2) is PressedContainerShape/ContainerHeight for the Small bucket, exactly", () => {
-    expect(THEME_CSS).toMatch(
-      /\.btn\s*\{\s*--btn-press-radius:\s*calc\(var\(--size\)\s*\*\s*0\.2\);\s*\}/,
-    );
-    const { containerHeightDp, pressedCornerDp } = ANDROIDX_BUTTON_TOKENS.small;
-    expect(pressedCornerDp / containerHeightDp).toBe(0.2);
+/**
+ * The press morph's targets, transcribed from androidx-main
+ * (4611dbdb89a41bbe5d61199c155ca67da4987d81, the same directory as above):
+ * each bucket's `PressedContainerShape`, resolved through `ShapeTokens.kt`.
+ */
+const ANDROIDX_PRESSED_CORNER_DP = {
+  xsmall: 8, // ButtonXSmallTokens, 32dp tall → CornerSmall
+  small: 8, // ButtonSmallTokens, 40dp tall → CornerSmall
+  medium: 12, // ButtonMediumTokens, 56dp tall → CornerMedium
+} as const;
+
+/**
+ * Evaluates a `--btn-press-radius` declaration at a given density, in px:
+ * every `var(--md-sys-shape-corner-*)` replaced by the value `theme.css`
+ * itself declares for it, `var(--density, 0)` by the density. So this
+ * checks the formula *and* the corner scale it reads, not a string.
+ */
+function pressRadius(selector: string, density: number): number {
+  const rule = new RegExp(
+    `\\n${selector.replace(".", "\\.")}\\s*\\{\\s*--btn-press-radius:\\s*([^;]+);`,
+  );
+  const value = rule.exec(THEME_CSS)?.[1];
+  if (value === undefined) throw new Error(`${selector} declares no --btn-press-radius`);
+  const expr = value
+    .replace(/var\((--md-sys-shape-corner-[a-z-]+)\)/g, (_, name: string) => {
+      const declared = new RegExp(`${name}:\\s*([0-9.]+)px;`).exec(THEME_CSS)?.[1];
+      if (declared === undefined) throw new Error(`${name} is not declared`);
+      return declared;
+    })
+    .replace(/var\(--density,\s*0\)/g, String(density))
+    .replace(/^calc/, "");
+  if (!/^[\d\s.+*()-]+$/.test(expr)) throw new Error(`cannot evaluate ${selector}: ${expr}`);
+  return Number(new Function(`return (${expr});`)());
+}
+
+describe("the press-morph radius is M3's PressedContainerShape, per size and density", () => {
+  it(".btn (md) presses to Small's corner at compact (40px) and Medium's at comfortable (56px)", () => {
+    expect(pressRadius(".btn", 0)).toBe(ANDROIDX_PRESSED_CORNER_DP.small);
+    expect(pressRadius(".btn", 1)).toBe(ANDROIDX_PRESSED_CORNER_DP.medium);
   });
 
-  it(".btn-circle's ratio (0.1) is exactly half of .btn's — the documented --radius-xs halving, reapplied", () => {
+  it(".btn-sm presses to XSmall's corner at compact (32px) and Small's at comfortable (40px)", () => {
+    expect(pressRadius(".btn-sm", 0)).toBe(ANDROIDX_PRESSED_CORNER_DP.xsmall);
+    expect(pressRadius(".btn-sm", 1)).toBe(ANDROIDX_PRESSED_CORNER_DP.small);
+  });
+
+  it(".btn-sm's rule comes after .btn's — the two have equal specificity and share elements", () => {
+    expect(THEME_CSS.search(/\n\.btn-sm\s*\{\s*--btn-press-radius/)).toBeGreaterThan(
+      THEME_CSS.search(/\n\.btn\s*\{\s*--btn-press-radius/),
+    );
+  });
+
+  it(".btn-circle keeps the gentler size-proportional ratio (0.1), deliberately off-spec", () => {
     expect(THEME_CSS).toMatch(
       /\.btn-circle\s*\{\s*--btn-press-radius:\s*calc\(var\(--size\)\s*\*\s*0\.1\);\s*\}/,
     );
-  });
-
-  it("0.2 is the closest single ratio available — Medium and Large's own ratios bracket it, not match it", () => {
-    // The comment in theme.css calls 0.2 "about a fifth", not exact for
-    // every bucket — this pins that the other two androidx buckets really
-    // do sit on either side of 0.2 rather than on it, which is the
-    // evidence for using one approximate ratio instead of a per-bucket
-    // lookup this package has no clean key for.
-    const mediumRatio =
-      ANDROIDX_BUTTON_TOKENS.medium.pressedCornerDp /
-      ANDROIDX_BUTTON_TOKENS.medium.containerHeightDp;
-    const largeRatio =
-      ANDROIDX_BUTTON_TOKENS.large.pressedCornerDp / ANDROIDX_BUTTON_TOKENS.large.containerHeightDp;
-    expect(mediumRatio).toBeGreaterThan(0.2);
-    expect(largeRatio).toBeLessThan(0.2);
   });
 });
 
@@ -199,7 +225,7 @@ describe("every sized primitive this axis covers resolves through it, not a hard
     {
       label: "Button",
       file: "components/primitives/button.tsx",
-      needle: '"btn font-sans font-semibold',
+      needle: '"btn font-sans font-medium',
     },
     { label: "Input", file: "components/primitives/input.tsx", needle: '"input w-full font-sans' },
     {

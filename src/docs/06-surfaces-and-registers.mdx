@@ -14,7 +14,10 @@ doing on that surface**.
   by row, looking for the one that is wrong. A 1px hairline on a surface
   step, and nothing else competing. This is most of the library.
 - **Floating** — popover, dropdown, dialog, tooltip, drawer, toast.
-  These overlap a ground they do not know, so they get a shadow.
+  These overlap a ground they do not know, so they get a shadow — M3's
+  elevation (level 2 for menus and popovers, level 3 for dialogs and
+  toasts) plus an `outline-variant` hairline, because a black shadow on a
+  near-black page is invisible.
 - **Instrument** — dashboards and metrics. You *scan* these. The job is
   to make one number findable in a glance. These get an aurora:
   `InstrumentPanel`'s mesh ground, or `Card glow`.
@@ -99,17 +102,19 @@ them and the two themes borrowing inconsistently. They are `color-mix`
 derived now and the comment says what is true. The arc was also too
 narrow to read as several hues — `--aurora-3` sat on `--ring`, between
 the cyan and the violet it was meant to separate, so the mesh read as one
-hue with a gradient. It is a mix toward `--state-danger-fg` now, a real
-magenta between `parked` and `danger`, with the stop alphas raised
+hue with a gradient. It is a mix toward `--state-danger-fg` now, a rose
+between `parked`'s fuchsia and `danger`, with the stop alphas raised
 (dark 30/26/22/14, light 20/17/15/10, from 22/18/16/10 and 14/12/11/7).
+The ramp is deliberately not the seed's `primary`: that hue is the
+interactive one, and a glow is not a control.
 
 ## `--subtle-foreground` is banned on the mesh
 
 A gradient ground breaks the assumption every contrast check in this
 system rests on: that a foreground sits on **one** known surface.
 
-Measured over `--surface-1` at the shipped 14% stop cap, worst case
-across the four blobs:
+Measured over `--surface-1` at each blob's peak alpha (14/12/12/8%),
+worst case across the four, with the generated M3 palette:
 
 <table style={{ borderCollapse: "collapse", width: "100%", margin: "1rem 0" }}>
   <thead>
@@ -123,14 +128,14 @@ across the four blobs:
   <tbody>
     <tr>
       <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}><code>--subtle-foreground</code></td>
-      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>4.41:1</td>
-      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>4.45:1</td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>4.15:1</td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>4.25:1</td>
       <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>4.5:1</td>
     </tr>
     <tr>
       <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}><code>--muted-foreground</code></td>
-      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>5.29:1 and above</td>
-      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>5.29:1 and above</td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>6.10:1</td>
+      <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>4.68:1</td>
       <td style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid currentColor", verticalAlign: "top" }}>4.5:1</td>
     </tr>
   </tbody>
