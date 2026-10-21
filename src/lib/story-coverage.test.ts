@@ -50,6 +50,10 @@ const EXEMPT: Record<string, string> = {
     "button, `MaskedValue`'s reveal toggle and `CopyButton`. Its effect is exercised by each " +
     "of those components' own stories; the constant itself renders nothing on its own to " +
     "mount a story around.",
+  FIELD_SHAPE:
+    "Not a component — the shared class-string fragment (`field-shape.ts`) for the field " +
+    "shape morph (a stadium at rest, a rounded rectangle on focus), consumed by `Input`, " +
+    "`Textarea`, `SelectTrigger` and `DatePickerTrigger`, whose own stories exercise it.",
   REGISTERED_FONT_SIZES:
     "Not a component. Exported from `cn.ts` purely so `theme-tokens.test.ts` can check the " +
     "registered scale against the stylesheet.",

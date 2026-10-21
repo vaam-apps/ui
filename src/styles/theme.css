@@ -480,6 +480,49 @@
 }
 
 /*
+ * M3 Expressive text fields, the owner's way round: **almost circular at
+ * rest, merely rounded while focused** — the field's corners pull in when
+ * it takes focus, the way a pressed button's do, and spring back out on
+ * blur. `src/lib/field-shape.ts` is the class string that reads these
+ * two properties; this is where their values live, beside the two
+ * density hooks every field already reads.
+ *
+ * - **Rest** is half the field's own height on `.input`/`.select` (a
+ *   stadium: 20px compact, 28px comfortable), finite for the reason
+ *   `--btn-rest-radius`'s note above gives — a radius morphing from
+ *   `rounded-full` does not animate, it strobes. `.textarea` has no
+ *   `--size` (it grows with its rows), and a stadium on a multi-line box
+ *   is a lozenge whose first and last lines run into the curve, so it
+ *   rests at `extra-large` (28dp), the largest step that still reads as a
+ *   rectangle with soft corners.
+ * - **Focus** is `medium` (12dp) at compact and `large` (16dp) at
+ *   comfortable — the same small-to-medium-with-density step
+ *   `--btn-press-radius` takes, one rung up because a field is a larger
+ *   surface than a button. M3's own `OutlinedTextFieldTokens.ContainerShape`
+ *   is `extra-small` (4dp); this is deliberately rounder, at the owner's
+ *   request, and the focus shape is still the one that reads as "a box
+ *   you are typing into".
+ *
+ * Declared on the daisyUI classes themselves (unlayered, custom properties
+ * only — nothing a Tailwind utility sets), for the same reason
+ * `--size-field` is: `calc()` re-evaluates against `--size` and `--density`
+ * where it is declared, so the radius follows a comfortable subtree.
+ */
+.input,
+.select,
+.textarea {
+  --field-radius-rest: calc(var(--size, 40px) / 2);
+  --field-radius-focus: calc(
+    var(--md-sys-shape-corner-medium) +
+    var(--density, 0) *
+    (var(--md-sys-shape-corner-large) - var(--md-sys-shape-corner-medium))
+  );
+}
+.textarea {
+  --field-radius-rest: var(--md-sys-shape-corner-extra-large);
+}
+
+/*
  * The rest of an M3 Expressive button's anatomy, per size bucket, through
  * daisyUI's own `.btn` hooks (`--btn-p` is its inline padding, `--fontsize`
  * its label size) so nothing else about `.btn` has to be restated.

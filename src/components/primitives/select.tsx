@@ -30,6 +30,7 @@ import {
 } from "react";
 import { cn } from "../../lib/cn";
 import { useDropdownPlacement } from "../../lib/dropdown-placement";
+import { FIELD_SHAPE } from "../../lib/field-shape";
 import { omitUndefined } from "../../lib/omit-undefined";
 import { flattenParts } from "../../lib/parts";
 import { usePopupModality } from "../../lib/popup-modality";
@@ -454,10 +455,16 @@ export function SelectGroup({ children }: { children: ReactNode }) {
  * in the library (`DatePicker`, the nav disclosure, `Pagination`) — the
  * CSS triangle matches nothing else.
  *
- * `pe-3` goes with it. daisyUI reserves `padding-inline-end: 1.75rem` for
- * the arrow it is no longer drawing; left alone, the chevron would float
- * 28px off the right edge while the leading edge sits at 12px, which
- * looks like a mistake even to someone who cannot say why.
+ * Symmetric inline padding goes with it. daisyUI reserves
+ * `padding-inline-end: 1.75rem` for the arrow it is no longer drawing;
+ * left alone, the chevron would float 28px off the right edge. It is
+ * `FIELD_SHAPE`'s `px-4` now (this used to be a `pe-3` against daisyUI's
+ * 12px start), the 16dp both ends need once the corners are a semicircle.
+ *
+ * Shape: `FIELD_SHAPE` (`src/lib/field-shape.ts`) — a stadium at rest, a
+ * rounded rectangle while focused *or while its popup is open*
+ * (`aria-expanded`), since focus moves into the listbox and the trigger
+ * would otherwise spring back to a stadium under it.
  *
  * No `select-bordered` here (or `input-bordered` on `DatePicker`'s
  * trigger, styled the same way). It was daisyUI v4; in v5 `.select`/
@@ -515,7 +522,8 @@ export function SelectTrigger({
       aria-label={ariaLabel}
       aria-labelledby={ariaLabelledBy}
       className={cn(
-        "select flex w-full items-center justify-between gap-2 bg-none pe-3 font-sans text-prose",
+        "select flex w-full items-center justify-between gap-2 bg-none font-sans text-prose",
+        FIELD_SHAPE,
         className,
       )}
     >

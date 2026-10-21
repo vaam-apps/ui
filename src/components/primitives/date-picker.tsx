@@ -17,6 +17,7 @@ import {
 import { type DateRange, defaultDateLib, formatWeekdayName } from "react-day-picker";
 import { cn } from "../../lib/cn";
 import { useDropdownPlacement } from "../../lib/dropdown-placement";
+import { FIELD_SHAPE } from "../../lib/field-shape";
 import { omitUndefined } from "../../lib/omit-undefined";
 import { flattenParts } from "../../lib/parts";
 import { usePopupModality } from "../../lib/popup-modality";
@@ -376,6 +377,10 @@ export function DatePickerTrigger({
         })}
         className={cn(
           "input flex w-full items-center gap-2 text-left font-sans text-prose",
+          // A stadium at rest, a rounded rectangle while focused or while
+          // the picker it opened is up (`aria-expanded`) — `Select`'s
+          // trigger's shape, from the same constant (`field-shape.ts`).
+          FIELD_SHAPE,
           "aria-invalid:border-state-danger-border aria-invalid:text-state-danger-fg",
           "disabled:cursor-not-allowed disabled:opacity-50",
           // D11: the gutter the Clear button's *tap target* needs, not the
