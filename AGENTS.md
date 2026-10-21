@@ -1,7 +1,7 @@
 # AGENTS.md
 
-Working notes for `@vaam-apps/ui` — a dark-first React component library
-for operator consoles. `CLAUDE.md` is a symlink to this file; there is one
+Working notes for `@vaam-apps/ui` — a dark-first, Material 3 Expressive
+React component library for operator consoles. `CLAUDE.md` is a symlink to this file; there is one
 document, not two that drift.
 
 This is not a summary of the README. It is the set of things that are
@@ -19,6 +19,7 @@ pnpm lint          # biome check . + markdownlint-cli2 — the whole tree
 pnpm typecheck     # tsc --noEmit    — covers src, .storybook AND e2e
 pnpm test          # vitest run
 pnpm build         # tsc -p tsconfig.build.json + copy styles + fix specifiers
+pnpm generate:colors   # rewrite theme.css's generated M3 colour regions
 pnpm storybook     # dev server on :6006
 pnpm build-storybook
 pnpm e2e           # playwright, against the built storybook-static/
@@ -68,11 +69,26 @@ the comment in the same edit; a comment that survives the reasoning it
 describes is worse than none. Never invent a number — measure it or leave
 it out.
 
+**Colours are generated, not picked.** `scripts/generate-md3-colors.ts`
+builds the M3 Expressive scheme (`Variant.EXPRESSIVE`, spec 2025, contrast
+0) from one seed and writes every `--md-sys-color-*` role, the status
+custom colours and the few derived tokens into `theme.css` between
+`<md3:generated>` markers. Never hand-edit those regions: change the
+generator, run `pnpm generate:colors`, and `hct-neutrals.test.ts` fails on
+any byte of drift. Everything outside the regions is a hand-written
+*mapping* onto the roles (`--surface-3: var(--md-sys-color-…)`), so the
+tokens components use kept their names. The material package is a
+devDependency, patched (`pnpm-workspace.yaml` says why); consumers get
+static CSS.
+
 **Colour means something, and the status system owns it.** `StatusHue` is
 the vocabulary. Decorative chrome (the aurora glow and mesh) carries no
 state, cannot be tinted per state, and is bound to the same hues precisely
 so it cannot drift into looking like a signal. Do not add a coloured
-surface that a reader could mistake for a status.
+surface that a reader could mistake for a status. Only the seed's
+`primary` family is chrome: Expressive rotates `secondary`/`tertiary`
+toward the status greens at this seed, so where M3 draws a selection in
+`secondary-container` or `tertiary-container`, use `primary-container`.
 
 **Three surface registers**, described in full in
 `src/components/data/instrument-panel.tsx`: *diagnostic* (a hairline on a
@@ -167,7 +183,8 @@ broken. That is the point of the list.
 
 | Gate | Exists because |
 |---|---|
-| `lib/contrast.test.ts` | a palette picked by eye ships a status vocabulary nobody can read. Parses `theme.css`, composites translucent fills. It once stayed green with the whole light theme deleted — it now asserts the theme roster and each text tier by name. |
+| `lib/contrast.test.ts` | a palette picked by eye ships a status vocabulary nobody can read. Parses `theme.css`, resolves `var()` chains the way the cascade does, composites translucent fills. It once stayed green with the whole light theme deleted — it now asserts the theme roster and each text tier by name. |
+| `lib/hct-neutrals.test.ts` | generated colours and the committed CSS can drift apart, and a seed can make `primary` read as a status. Byte-for-byte drift gate against the generator, an independent rebuild of the Expressive scheme, the library→role mapping, and CIEDE2000 floors: 13 between status hues and between `primary` and any of them, 30 between a status hue and any surface or edge. The CIEDE2000 code is checked against Sharma et al.'s test data. |
 | `lib/a11y.test.tsx` | axe over components mounted with `createRoot` + `act`. It **must** be a client render: Headless UI wires `aria-labelledby` in an effect, so `renderToStaticMarkup` reports violations that are not real. |
 | `lib/story-coverage.test.ts` | an export nobody ever mounts is a blind spot. |
 | `lib/cn.test.ts` | tailwind-merge deleting classes silently. |

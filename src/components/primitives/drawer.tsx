@@ -101,16 +101,10 @@ export const DrawerTitle = forwardRef<
 >(({ className, ...props }, ref) => (
   <DrawerPrimitive.Title
     ref={ref}
-    // `font-display`/`tracking-normal`: `theme.css`'s own doc on
-    // `--font-display` names "card and dialog headings" outright, and a
-    // drawer title is the same role — see `card.tsx`'s `CardHeader`
-    // comment for why the tracking reset is needed (the global
-    // `html { letter-spacing: -0.011em }` was tuned for the sans body
-    // face, not this serif).
-    className={cn(
-      "font-display font-medium text-foreground text-title-sm tracking-normal",
-      className,
-    )}
+    // `font-display`: `theme.css`'s own doc on `--font-display` names
+    // "card and dialog headings" outright, and a drawer title is the same
+    // role.
+    className={cn("font-display font-medium text-foreground text-title-sm", className)}
     {...props}
   />
 ));

@@ -4,6 +4,9 @@ A dark-first React component library for **operator consoles** — the
 screens a person uses to find out why one record out of a hundred
 thousand did not do what it was supposed to.
 
+- **Material 3 Expressive**, and only that: colour generated from one seed
+  with Material's own colour science, M3's corner scale, type scale and
+  spring motion — shipped as static CSS custom properties.
 - **daisyUI** for styling, so component classes stay short and themeable.
 - **Headless UI** for behaviour, so focus, keyboard and ARIA are not
   reimplemented per component.
@@ -75,7 +78,7 @@ the page background, card surfaces and body text silently come out as
 stock daisyUI rather than this theme. Turning the built-ins off leaves
 nothing to collide with. Found by measuring a rendered page, not by
 reading: `--color-base-100` resolved to `oklch(25.33% .016 252.42)` where
-the theme declares `#0a0b0d`.
+the theme declared its own surface.
 
 **2. Keep the `@source` line.** Tailwind v4 generates only the utilities
 it can see used, and it does not look inside `node_modules` on its own.
@@ -94,19 +97,68 @@ from daisyUI boilerplate, that attribute previously matched nothing and
 now matches. Set `data-theme="dark"` explicitly if that is you.
 
 **3. Load the faces, or accept the fallback.** `theme.css` names four
-roles — `--font-display` (IBM Plex Serif), `--font-sans` (IBM Plex Sans),
-`--font-italic` (IBM Plex Serif) and `--font-mono` (JetBrains Mono) — as
-**stacks, not `@font-face` rules**. This package ships no font files and
-still does not. Load them however you already load fonts:
+roles — `--font-display` and `--font-sans` (Roboto Flex, M3's *brand* and
+*plain* faces and the vaam-apps house face), `--font-italic` (Roboto
+Flex's slant) and `--font-mono` (JetBrains Mono) — as **stacks, not
+`@font-face` rules**. This package ships no font files and still does
+not. Load them however you already load fonts:
 
 ```html
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Serif:ital,wght@0,500;0,600;1,400;1,500&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,slnt,wdth,wght@8..144,-10..0,25..151,100..1000&family=JetBrains+Mono:wght@400;500&display=swap">
 ```
 
-Skipping this is not a failure — the stacks fall back through `ui-serif` /
-`system-ui` / `ui-monospace` and every screen still works. It is a quieter
-loss than the two steps above: the display and italic roles collapse into
-the same system serif, and the four-voice distinction goes with them.
+Skipping this is not a failure — the stacks fall back through
+`system-ui` / `ui-monospace` and every screen still works, a little less
+like M3.
+
+## Theming: Material 3 Expressive tokens
+
+Every token is an M3 system token, and a consumer reads them like any
+other custom property:
+
+```css
+.my-banner {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  border-radius: var(--md-sys-shape-corner-large);
+  font: var(--md-sys-typescale-title-medium-weight) var(--md-sys-typescale-title-medium-size) /
+    var(--md-sys-typescale-title-medium-line-height) var(--md-sys-typescale-title-medium-font);
+  transition: transform var(--md-sys-motion-spring-spatial-fast-duration)
+    var(--md-sys-motion-spring-spatial-fast);
+}
+```
+
+- **Colour** — `--md-sys-color-<role>` for every M3 role (`primary`,
+  `on-primary`, `primary-container`, … `surface-container-highest`,
+  `outline`, `inverse-surface`, `scrim`), generated for dark and light
+  with `Variant.EXPRESSIVE`, colour spec 2025, from the seed **`#4f46e5`**.
+  The status hues are M3 custom colours: `--md-custom-color-<hue>`, `-on-`,
+  `-container` and `on-<hue>-container`. Tailwind utilities exist for the
+  roles components use (`bg-primary-container`, `text-on-surface-variant`,
+  `bg-inverse-surface`, …).
+- **Shape** — `--md-sys-shape-corner-{none, extra-small, small, medium,
+  large, large-increased, extra-large, extra-large-increased,
+  extra-extra-large, full}`. Tailwind's `rounded-xs` … `rounded-4xl` are
+  that scale in order; daisyUI's `rounded-selector`/`-field`/`-box` are
+  `small`/`extra-small`/`medium`.
+- **Type** — `--md-sys-typescale-<role>-{font, size, line-height, tracking,
+  weight}` for the fifteen roles, plus `--md-sys-typescale-emphasized-<role>-weight`.
+  `text-body-medium`, `text-headline-small` and friends are utilities; the
+  library's older steps (`text-body`, `text-title`, …) now resolve to M3
+  roles.
+- **Motion** — `--md-sys-motion-spring-{spatial,effects}-{fast,default,slow}`
+  and their `-duration`s: M3 Expressive's springs, as `linear()` easings.
+
+The library's own names — `bg-surface-1..3`, `border-edge*`,
+`text-muted-foreground`, `text-subtle-foreground`, `--ring` — are mappings
+onto those roles, so a consumer who overrides a `--md-sys-color-*` role
+re-themes every component that reads it. To re-seed, generate a scheme
+with `@material/material-color-utilities` (`scripts/generate-md3-colors.ts`
+in this repository is the reference) and declare its roles on `:root` and
+`[data-theme="light"]` after this stylesheet. The status hues are held to
+contrast and separation gates in this repository; a consumer's own seed
+is not, so check `primary` against `success` and `progress` before
+shipping one.
 
 ## What is in it
 
@@ -232,14 +284,14 @@ on. It is not `neutral` either, which is transparent on a transparent
 ground and deliberately does *not* pull the eye, so a payment sitting on a
 payer's handset stops being findable in a table of a thousand rows.
 Reaching for `uncertain` is worse still: amber makes every healthy
-in-flight payment read as a problem. `parked` is violet, and quiet, and
+in-flight payment read as a problem. `parked` is fuchsia, and quiet, and
 its mark is `ring`.
 
 There is deliberately **no `info` hue**, and the eighth hue is named
-`progress` for that reason. Blue is selection and focus only (`--ring`),
-never a status — `theme.css` even pins daisyUI's own `--color-info` to the
-neutral grey with a written reason, so a `StatusHue` named `info` would
-contradict its own neighbour by name. The two states an `info` hue gets
+`progress` for that reason. The seed's indigo is selection and focus only
+(`primary`, `--ring`), never a status — `theme.css` even pins daisyUI's
+own `--color-info` to the neutral grey with a written reason, so a
+`StatusHue` named `info` would contradict its own neighbour by name. The two states an `info` hue gets
 reached for are `progress` and `parked`.
 
 ### Choosing a mark
@@ -325,9 +377,9 @@ this row stop polling", and that is all it does.
   hue.** Colour alone fails for the ~8% of men with a colour-vision
   deficiency and fails completely in a monochrome screenshot pasted into
   a ticket. That redundancy is load-bearing rather than decorative: the
-  closest two hues in the system, `neutral` and `expired`, are ΔE00 8.7
-  apart, so inside a 14px glyph the *mark* is doing much of the work of
-  telling them apart.
+  closest two hues in the system, `warning` and `uncertain`, are ΔE00 14.2
+  apart in the light theme (15.3 in dark), so inside a 14px glyph the
+  *mark* is still doing much of the work of telling them apart.
 - **`family` is presentational, never authorisation.** A UI that greys
   out "cancel" because its own table says `terminal` will be wrong the
   first time the state machine changes and nobody remembers the table
@@ -335,14 +387,19 @@ this row stop polling", and that is all it does.
 - **`unresolved` is a first-class outcome**, distinct from success and
   failure. Systems that model only two outcomes end up reporting "we
   never learned what happened" as whichever is more convenient.
-- **Every hue is legible in both treatments**, on all four steps of the
-  surface ladder. Measured against the hex tokens in `theme.css`, not
-  assumed — the tokens are authored in hex, so a helper that expects oklch
-  parses none of them and reports success on nothing. Quiet glyphs run
-  6.34:1 to 13.65:1 against the 3:1 a non-text graphic needs, and loud
-  pills — where the 12px label takes the hue itself — run 5.53:1 to
-  11.71:1 against 4.5:1. The worst case in the system is `expired`, loud,
-  on a hovered row.
+- **Every hue is legible in both treatments**, on all five steps of the
+  surface ladder, in both themes. Measured against the generated hex
+  tokens in `theme.css`, not assumed. Quiet glyphs run 5.01:1 to 13.46:1
+  against the 3:1 a non-text graphic needs, and loud pills — where the
+  12px label takes the hue itself — run 4.80:1 to 10.57:1 against 4.5:1.
+  The worst case in the system is `danger`, loud, on the light theme's top
+  container step.
+- **No two hues closer than ΔE00 13, and neither is the seed.** The
+  status hues are M3 custom colours harmonized toward the seed, and
+  `hct-neutrals.test.ts` holds every pair — and `primary` against every
+  hue — to that floor. It is why the seed is an indigo and not the
+  vaam-apps house teal: a teal `primary` lands ΔE00 5.5 from `progress`
+  and 9.4 from `success`.
 
 ## Money
 
@@ -421,9 +478,12 @@ Worth knowing before you fight them:
   aurora: `InstrumentPanel`'s mesh ground, or `Card glow`. The third one
   is a deliberate exception, not a loosening: a glow on every card is a
   glow on none, and the rule still holds everywhere it was doing work.
-- **There is no success or warning *button*.** Those hues belong to
-  status; a button is primary, secondary, ghost or destructive. Mixing
-  them is how a status language erodes.
+- **There is no success or warning *button*, and no tonal one.** Those
+  hues belong to status; a button is primary (M3 filled), secondary
+  (outlined), ghost (text), elevated or destructive. M3's tonal button
+  paints `secondary-container`, which Expressive rotates toward olive at
+  this seed — its label measured ΔE00 12.98 from `success`. Mixing them is
+  how a status language erodes.
 - **Empty states are inline status lines, not centred placards** — see
   `InlineEmptyState`.
 - **Hue means status, with exactly one exception.** The `--aurora-*` ramp
@@ -451,17 +511,16 @@ Worth knowing before you fight them:
 - **Skeletons drift; they do not shimmer.** A shimmer sweeps on a fixed
   period, which reads as progress a placeholder cannot know about, and a
   column of them beats like a metronome. `Skeleton` runs a chaotic
-  gradient instead — soft aurora ribbons on coprime periods (23s and 31s),
+  gradient instead — soft ribbons on coprime periods (9s and 13s),
   no sweep, no direction, out of phase with its neighbours — and stops
   entirely under `prefers-reduced-motion`.
-- **Two themes, and dark is still the default.** A second theme is a real
-  amount of work to keep honest, and the honest part is contrast, not
-  colour: every status foreground in the dark set is a 300-level tint
-  chosen for ~11:1 against near-black, and measured against white all
-  eight fell between 1.4:1 and 2.6:1 — every one below AA. So
-  `src/lib/contrast.test.ts` was written *first* and the light values
-  searched against it. `dark` keeps `default: true` and `prefersdark`, so
-  a consumer who sets no `data-theme` gets exactly what they got before.
+- **Two themes, and dark is still the default.** Both are generated from
+  the same seed, and the honest part is contrast, not colour:
+  `src/lib/contrast.test.ts` measures every text tier and status hue on
+  every surface, loud fills composited, and where Material's recipe would
+  have failed it the generator departs from the recipe (the light status
+  foregrounds sit at tone 38, not 40). `dark` keeps `default: true` and
+  `prefersdark`, so a consumer who sets no `data-theme` still gets dark.
   Light is opt-in, via `data-theme="light"` or `ThemeSwitcher`.
 
 ## The component gallery
@@ -543,7 +602,17 @@ A few guards are worth knowing about before you trip one:
   loud pills at 4.27:1 and 4.36:1 that no story renders. It asserts the
   theme *roster* and the three text tiers by name, because an earlier
   version stayed green with an entire theme deleted and silently skipped
-  any foreground that was not a hex literal.
+  any foreground that was not a hex literal. It resolves `var()` chains
+  the way the cascade does, because the palette is a mapping now:
+  `--color-base-100` is `var(--md-sys-color-surface)`.
+- **`src/lib/hct-neutrals.test.ts`** is the colour gate. It re-runs
+  `scripts/generate-md3-colors.ts` and fails if `theme.css`'s generated
+  regions differ by a byte (run `pnpm generate:colors`, never edit them by
+  hand), rebuilds the M3 Expressive scheme independently and checks every
+  `--md-sys-color-*` role, checks each library token resolves to the role
+  it is mapped onto, and holds the status hues to ΔE2000 floors: 13
+  between any two of them and between `primary` and any of them, 30
+  between any of them and a surface or edge.
 - **`src/components/primitives/side-nav.portal.test.tsx`** pins that the
   floating rail portals to `document.body` even inside a transformed
   ancestor, and that exactly one `nav[aria-label="Primary"]` exists in

@@ -8,16 +8,10 @@ import { cn } from "../../lib/cn";
  * job (design doc §5.2); mixing them is how the status language erodes.
  *
  * D11: `cva()` replaces the previous `variant === "x" && "..."` conditional
- * chain, same classes. One deliberate D8 diff, not a byte-identical carry-
- * over: the previous base string hard-coded `rounded-sm`, which fought
- * daisyUI's own `.badge` rule (`border-radius: var(--radius-selector)`,
- * confirmed by reading `daisyui/components/badge.css` directly) at equal
- * specificity — a redundant override, not a deliberate choice, and for the
- * wrong tier besides: `--radius-selector` (8px) is this register's
- * small-control tier, `--radius-sm` now aliases `--radius-field` (12px).
- * Dropping the override lets daisyUI's own class govern radius, which is
- * exactly constraint 7 ("DaisyUI does the work") and the correct tier for
- * a tag-sized control.
+ * chain, same classes. No `rounded-*` here: daisyUI's own `.badge` rule
+ * reads `--radius-selector`, which `theme.css` maps to M3's `small`
+ * corner (8px), the chip corner — a hard-coded override once fought it at
+ * equal specificity.
  */
 export const badgeVariants = cva("badge font-mono text-caption", {
   variants: {

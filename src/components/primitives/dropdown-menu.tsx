@@ -49,7 +49,7 @@ export function DropdownMenuContent({
         // left for it. Bounded here, truncated one level in on the item
         // (see `DropdownMenuItem`'s own comment for why "on the item"
         // itself — this component's row — does not work).
-        "z-50 min-w-[180px] max-w-[min(20rem,calc(100vw-2rem))] rounded-md border border-edge bg-surface-2 p-1 shadow-[var(--shadow-popover)] [--anchor-gap:4px] focus:outline-none",
+        "z-50 min-w-[180px] max-w-[min(20rem,calc(100vw-2rem))] rounded-lg border border-edge bg-surface-2 p-1 shadow-[var(--shadow-popover)] [--anchor-gap:4px] focus:outline-none",
         // Spatial (scale), M3 Expressive `--dur-spatial-fast` /
         // `--ease-spatial-fast` — see `date-picker.tsx`'s `PANEL_CLASS`
         // for the full reasoning (small/local panel, opacity riding the
@@ -72,7 +72,7 @@ export function DropdownMenuItem({
       as="button"
       type="button"
       className={cn(
-        "flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-body text-foreground outline-none",
+        "flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-body text-foreground outline-none",
         "data-focus:bg-surface-3",
         "data-disabled:pointer-events-none data-disabled:opacity-50",
         className,
@@ -149,7 +149,7 @@ export function DropdownMenuLinkItem({
     <MenuItem
       as="a"
       className={cn(
-        "flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-body text-foreground outline-none",
+        "flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-body text-foreground outline-none",
         "data-focus:bg-surface-3",
         "data-disabled:pointer-events-none data-disabled:opacity-50",
         className,
@@ -192,7 +192,7 @@ export function DropdownMenuCheckboxItem({
       // real `menuitemcheckbox` would have announced, and it does not
       // depend on winning an argument with the library.
       className={cn(
-        "flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-body text-foreground outline-none",
+        "flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-body text-foreground outline-none",
         "data-focus:bg-surface-3",
         className,
       )}

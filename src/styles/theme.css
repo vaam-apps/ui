@@ -1,247 +1,163 @@
 /*
- * @vaam-apps/ui design tokens (T6), redesigned per docs/design/console-redesign.md
- * (the admin console redesign, Phase 0).
+ * @vaam-apps/ui design tokens — Material 3 Expressive, and only that.
  *
- * Source of truth: docs/design/console-redesign.md §2 (decision ledger,
- * D8/D9) and §1 (reference lock), superseding this file's earlier
- * dashboard-design-system.md/dashboard-architecture-plan.md lineage where
- * the two disagree — see D8/D9 in that document for the reasoning behind
- * every change below.
+ * Colour, shape, type and motion all follow the M3 Expressive spec. Every
+ * colour is generated from one seed by Material's own colour science; every
+ * corner is a step of M3's corner scale; every text step is an M3 type role;
+ * every transition that moves something is an M3 Expressive spring. This
+ * replaced a hand-picked monochrome system ("one accent, never a hue"), a
+ * three-step radius register and an IBM Plex type stack — the arguments
+ * this file used to carry for keeping each of them are retired with them,
+ * not left behind to contradict what ships.
  *
- * **Two themes, dark still the default (supersedes D9).** D9 deleted the
- * light theme outright on the grounds that a second theme is "a real
- * amount of work to keep honest". That was true, and the work has now
- * been done rather than the constraint quietly dropped.
+ * # Colour: generated, not picked
  *
- * What made it real: every status foreground is a 300-level tint chosen
- * for roughly 11:1 against near-black, and measured against white all
- * eight landed between **1.4:1 and 2.6:1** — every one of them below the
- * 4.5:1 WCAG AA bar. A light palette picked by eye would have shipped a
- * status vocabulary nobody could read, and `theme-tokens.test.ts` could
- * not have caught it: that file asserts a token is *declared*, never that
- * it is *legible*. So `contrast.test.ts` was written **first**, and the
- * light values below were searched for against it — maximum pairwise ΔE
- * among candidates that already cleared the bar. The result separates
- * better than the dark set it mirrors (minimum ΔE76 18.1 against the dark
- * theme's own 9.6, both between `neutral` and `expired` — re-measured
- * 2026-09-22 against plain CIE76 Euclidean-Lab distance, the metric this
- * figure and `--state-expired-fg`'s own "ΔE 18" both use; a stale "19.3"
- * here predated that expired-token correction and had drifted from it,
- * caught while deriving `hct-neutrals.test.ts`'s CIEDE2000 gate below).
+ * `scripts/generate-md3-colors.ts` builds the M3 Expressive scheme
+ * (`Variant.EXPRESSIVE`, colour spec 2025, contrast 0) from `SEED` with
+ * `@material/material-color-utilities` — a devDependency, so consumers get
+ * static CSS — and writes every role into the two `<md3:generated>` regions
+ * below as `--md-sys-color-<role>`: primary, secondary, tertiary and error
+ * with their `on-`, `-container` and `-fixed` families, the full surface
+ * ladder (`surface-dim` … `surface-container-highest`), `outline`,
+ * `outline-variant`, the `inverse-*` roles, `scrim` and `shadow`. A consumer
+ * reads them like any custom property: `var(--md-sys-color-primary)`. The
+ * regions are not edited by hand; `hct-neutrals.test.ts` re-runs the
+ * generator and fails if a byte differs.
  *
- * `dark` keeps `default: true`, so a consumer who sets no `data-theme`
- * attribute gets exactly what they got before this change. Light is
- * opt-in, via `data-theme="light"` or the `ThemeSwitcher` component.
+ * The seed is an indigo, `#4f46e5`, not the vaam-apps house teal — the
+ * generator's own doc comment has the measurement that decided it: a teal
+ * primary sits closer to `progress` and `success` than two status hues are
+ * allowed to sit to each other.
  *
- * **Radius (D8).** Rewritten from the previous near-square 2px system to a
- * visibly, deliberately rounded one. This is a genuine visual-identity
- * break from what shipped before, and it is intended, not a cautious
- * half-step — see D8's own entry in the decision ledger for the full
- * reasoning: the previous 2px system was a real, careful decision under an
- * earlier brief, and this redesign replaces it outright rather than
- * splitting the difference with it.
+ * Everything else is a *mapping onto* those roles, written by hand in this
+ * file so each one sits beside its reason:
  *
- * daisyUI v5 is CSS-first: the `@plugin "daisyui/theme"` block below
- * defines the one theme this console ships, under daisyUI's own built-in
- * name "dark" (see the "Customize Built-in daisyUI Theme" pattern in
- * daisyUI's own docs), so every native daisyUI class (`.btn`, `.input`,
- * `.card`, `.badge`, `.table`, `.tabs`, …) themes correctly with zero
- * patching.
+ * - daisyUI's theme tokens (`--color-primary`, `--color-base-*`, …) — the
+ *   two `@plugin "daisyui/theme"` blocks — so every native daisyUI class
+ *   themes from the scheme with no patching;
+ * - this library's own tokens (`--surface-3`, the `--edge` ladder, the
+ *   three text tiers, `--ring`, the shadows) — the `:root, [data-theme]`
+ *   block — under the names components already use, so no component had to
+ *   learn a new vocabulary to change colour.
  *
- * Everything daisyUI has no concept of — the extra surface-3 hover step,
- * hairline border tiers, muted/subtle text tiers, focus-ring colour, and
- * above all the eleven-state status system — lives in plain CSS custom
- * properties scoped by `[data-theme="dark"]` immediately below the daisyUI
- * theme block, then re-exposed as Tailwind utilities via `@theme inline` so
- * component code can write `bg-surface-3` / `text-state-danger-fg` instead
- * of `bg-[var(--surface-3)]` everywhere. This is deliberately NOT folded
- * into daisyUI's own theme config: daisyUI has no vocabulary for a
- * six-hue/eleven-state status system, a three-tier border ladder, or two
- * distinct floating-layer shadows, so these stay hand-written CSS custom
- * properties by necessity, not by omission — with only one theme left to
- * maintain, this file is already substantially smaller and more
- * daisyUI-driven than before (D9 alone removes the entire duplicate
- * light-theme block), and every token below that daisyUI *can* express
- * lives in its theme block, not out here.
+ * **The status system stays the spine.** The eight `--state-*` hues are M3
+ * *custom colours*: each source hue harmonized toward the seed and read off
+ * its own tonal palette, so green still means delivered while sitting in
+ * the seed's family. Two gates hold the line the old hand-picked palette
+ * held: `contrast.test.ts` (WCAG AA for every text tier and status
+ * foreground on every surface, loud fills composited), and
+ * `hct-neutrals.test.ts` (no two status hues, and neither `primary` nor
+ * `primary-container`, closer than ΔE2000 13 to a status hue; no surface or
+ * edge closer than 30). Where Material's recipe would have broken one of
+ * those, the generator departs from the recipe and says why at the point
+ * of departure — never the other way round.
  *
- * One deliberate rename from the design doc: its `--border` token (default
- * container border colour) is called `--edge` here instead. daisyUI
- * reserves `--border` for component border *width* (see the `--border: 1px`
- * key inside the theme block below) — reusing the name for a colour would
- * silently overwrite that width value at `[data-theme=...]` scope. `--edge`
- * carries the same three-step ladder (`--edge-subtle` / `--edge` /
- * `--edge-strong`) the design doc specifies, just under a collision-free
- * name.
+ * `primary` is the only chrome accent. Expressive's `secondary` and
+ * `tertiary` rotate the seed's hue around the wheel — at this seed into the
+ * green-to-olive band `success` lives in (light `secondary` measures 13.2
+ * from `success`, light `tertiary` 17.5) — so where M3 would draw a
+ * selection, an active indicator or a focus ring in `secondary` or
+ * `tertiary`, components here use the primary family instead. That is also
+ * why there is no tonal button: M3 defines it as `secondary-container`
+ * with an `on-secondary-container` label, and that label measured 12.98
+ * from light `success` — under the floor two status hues must clear.
+ * Decorative chrome (the aurora glow and mesh) is still bound to the status
+ * hues by `color-mix` and still carries no state.
  *
- * Font self-hosting/subsetting (design doc F2: IBM Plex + JetBrains
- * Mono, latin + latin-ext, `font-display: swap`) is explicitly
- * NOT done here — that is a separate, later task per the design doc's own
- * build order, and no font files are checked into this repo yet. The
- * family stacks below are correct and will pick the right system fallback
- * (`ui-serif` / `system-ui` / `ui-monospace`) until self-hosting lands.
+ * # Themes
  *
- * **M3 Expressive colour (2026-09-22 investigation, see `hct-neutrals.test.ts`).**
- * Motion, shape and type already took the M3 Expressive pass; colour was
- * the last piece, and it landed as *documentation and a regression gate*,
- * not new shipped hex values — a well-argued "this mostly already holds"
- * is the honest result here, not a shortfall.
+ * `dark` keeps `default: true`: a consumer who sets no `data-theme`
+ * attribute gets the dark scheme, exactly as before this change. Light is
+ * opt-in, via `data-theme="light"` or the `ThemeSwitcher` component. Both
+ * are registered under daisyUI's own built-in names, which is why the
+ * consuming stylesheet must load daisyUI with `themes: false`.
  *
- * §1.3 below is unchanged and is the reason: "one accent, never a hue"
- * rules out the seed → tonal-palette pipeline M3's colour system is built
- * around, so there is no principled way to *derive* a neutral from a seed
- * in this library. What was checked instead is whether the surfaces this
- * file already ships happen to sit inside M3 Expressive's own idea of a
- * considered neutral, measured in HCT via
- * `@material/material-color-utilities@0.4.0` (a devDependency, used only to
- * derive and verify values here — never shipped to consumers). They do:
- * `getNeutralPalette`/
- * `getNeutralVariantPalette` in that package's `dynamic_scheme.js`
- * (`case Variant.EXPRESSIVE`) fix chroma at 8 for neutral and 12 for
- * neutral-variant, source-independent (checked against three unrelated
- * seeds). `--color-base-100/200/300` and `--surface-3` measure
- * chroma 3.1 → 7.2 in dark and 3.1 → 6.4 in light — under the budget with
- * room to spare, on a palette nobody ever tuned against it. The `--edge`
- * ladder sits a tier above (8.3–10.5 dark, 6.0–11.1 light), inside the
- * neutral-*variant* budget the same way — the exact relationship M3 draws
- * between the two palettes. Both are gated by `hct-neutrals.test.ts` now,
- * so a future edit that saturates a surface or a border has somewhere to
- * fail rather than just looking a little different.
+ * # Shape, type, motion
  *
- * Two things that finding rules out. First, deriving the surfaces from an
- * explicit seed anyway "to be principled": there is no measured gain over
- * what is already shipped, and it would touch the single most pervasive
- * colour in the library — the definition of a high-risk, low-payoff edit.
- * Second, and the higher-risk item this investigation carried: putting the
- * eight `--state-*-fg` hues on a uniform HCT tone step, so dark mirrors
- * light's own tone band (35.7–39.1, an emergent property of the ΔE search
- * above, not a target) "by construction". Tried and rejected: forcing dark
- * theme's spread (currently 66.0–85.9, chosen per-hue for AA headroom) to
- * a single tone (T80) leaves WCAG contrast essentially flat (7.6–13.7:1
- * today vs. 11.5–11.6:1 forced — already comfortably over the 4.5:1 bar
- * either way) and does **not** fix the palette's tightest collision:
- * `neutral`/`expired` separate by only ΔE2000 8.7 today and 8.67 forced —
- * unchanged, because that pair's closeness is a *chroma* problem
- * (`expired` is deliberately near-achromatic, chroma 2.3 — see its own
- * comment below) rather than a tone mismatch, so equalising tone cannot
- * touch it. Eight shipped hex values changed for a measured improvement of
- * nothing, on tokens every consumer and every pixel-level gate already
- * depends on: not done.
+ * Shape is M3's full corner scale (`--md-sys-shape-corner-*`, none through
+ * full) with each daisyUI radius tier and Tailwind radius step mapped onto
+ * it — see the `:root` block after the themes. Type is M3's fifteen roles
+ * plus their emphasized weights (`--md-sys-typescale-*`) in Roboto Flex,
+ * and the library's existing `--text-*` steps now resolve to those roles.
+ * Motion is unchanged in substance: it already transcribed the Expressive
+ * spring scheme — see "M3 Expressive motion" below.
+ *
+ * One deliberate rename survives from before: the default container border
+ * colour is `--edge`, not `--border`. daisyUI reserves `--border` for
+ * component border *width* (the `--border: 1px` key in the theme blocks
+ * below), and reusing the name for a colour would overwrite that width at
+ * `[data-theme=...]` scope.
+ *
+ * This package ships no font files. Roboto Flex leads the stacks below and
+ * a consumer loads it (Google Fonts, self-hosted, or not at all); without
+ * it the stacks fall back to `system-ui` / `ui-monospace`.
  */
 
+/*
+ * The daisyUI theme, as a mapping onto the generated M3 roles.
+ *
+ * Every value here is a `var()` onto a `--md-sys-color-*` role that the
+ * `:root, [data-theme="dark"]` block further down declares, so a consumer
+ * who overrides a role (or ships a scheme generated from their own seed)
+ * re-themes every native daisyUI class with it. daisyUI emits these keys on
+ * the same element that carries the role, so the `var()` resolves per
+ * theme — including a nested `data-theme` subtree.
+ *
+ * The light block below is the same mapping key for key; only `name`,
+ * `default`, `prefersdark` and `color-scheme` differ.
+ */
 @plugin "daisyui/theme" {
   name: "dark";
   default: true;
   prefersdark: true;
   color-scheme: dark;
 
-  /* base-100/200/300 double as our --background / --surface-1 / --surface-2 —
-     see the surface ladder comment on the [data-theme="dark"] block below. */
-  --color-base-100: #0a0b0d;
-  --color-base-200: #101216;
-  --color-base-300: #16181d;
-  --color-base-content: #e8eaed;
+  /* The surface ladder: page, then the two container steps components
+     paint panels with. `--surface-3`/`--surface-4` continue it below. */
+  --color-base-100: var(--md-sys-color-surface);
+  --color-base-200: var(--md-sys-color-surface-container-low);
+  --color-base-300: var(--md-sys-color-surface-container);
+  --color-base-content: var(--md-sys-color-on-surface);
 
-  /* §1.3: one accent, never a hue. Primary/secondary/accent all resolve to
-     the same achromatic inverse fill — there is no second brand colour to
-     assign them to, on purpose. */
-  --color-primary: #e8eaed;
-  --color-primary-content: #0a0b0d;
-  --color-secondary: #e8eaed;
-  --color-secondary-content: #0a0b0d;
-  --color-accent: #e8eaed;
-  --color-accent-content: #0a0b0d;
-  --color-neutral: #1c1f25;
-  --color-neutral-content: #e8eaed;
+  --color-primary: var(--md-sys-color-primary);
+  --color-primary-content: var(--md-sys-color-on-primary);
+  --color-secondary: var(--md-sys-color-secondary);
+  --color-secondary-content: var(--md-sys-color-on-secondary);
+  --color-accent: var(--md-sys-color-tertiary);
+  --color-accent-content: var(--md-sys-color-on-tertiary);
+  /* daisyUI's `neutral` is a quiet filled chip or badge; M3's nearest is
+     the top container step with on-surface text. */
+  --color-neutral: var(--md-sys-color-surface-container-highest);
+  --color-neutral-content: var(--md-sys-color-on-surface);
 
-  /* daisyUI's own semantic four. Not used by the eleven-state status system
-     (that is bespoke — §4) but kept coherent for any incidental native use
-     (e.g. a plain `alert-error`). info=neutral grey on purpose: blue is
-     selection-only per §1.3, never a status hue. */
-  --color-info: #9aa1ac;
-  --color-info-content: #0a0b0d;
-  --color-success: #4ade80;
-  --color-success-content: #06210f;
-  --color-warning: #fcd34d;
-  --color-warning-content: #241a00;
-  --color-error: #e5534b;
-  --color-error-content: #ffffff;
+  /* daisyUI's semantic four, for incidental native use (a plain
+     `alert-error`). The status system does not read them; they read it, so
+     a daisyUI `success` is the same green as a delivered pill. `info` is
+     the neutral status grey: blue-ish `progress` is a state, not a tone of
+     voice. */
+  --color-info: var(--state-neutral-fg);
+  --color-info-content: var(--md-sys-color-surface);
+  --color-success: var(--state-success-fg);
+  --color-success-content: var(--md-custom-color-on-success);
+  --color-warning: var(--state-warning-fg);
+  --color-warning-content: var(--md-custom-color-on-warning);
+  --color-error: var(--md-sys-color-error);
+  --color-error-content: var(--md-sys-color-on-error);
 
-  /* D8: a visibly rounded register, three deliberately distinct steps —
-     small controls (selector) noticeably tighter than fields, fields
-     noticeably tighter than boxes — so the progression itself reads as
-     intentional, not just "rounded everywhere by the same amount". Judged
-     against §1's reference lock (LottieFiles' filled-rounded-rectangle
-     active nav row, Column's selected-row fill, Polar's drawer/card
-     corners), not against the 2px system this replaces: every one of
-     those references reads as genuinely, confidently rounded, not a
-     restrained near-square nudge. Still short of `--radius-full` (a true
-     pill) — §1.1's own description of the LottieFiles active row is
-     explicit that it is "not fully pill-shaped either", and a data table's
-     own row/cell chrome would look novelty-bubbly at pill radius — but
-     within that ceiling this is the confident end of the range, not the
-     cautious one.
-
-     **M3 Expressive shape-scale audit (verdict: keep the three-tier
-     register, no fourth step).** Google's own Expressive shape scale is
-     wider than this — roughly eleven named corner sizes (none through
-     extra-extra-large, several with an "increased" variant in between)
-     against this file's three plus the `--radius-xs` glyph-scale outlier
-     below. Checked against what this package actually renders, not
-     against the spec page in isolation, for three reasons the wider scale
-     does not survive here:
-
-     1. The extra Google steps above `--radius-box` (large-increased,
-        extra-large, extra-large-increased, extra-extra-large) exist for
-        surfaces a desktop console mostly doesn't have — phone-scale
-        bottom sheets and extended FABs at 28dp+ — and this file's own D8
-        reasoning already rejects that register for the surfaces it *does*
-        have: a data table's row/cell chrome "would look novelty-bubbly at
-        pill radius", the same objection at a smaller number. (The "doesn't
-        have" half was wrong when it was written: `DetailDrawerContent`
-        had been a phone bottom sheet below `md` since D14, and `Select`
-        is a second one below `sm` now. Both take M3's own 28dp as
-        `--radius-sheet`, declared beside `--radius-xs` below as a
-        single-purpose corner rather than a fourth step — and so does
-        `Dialog`'s panel, M3's `DialogTokens.ContainerShape`, the same
-        `CornerExtraLarge`, by the maintainer's call when dialogs moved
-        to M3 (2026-09-24). The objection here is to *console* surfaces
-        at that radius — cards, tables, panels in the page — and it
-        stands.) A desktop
-        operator console grounded in Polar's/Column's drawer and card
-        corners has no reference screen calling for a fourth, larger step,
-        and "one register, no fourth" (this comment's own opening line) is
-        a standing rule, not a rule that resets per redesign.
-     2. The "increased" variants (extra-small-increased,
-        large-increased, extra-large-increased) are Google's own
-        *interpolation waypoints* for their polygon-based shape-morph
-        system — named intermediate shapes a discrete state machine steps
-        through. CSS `border-radius` has no such need: a `transition` on
-        the property is continuously interpolated by the browser between
-        whatever two values a component names, so the "waypoint" problem
-        those extra tokens solve for Compose's shape-morph library doesn't
-        exist here. Confirmed empirically, not just argued: implementing
-        this file's own press-shape morph (`src/lib/press-shape.ts`)
-        needed exactly one additional value, and it didn't need to be a
-        new one — `--radius-selector` itself, already declared below,
-        covers it.
-     3. The 35-shape polygon library (cookies, clovers, arches, bursts —
-        Expressive's other shape axis, for avatars, FABs and loading
-        indicators) is explicitly out of scope for this pass; nothing in
-        this package's component set (form controls, tables, panels,
-        toasts) is a shape *outline* that would ever read as one of those
-        polygons rather than a rounded rectangle, so there is no register
-        gap to fill for it either.
-
-     So: three tiers plus two single-purpose outliers — the checkbox-only
-     `--radius-xs` and `--radius-sheet`, M3's corner for its sheets and
-     dialogs and nothing else — already
-     say everything this component set needs said. Widening the register
-     "to match the spec" without a reference screen or a real interaction
-     calling for the extra step would be exactly the unargued change this
-     file's own conventions rule out. */
-  --radius-selector: 8px;
-  --radius-field: 12px;
-  --radius-box: 20px;
+  /* daisyUI's three radius tiers on M3's corner scale (the scale itself is
+     declared in the `:root` block after the themes):
+     - selector (badges, toggles, daisyUI's own checkbox): `small`, 8px —
+       M3's chip corner (`AssistChipTokens`/`FilterChipTokens`).
+     - field (inputs, selects, daisyUI's `.btn` before `Button` rounds it
+       fully): `extra-small`, 4px — `OutlinedTextFieldTokens.ContainerShape`.
+     - box (cards, alerts, dropdowns): `medium`, 12px —
+       `FilledCardTokens`/`OutlinedCardTokens.ContainerShape`.
+     Transcribed from androidx-main's `compose/material3/material3/src/
+     commonMain/kotlin/androidx/compose/material3/tokens/` at commit
+     4611dbdb89a41bbe5d61199c155ca67da4987d81. */
+  --radius-selector: var(--md-sys-shape-corner-small);
+  --radius-field: var(--md-sys-shape-corner-extra-small);
+  --radius-box: var(--md-sys-shape-corner-medium);
   --size-selector: 0.25rem;
   /* Density axis (D10) — see the standalone "Density register" block below
      this theme's closing brace for the full derivation, and
@@ -493,50 +409,74 @@
 }
 
 /*
- * The press-shape morph's target radius (`src/lib/press-shape.ts`), made
- * proportional to each control's own rendered size instead of the flat
- * `--radius-selector` (8px) constant it used to be. Measured before this
- * change: on `Button size="icon"` (32×32 at rest) the flat 8px target was
- * 25% of the box — "obviously square" per the bug report this fixes — while
- * on a 40px-tall text button the same 8px was already a fifth of the
- * height and read fine, which is why the defect went unnoticed on every
- * other control sharing `PRESS_SHAPE_MORPH`.
+ * The press-shape morph's target radius (`src/lib/press-shape.ts`), read
+ * straight off M3's corner scale now that the scale exists here.
  *
- * The replacement ratio is transcribed, not invented, from
- * `PressedContainerShape` in the same three androidx token files cited
- * above, cross-referenced against `ShapeTokens.kt`'s own corner values in
- * the same directory: `ButtonSmallTokens` (40dp) presses to `CornerSmall`
- * (8dp), `ButtonMediumTokens` (56dp) to `CornerMedium` (12dp),
- * `ButtonLargeTokens` (96dp) to `CornerLarge` (16dp) — 8/40 = 0.200,
- * 12/56 = 0.214, 16/96 = 0.167. `0.2` is used below rather than a
- * per-bucket lookup: it is exact for the Small bucket (the one every
- * compact-register control in this package actually sits in today, so
- * compact stays byte-identical — 40px * 0.2 = 8px, the same number the
- * flat constant already produced there) and within a pixel of Medium
- * (56px comfortable * 0.2 = 11.2px against the real 12px token), which is
- * the working approximation the three data points above describe as
- * "about a fifth" rather than a strict per-bucket table this package has
- * no clean way to key off of (a control's Button `size` prop, not its
- * resolved pixel height, is what would have to drive a lookup, and nothing
- * here reads that far up).
+ * Every M3 Expressive button is round at rest (`ContainerShapeRound` is
+ * `CornerFull` in all three token files below) and squares off while
+ * pressed. `PressedContainerShape`, androidx-main
+ * 4611dbdb89a41bbe5d61199c155ca67da4987d81, `…/material3/tokens/`:
  *
- * `.btn-circle` gets its own, deliberately gentler ratio rather than
- * reusing 0.2: going from an unbounded radius (a true circle) to *any*
- * finite corner is a much larger perceptual jump than a rounded rectangle
- * softening further, which is exactly what the 25%-of-box measurement
- * above was reporting. `0.1` — half of the rectangular ratio — is the
- * same halving relationship `--radius-xs` (4px) already establishes
- * against `--radius-selector` (8px) two sections up, for the identical
- * "a small glyph-scale control reads as square at a quarter of its own
- * box" risk, reapplied here as a ratio instead of a fixed px so it now
- * scales with both size *and* density instead of needing a new constant
- * every time either changes.
+ *   ButtonXSmallTokens   32dp tall  → CornerSmall   8dp
+ *   ButtonSmallTokens    40dp tall  → CornerSmall   8dp
+ *   ButtonMediumTokens   56dp tall  → CornerMedium 12dp
+ *
+ * That maps onto this library's two sizes and two densities exactly, so the
+ * "about a fifth of the height" ratio this used to approximate them with
+ * (`calc(var(--size) * 0.2)`: 6.4px on a compact `sm`, 11.2px on a
+ * comfortable `md`) is retired for the real tokens: `.btn-sm` is XSmall at
+ * compact and Small at comfortable, both `small`; `.btn` (`md`) is Small at
+ * compact and Medium at comfortable, so it steps from `small` to `medium`
+ * with `--density`. Source order matters — `.btn-sm` elements also carry
+ * `.btn`, and the two rules have equal specificity.
+ *
+ * `.btn-circle` keeps its own, gentler ratio, deliberately off-spec. M3's
+ * icon buttons press to the same `CornerSmall`, and on `Button
+ * size="icon"`'s 32×32 box that is a quarter of the width — the exact
+ * "becoming a square on long-press" the owner reported as bizarre before
+ * the ratio existed. A tenth of the box (3.2px compact, 4px comfortable)
+ * still reads as a press without turning a circle into a tile; that report
+ * outranks the token here.
  */
 .btn {
-  --btn-press-radius: calc(var(--size) * 0.2);
+  --btn-press-radius: calc(
+    var(--md-sys-shape-corner-small) +
+    var(--density, 0) *
+    (var(--md-sys-shape-corner-medium) - var(--md-sys-shape-corner-small))
+  );
+}
+.btn-sm {
+  --btn-press-radius: var(--md-sys-shape-corner-small);
 }
 .btn-circle {
   --btn-press-radius: calc(var(--size) * 0.1);
+}
+
+/*
+ * The rest of an M3 Expressive button's anatomy, per size bucket, through
+ * daisyUI's own `.btn` hooks (`--btn-p` is its inline padding, `--fontsize`
+ * its label size) so nothing else about `.btn` has to be restated.
+ * `LeadingSpace`/`TrailingSpace` from the same token files as above — 16dp
+ * for XSmall and Small, 24dp for Medium — and the label role from
+ * `ButtonDefaults.textStyleFor` (`Button.kt`): `label-large` (14px) under
+ * Medium's height, `title-medium` (16px) at it. daisyUI's own values were
+ * 12px/12px padding and 12px/14px labels.
+ *
+ * Custom properties only, unlayered so they beat daisyUI's nested layer,
+ * and nothing a Tailwind utility sets — so a caller's `px-*` or `text-*` on
+ * a `Button` still wins, as it should.
+ */
+.btn {
+  --btn-p: calc(16px + var(--density, 0) * 8px);
+  --fontsize: calc(
+    var(--md-sys-typescale-label-large-size) +
+    var(--density, 0) *
+    (var(--md-sys-typescale-title-medium-size) - var(--md-sys-typescale-label-large-size))
+  );
+}
+.btn-sm {
+  --btn-p: 16px;
+  --fontsize: var(--md-sys-typescale-label-large-size);
 }
 
 /*
@@ -849,240 +789,157 @@
 }
 
 /*
- * Surface ladder (§3.1): --color-base-100/200/300 above already carry
- * background / surface-1 / surface-2. --surface-3 (row hover, pressed,
- * selected fill) is one step daisyUI's own three-tier base system doesn't
- * have, so it lives here as a plain extra token.
- *
- * This block's light counterpart lives ~150 lines below. D9 had deleted it
- * outright; the header explains why it is back and what had to be true
- * first. Light's own comment there calls itself "slightly blue-biased,
- * so the greys read as chosen rather than as stock neutrals" — measured in
- * HCT (this file's header, "M3 Expressive colour"), the same is true here:
- * `#0a0b0d` → `#1c1f25` sit at hue 258–265° (blue-violet) and chroma
- * 3.1 → 7.2, not zero. Neither ladder was ever built from a seed; both
- * turn out to already read as a considered cool grey rather than a stock
- * one, which is the finding that header records.
+ * The dark scheme: generated roles, then dark's own decorative tunings.
  *
  * # Why `:root` is in this selector list
  *
- * daisyUI's `dark` carries `default: true`, so *its* tokens —
- * `base-100`, `base-200`, `base-300`, `base-content` — apply with no
- * `data-theme` attribute at all. The README said the same held for the
- * theme as a whole: "`<html data-theme="dark">` — or no attribute at all
- * — picks it up exactly as before." That was **false for every token
- * declared here**, and it was false silently.
+ * daisyUI's `dark` carries `default: true`, so *its* keys apply with no
+ * `data-theme` attribute at all — and they are `var()`s onto the roles
+ * declared here. Without `:root` in this list a bare `<html>` would get
+ * daisyUI's mapping and nothing for it to resolve against: every
+ * `--color-base-*`, and every `text-muted-foreground`, `border-edge` and
+ * `bg-surface-3`, computing to nothing. That exact failure shipped once
+ * (measured: `--muted-foreground`, `--edge` and `--subtle-foreground` all
+ * resolving to the empty string on a page with no attribute), found on
+ * Storybook's own documentation pages — which render outside the decorator
+ * that stamps the attribute, i.e. the way a consumer who sets nothing does.
  *
- * Measured on a page with no attribute: `--color-base-100` resolved to
- * `#0a0b0d` (daisyUI's default doing its job) while
- * `--muted-foreground`, `--edge` and `--subtle-foreground` all resolved
- * to the empty string. Every `text-muted-foreground`, `border-edge` and
- * `bg-surface-3` on that page therefore computed to nothing — text with
- * no colour, borders with no colour. It is the exact failure
- * `theme-tokens.test.ts` exists to prevent, arriving through a door that
- * test does not watch: the tokens *are* declared, just not reachable.
- *
- * Found on Storybook's own documentation pages, which render outside the
- * decorator that stamps the attribute — i.e. the one place in this
- * repository that renders the library the way a consumer who read that
- * README sentence would.
- *
- * `:root` and `[data-theme="light"]` are both specificity (0,1,0), and
- * the light block is later in this file, so an explicit light theme still
- * wins. Nothing about `[data-theme="dark"]` changes.
+ * `:root` and `[data-theme="light"]` are both specificity (0,1,0), and the
+ * light block is later in this file, so an explicit light theme still wins.
  */
 :root,
 [data-theme="dark"] {
-  --surface-3: #1c1f25;
-  /* One step past the top of the ladder, for `.surface-raised` only (see
-     that rule, in `@theme inline` below): a hover or selected fill on a
-     panel that is itself `surface-3` — a `Dialog`, M3's
-     `SurfaceContainerHigh`. Half the ladder's usual step, and not by
-     taste: `contrast.test.ts` measures every foreground on it, and the
-     ladder's own +6/+7/+8 step (`#22262d`) put `--subtle-foreground` at
-     4.36:1. `#202329` is the largest step that keeps every case at AA
-     (4.52:1, `--subtle-foreground`); one more (`#21242a`) fails it. */
-  --surface-4: #202329;
+  /* <md3:generated theme="dark"> — scripts/generate-md3-colors.ts writes everything up to the closing marker. Do not edit by hand: run `pnpm generate:colors`. */
+  --md-sys-color-background: #0f0c1b;
+  --md-sys-color-on-background: #eae1ff;
+  --md-sys-color-surface: #0f0c1b;
+  --md-sys-color-surface-dim: #0f0c1b;
+  --md-sys-color-surface-bright: #2f2748;
+  --md-sys-color-surface-container-lowest: #000000;
+  --md-sys-color-surface-container-low: #151123;
+  --md-sys-color-surface-container: #1b162c;
+  --md-sys-color-surface-container-high: #221c35;
+  --md-sys-color-surface-container-highest: #28213e;
+  --md-sys-color-on-surface: #eae1ff;
+  --md-sys-color-on-surface-variant: #b0a6ca;
+  --md-sys-color-outline: #797192;
+  --md-sys-color-outline-variant: #4b4362;
+  --md-sys-color-inverse-surface: #fdf7ff;
+  --md-sys-color-inverse-on-surface: #575264;
+  --md-sys-color-primary: #cfcdff;
+  --md-sys-color-primary-dim: #c0bdfe;
+  --md-sys-color-on-primary: #424179;
+  --md-sys-color-primary-container: #c0bdfe;
+  --md-sys-color-on-primary-container: #39386f;
+  --md-sys-color-primary-fixed: #c0bdfe;
+  --md-sys-color-primary-fixed-dim: #b2b0ef;
+  --md-sys-color-on-primary-fixed: #252359;
+  --md-sys-color-on-primary-fixed-variant: #424179;
+  --md-sys-color-inverse-primary: #5a5992;
+  --md-sys-color-secondary: #c0cbac;
+  --md-sys-color-secondary-dim: #b2bd9f;
+  --md-sys-color-on-secondary: #3a432d;
+  --md-sys-color-secondary-container: #202914;
+  --md-sys-color-on-secondary-container: #9da88b;
+  --md-sys-color-secondary-fixed: #eaf5d5;
+  --md-sys-color-secondary-fixed-dim: #dce7c7;
+  --md-sys-color-on-secondary-fixed: #424b34;
+  --md-sys-color-on-secondary-fixed-variant: #5e684f;
+  --md-sys-color-tertiary: #f2ffd0;
+  --md-sys-color-tertiary-dim: #d5f88d;
+  --md-sys-color-on-tertiary: #4c6809;
+  --md-sys-color-tertiary-container: #d5f88d;
+  --md-sys-color-on-tertiary-container: #445f00;
+  --md-sys-color-tertiary-fixed: #dafe92;
+  --md-sys-color-tertiary-fixed-dim: #ccef85;
+  --md-sys-color-on-tertiary-fixed: #384f00;
+  --md-sys-color-on-tertiary-fixed-variant: #516d10;
+  --md-sys-color-error: #fd6f85;
+  --md-sys-color-error-dim: #c8475d;
+  --md-sys-color-on-error: #490013;
+  --md-sys-color-error-container: #8a1632;
+  --md-sys-color-on-error-container: #ff97a3;
+  --md-sys-color-shadow: #000000;
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-surface-tint: #cfcdff;
+  --md-sys-color-surface-variant: #28213e;
+  --md-custom-color-neutral: #afa8bd;
+  --md-custom-color-on-neutral: #322e3e;
+  --md-custom-color-neutral-container: #494456;
+  --md-custom-color-on-neutral-container: #e7dff5;
+  --md-custom-color-progress: #64d3ff;
+  --md-custom-color-on-progress: #003546;
+  --md-custom-color-progress-container: #004d64;
+  --md-custom-color-on-progress-container: #bde9ff;
+  --md-custom-color-success: #41dfa5;
+  --md-custom-color-on-success: #003825;
+  --md-custom-color-success-container: #005138;
+  --md-custom-color-on-success-container: #64fcbf;
+  --md-custom-color-warning: #ffb599;
+  --md-custom-color-on-warning: #5a1c00;
+  --md-custom-color-warning-container: #7d2c04;
+  --md-custom-color-on-warning-container: #ffdbce;
+  --md-custom-color-danger: #ffb1c2;
+  --md-custom-color-on-danger: #66002b;
+  --md-custom-color-danger-container: #871a41;
+  --md-custom-color-on-danger-container: #ffd9df;
+  --md-custom-color-uncertain: #fdb965;
+  --md-custom-color-on-uncertain: #472a00;
+  --md-custom-color-uncertain-container: #653e00;
+  --md-custom-color-on-uncertain-container: #ffddb8;
+  --md-custom-color-expired: #ded6d2;
+  --md-custom-color-on-expired: #34302d;
+  --md-custom-color-expired-container: #4a4643;
+  --md-custom-color-on-expired-container: #e9e1dd;
+  --md-custom-color-parked: #f8acff;
+  --md-custom-color-on-parked: #570067;
+  --md-custom-color-parked-container: #7b0190;
+  --md-custom-color-on-parked-container: #ffd6ff;
+  --state-neutral-fg: #afa8bd;
+  --state-neutral-bg: transparent;
+  --state-neutral-border: transparent;
+  --state-progress-fg: #64d3ff;
+  --state-progress-bg: rgb(100 211 255 / 0.12);
+  --state-progress-border: rgb(100 211 255 / 0.3);
+  --state-success-fg: #41dfa5;
+  --state-success-bg: transparent;
+  --state-success-border: transparent;
+  --state-warning-fg: #ffb599;
+  --state-warning-bg: rgb(255 181 153 / 0.12);
+  --state-warning-border: rgb(255 181 153 / 0.3);
+  --state-danger-fg: #ffb1c2;
+  --state-danger-bg: rgb(255 177 194 / 0.12);
+  --state-danger-border: rgb(255 177 194 / 0.3);
+  --state-uncertain-fg: #fdb965;
+  --state-uncertain-bg: rgb(253 185 101 / 0.12);
+  --state-uncertain-border: rgb(253 185 101 / 0.3);
+  --state-expired-fg: #ded6d2;
+  --state-expired-bg: rgb(222 214 210 / 0.12);
+  --state-expired-border: rgb(222 214 210 / 0.3);
+  --state-parked-fg: #f8acff;
+  --state-parked-bg: rgb(248 172 255 / 0.12);
+  --state-parked-border: rgb(248 172 255 / 0.3);
+  --subtle-foreground: #9087a9;
+  --edge-strong: #5c5575;
+  --ring-subtle: rgb(207 205 255 / 0.24);
+  /* </md3:generated theme="dark"> */
 
-  /* The aurora ramp.
-   *
-   * This is the one place in the system where *chrome* carries hue, and
-   * the first version of this comment claimed the hues were "named
-   * rather than borrowed" so that stayed obvious. That was not true: all
-   * four values were the status palette copy-pasted as literals —
-   * `--state-progress-fg`, `--state-parked-*`'s base, `--ring` and
-   * `--state-success-fg` — with nothing binding them to their sources,
-   * and light borrowed inconsistently on top. Four duplicated literals
-   * with no test is the failure class this changelog already records
-   * four times.
-   *
-   * So: they *are* drawn from the system's own hues, deliberately — a
-   * placeholder should belong to the same world as the thing it stands
-   * in for, not a second invented palette — and `color-mix` binds them
-   * to the real tokens so they cannot drift. What makes them chrome is
-   * not a separate hue but the absence of meaning: no status surface
-   * reads this ramp, and nothing infers state from it.
-   *
-   * Opaque here; each use site applies its own alpha. The skeleton wants
-   * 8–20%, a card glow wants more, and baking alpha into the token made
-   * the second impossible. */
-  --aurora-1: var(--state-progress-fg);
-  --aurora-2: var(--state-parked-fg);
-  /* The arc's third point is mixed rather than borrowed: `--ring` sat
-     between cyan and violet, so four anchors spanned barely a third of
-     the wheel and the drift read as one colour breathing. A magenta
-     between `parked` and `danger` opens it to cyan → violet → magenta →
-     green, which is the arc a real aurora walks. Still derived from the
-     palette, so it cannot drift from it. */
-  --aurora-3: color-mix(in oklab, var(--state-parked-fg) 55%, var(--state-danger-fg));
-  --aurora-4: var(--state-success-fg);
-
+  /* Decorative paint for the skeleton drift and the instrument register;
+     the ramp itself is in the shared block below. Dark spends more alpha
+     than light because the same hue does less on a dark ground. */
   --skeleton-aurora-1: color-mix(in oklab, var(--aurora-1) 30%, transparent);
   --skeleton-aurora-2: color-mix(in oklab, var(--aurora-2) 26%, transparent);
   --skeleton-aurora-3: color-mix(in oklab, var(--aurora-3) 22%, transparent);
   --skeleton-aurora-4: color-mix(in oklab, var(--aurora-4) 14%, transparent);
 
   /* The default drift's paint (§3.8, "the skeleton's chaotic gradient"
-     below). `--color-base-content` carries no hue at all, so the same
-     four-tier falloff the aurora ramp uses — unchanged, on purpose, so
-     this is a hue swap and not a second set of tuned numbers — reads as
-     a brightness texture instead of a tint. */
+     below). `--color-base-content` is `on-surface`, a near-achromatic tone
+     of the neutral palette, so the same four-tier falloff the aurora ramp
+     uses reads as a brightness texture instead of a tint. */
   --skeleton-tonal-1: color-mix(in oklab, var(--color-base-content) 30%, transparent);
   --skeleton-tonal-2: color-mix(in oklab, var(--color-base-content) 26%, transparent);
   --skeleton-tonal-3: color-mix(in oklab, var(--color-base-content) 22%, transparent);
   --skeleton-tonal-4: color-mix(in oklab, var(--color-base-content) 14%, transparent);
-
-  /* Overlay scrim. The only literal colour left in a component after the
-     light theme landed was `bg-black/50`, hardcoded in three places —
-     free in dark, and in light it crushes a near-white page to a dead
-     mid-grey with no way for a theme or a consumer to say otherwise. */
-  --scrim: rgb(0 0 0 / 0.5);
-
-  /* §3.6: borders, not shadows, for cards/tables/panels — only floating
-     layers (popover, dropdown, dialog, tooltip, sheet/drawer) get one. */
-  --shadow-popover: 0 8px 24px -6px rgb(0 0 0 / 0.65), 0 0 0 1px var(--edge);
-  --shadow-dialog: 0 24px 56px -12px rgb(0 0 0 / 0.75), 0 0 0 1px var(--edge);
-
-  --edge-subtle: #1f232a;
-  --edge: #2a2f37;
-  --edge-strong: #3d434d;
-
-  --muted-foreground: #9aa1ac;
-  /* `--subtle-foreground` was #6b727d, which fails WCAG AA on every
-     surface in this system — 4.06:1 on `--background` down to 3.40:1 on
-     `--surface-3`, against the 4.5:1 normal text requires. It is used in
-     38 places, all of them at `--text-caption` (12px) or `--text-micro`
-     (11px), so the normal-text bar is the right one; none of them are
-     large enough for the 3:1 exception.
-     
-     Found by the accessibility addon on a Storybook story, not by
-     inspection — the fourteen weekday headers of a two-month calendar
-     all failing at once is what made a token-level problem visible.
-     
-     #838a95 is the minimum that clears AA on the worst case (4.74:1 on
-     `--surface-3`, 5.66:1 on `--background`). It does compress the
-     three-tier ladder: the gap to `--muted-foreground` goes from ΔE 18.2
-     to 8.8, still comfortably above the ~2-3 where two greys stop being
-     told apart, but the dimmest tier is now less dim than it was. That
-     is a real visual change and it is deliberate — a design system
-     cannot ship text below AA and call the contrast a style choice. */
-  --subtle-foreground: #838a95;
-
-  --ring: #5b8def;
-  --ring-subtle: rgb(91 141 239 / 0.24);
-
-  --destructive: #e5534b;
-  --destructive-foreground: #ffffff;
-
-  /* §4.4 — the eleven-state status system's only saturated colours. */
-  --state-neutral-fg: #9aa1ac;
-  --state-neutral-bg: transparent;
-  --state-neutral-border: transparent;
-
-  --state-success-fg: #4ade80;
-  --state-success-bg: transparent;
-  --state-success-border: transparent;
-
-  --state-danger-fg: #fca5a5;
-  --state-danger-bg: rgb(248 113 113 / 0.1);
-  --state-danger-border: rgb(248 113 113 / 0.28);
-
-  --state-uncertain-fg: #fcd34d;
-  --state-uncertain-bg: rgb(251 191 36 / 0.1);
-  --state-uncertain-border: rgb(251 191 36 / 0.28);
-
-  --state-expired-fg: #a8a29e;
-  --state-expired-bg: rgb(168 162 158 / 0.1);
-  --state-expired-border: rgb(168 162 158 / 0.26);
-
-  --state-parked-fg: #c4b5fd;
-  --state-parked-bg: rgb(167 139 250 / 0.1);
-  --state-parked-border: rgb(167 139 250 / 0.28);
-
-  /* `warning` was referenced by `StateChip`'s own `warning` tone and by
-     `InlineBanner`'s `warning` variant (and therefore by every
-     `StaleWriteBanner` in the console) from the day both shipped, but the
-     trio was never declared here — so `text-state-warning-fg` &c.
-     generated no utility at all and those surfaces rendered with no
-     colour. Exactly the failure this file's own `--color-surface-1`
-     comment above describes, found the same way: by checking the token
-     list against what components actually reference, not by looking at a
-     screen. `theme-tokens.test.ts` now fails the build on a recurrence.
-
-     Must stay visibly distinct from `uncertain` even though both read as
-     "attention": `uncertain` means the outcome is unknown, `warning`
-     means a recoverable condition needs a human. Two states that look
-     the same are exactly what the silhouette/mark/fill redundancy in
-     §4.3 exists to avoid, and a hue collision undoes it.
-
-     Measured, not eyeballed — the first value tried here was `#fbbf24`,
-     which is 3 degrees of hue and ΔE 13 from `uncertain`'s own
-     `#fcd34d`: the same colour, for practical purposes, inside a 14px
-     glyph, and the comment justifying it ("orange keeps them separable")
-     described a colour it was not. `#fdba74` (orange-300) is ΔE 29 from
-     `uncertain`, 35 from `danger` and 47 from `expired`, so it collides
-     with nothing, and it is built the way every sibling here is — a
-     300-level tint for the foreground, its 400-level neighbour at
-     10%/28% for the fill and border. Contrast against `--background` is
-     11.7:1, in line with the 10-13 the other foreground tokens carry. */
-  --state-warning-fg: #fdba74;
-  --state-warning-bg: rgb(251 146 60 / 0.1);
-  --state-warning-border: rgb(251 146 60 / 0.28);
-
-  /* `progress` — running, outcome not yet known. Added because the hue
-     axis had no value for the one state every state machine spends most
-     of its time in: seven hues, five of which mean trouble or stasis, one
-     of which (`success`) is terminal, leaving `neutral` to cover both
-     "still moving" and "over, and there is nothing to see". The status
-     system's own §4.4 rule — two states that mean different things must
-     not look the same — is the same rule that separated `expired` and
-     `parked` from `neutral`, and "is it over?" is the axis it matters
-     most on.
-
-     Built like every tinted sibling here: a 300-level tint for the
-     foreground, its 400-level neighbour at 10%/28% for the fill and
-     border.
-
-     **This is the one token in this file that sits close to §1.3's "blue
-     is selection-only, never a status hue".** Taken deliberately, and
-     measured rather than argued: the cyan gap (Lab hue 212°, chroma 36)
-     is 71° of hue and dE2000 32.2 from the selection ring's own `#5b8def`
-     (Lab hue 283°, chroma 56), which is further apart than `warning` sits
-     from `uncertain` (29) — the separation this file already accepted as
-     sufficient. The two also never share a surface: `--ring` renders only
-     as a 2px outline offset outside a focused element, never as a glyph
-     or as text. Nearest status sibling is `neutral` at dE2000 25.3;
-     `success` is 31.0 away, which is the collision that actually matters
-     on a payments table and the reason teal-300 was rejected (16.9 from
-     `success` — near enough to be the same colour inside a 14px glyph,
-     the same failure mode `--state-warning-fg`'s own comment records).
-     Contrast on `--background` is 13.6:1, at the top of the 10.4-13.7
-     band the other foreground tokens occupy. A maintainer who reads
-     §1.3 more strictly than this should say so — the measurement is here
-     to be disagreed with, not to settle it by assertion. */
-  --state-progress-fg: #67e8f9;
-  --state-progress-bg: rgb(34 211 238 / 0.1);
-  --state-progress-border: rgb(34 211 238 / 0.28);
 }
 
 /*
@@ -1091,7 +948,8 @@
  * consuming stylesheet there is no built-in left to collide with.
  *
  * Not `default: true`. `dark` keeps that, so nothing changes for a
- * consumer who never sets the attribute.
+ * consumer who never sets the attribute. The mapping is the dark block's,
+ * key for key: the roles it points at are what differ.
  */
 @plugin "daisyui/theme" {
   name: "light";
@@ -1099,171 +957,274 @@
   prefersdark: false;
   color-scheme: light;
 
-  /* The dark ladder inverted and kept slightly blue-biased, so the greys
-     read as chosen rather than as stock neutrals — pure white would sit
-     oddly beside a status palette this cool. */
-  --color-base-100: #fcfcfd;
-  --color-base-200: #f4f6f8;
-  --color-base-300: #eceef2;
-  --color-base-content: #14171c;
+  --color-base-100: var(--md-sys-color-surface);
+  --color-base-200: var(--md-sys-color-surface-container-low);
+  --color-base-300: var(--md-sys-color-surface-container);
+  --color-base-content: var(--md-sys-color-on-surface);
 
-  /* §1.3 holds in both themes: one achromatic accent, never a hue. */
-  --color-primary: #14171c;
-  --color-primary-content: #fcfcfd;
-  --color-secondary: #14171c;
-  --color-secondary-content: #fcfcfd;
-  --color-accent: #14171c;
-  --color-accent-content: #fcfcfd;
-  --color-neutral: #e1e5ea;
-  --color-neutral-content: #14171c;
+  --color-primary: var(--md-sys-color-primary);
+  --color-primary-content: var(--md-sys-color-on-primary);
+  --color-secondary: var(--md-sys-color-secondary);
+  --color-secondary-content: var(--md-sys-color-on-secondary);
+  --color-accent: var(--md-sys-color-tertiary);
+  --color-accent-content: var(--md-sys-color-on-tertiary);
+  --color-neutral: var(--md-sys-color-surface-container-highest);
+  --color-neutral-content: var(--md-sys-color-on-surface);
 
-  /* info stays achromatic grey for the same reason it does in dark: blue
-     is selection-only and never a status hue. */
-  --color-info: #4e5666;
-  --color-info-content: #fcfcfd;
-  --color-success: #166534;
-  --color-success-content: #ffffff;
-  --color-warning: #9a3412;
-  --color-warning-content: #ffffff;
-  --color-error: #c02626;
-  --color-error-content: #ffffff;
+  --color-info: var(--state-neutral-fg);
+  --color-info-content: var(--md-sys-color-surface);
+  --color-success: var(--state-success-fg);
+  --color-success-content: var(--md-custom-color-on-success);
+  --color-warning: var(--state-warning-fg);
+  --color-warning-content: var(--md-custom-color-on-warning);
+  --color-error: var(--md-sys-color-error);
+  --color-error-content: var(--md-sys-color-on-error);
 
-  --radius-selector: 8px;
-  --radius-field: 12px;
-  --radius-box: 20px;
+  --radius-selector: var(--md-sys-shape-corner-small);
+  --radius-field: var(--md-sys-shape-corner-extra-small);
+  --radius-box: var(--md-sys-shape-corner-medium);
   --size-selector: 0.25rem;
-  /* Density axis (D10) — see the standalone "Density register" block below
-     this theme's closing brace for the full derivation, and
-     "`--size-field`, corrected" further down that same block for where
-     the formula itself lives now. It used to be declared right here, at
-     the theme root — the exact defect that block fixes: a custom
-     property's `calc()` only re-evaluates at the element where it is
-     *declared*, so a formula pinned to the theme root freezes against
-     whatever `--density` the root resolves to and never re-reads a
-     descendant's own `[data-density="comfortable"]` override.
-     `--size-field` is declared on `.input`/`.select`/`.btn` themselves
-     now, for the same reason `.btn-sm` already was. */
+  /* Density axis (D10): `--size-field` is declared on `.input`/`.select`/
+     `.btn` themselves, not here — see the dark block's note. */
   --border: 1px;
   --depth: 0;
   --noise: 0;
 }
 
-/*
- * Light's own extra tokens, mirroring the dark block above key for key.
- *
- * Every foreground here was derived against `contrast.test.ts` rather
- * than chosen and then checked — see this file's header. The worst case
- * in the set is `expired` at 4.71:1 on `--surface-3`, the darkest ground
- * a foreground has to survive; the rest sit between 4.97 and 5.99.
- */
 [data-theme="light"] {
-  --surface-3: #e1e5ea;
-  /* Dark's `--surface-4`, mirrored, and bounded the same way: the
-     ladder's own −11 step (`#d6dbe1`) put `--subtle-foreground` at 4.35:1
-     and the loud `progress` and `uncertain` pills under AA over their
-     tints. `#dce0e5` is the largest step that keeps every case at AA
-     (worst: loud `progress`, 4.51:1); one more (`#dbdfe4`) fails it. */
-  --surface-4: #dce0e5;
-
-  /* Cooler and far softer than dark's. A near-black shadow on a light
-     ground reads as dirt; the hue-matched slate at low alpha reads as
-     depth. */
-  --shadow-popover: 0 8px 24px -6px rgb(20 23 28 / 0.14), 0 0 0 1px var(--edge);
-  --shadow-dialog: 0 24px 56px -12px rgb(20 23 28 / 0.2), 0 0 0 1px var(--edge);
-
-  --edge-subtle: #e6e9ee;
-  --edge: #d5dae2;
-  --edge-strong: #b4bcc8;
-
-  --muted-foreground: #4e5666;
-  --subtle-foreground: #5b6371;
-
-  --ring: #2563eb;
-  --ring-subtle: rgb(37 99 235 / 0.18);
-
-  --destructive: #c02626;
-  --destructive-foreground: #ffffff;
-
-  /* The eight status hues at their light weights. `neutral` and `success`
-     keep `transparent` for fill and border in both themes — quiet is a
-     property of the hue vocabulary, not of the palette, and `isQuietHue`
-     in `status-tokens.ts` is the single place that fact is written down. */
-  --state-neutral-fg: #475569;
+  /* <md3:generated theme="light"> — scripts/generate-md3-colors.ts writes everything up to the closing marker. Do not edit by hand: run `pnpm generate:colors`. */
+  --md-sys-color-background: #fdf7ff;
+  --md-sys-color-on-background: #362c55;
+  --md-sys-color-surface: #fdf7ff;
+  --md-sys-color-surface-dim: #e0d4ff;
+  --md-sys-color-surface-bright: #fdf7ff;
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #f8f1ff;
+  --md-sys-color-surface-container: #f2eaff;
+  --md-sys-color-surface-container-high: #ede4ff;
+  --md-sys-color-surface-container-highest: #e8deff;
+  --md-sys-color-on-surface: #362c55;
+  --md-sys-color-on-surface-variant: #635984;
+  --md-sys-color-outline: #7f74a2;
+  --md-sys-color-outline-variant: #b7abdc;
+  --md-sys-color-inverse-surface: #100b1f;
+  --md-sys-color-inverse-on-surface: #a199b4;
+  --md-sys-color-primary: #5755a9;
+  --md-sys-color-primary-dim: #4b499c;
+  --md-sys-color-on-primary: #fbf7ff;
+  --md-sys-color-primary-container: #bdbaff;
+  --md-sys-color-on-primary-container: #343184;
+  --md-sys-color-primary-fixed: #bdbaff;
+  --md-sys-color-primary-fixed-dim: #adabff;
+  --md-sys-color-on-primary-fixed: #1e186e;
+  --md-sys-color-on-primary-fixed-variant: #3d3a8d;
+  --md-sys-color-inverse-primary: #a19ff9;
+  --md-sys-color-secondary: #54643e;
+  --md-sys-color-secondary-dim: #485833;
+  --md-sys-color-on-secondary: #efffd3;
+  --md-sys-color-secondary-container: #e5f8c6;
+  --md-sys-color-on-secondary-container: #4f5f3a;
+  --md-sys-color-secondary-fixed: #e5f8c6;
+  --md-sys-color-secondary-fixed-dim: #d6e9b9;
+  --md-sys-color-on-secondary-fixed: #3d4d29;
+  --md-sys-color-on-secondary-fixed-variant: #596a43;
+  --md-sys-color-tertiary: #4c6809;
+  --md-sys-color-tertiary-dim: #415b00;
+  --md-sys-color-on-tertiary: #f0ffcd;
+  --md-sys-color-tertiary-container: #dafe92;
+  --md-sys-color-on-tertiary-container: #476303;
+  --md-sys-color-tertiary-fixed: #dafe92;
+  --md-sys-color-tertiary-fixed-dim: #ccef85;
+  --md-sys-color-on-tertiary-fixed: #384f00;
+  --md-sys-color-on-tertiary-fixed-variant: #516d10;
+  --md-sys-color-error: #ac3149;
+  --md-sys-color-error-dim: #770326;
+  --md-sys-color-on-error: #fff7f7;
+  --md-sys-color-error-container: #f76a80;
+  --md-sys-color-on-error-container: #68001f;
+  --md-sys-color-shadow: #000000;
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-surface-tint: #5755a9;
+  --md-sys-color-surface-variant: #e8deff;
+  --md-custom-color-neutral: #615b74;
+  --md-custom-color-on-neutral: #ffffff;
+  --md-custom-color-neutral-container: #e7defc;
+  --md-custom-color-on-neutral-container: #1d182e;
+  --md-custom-color-progress: #00617d;
+  --md-custom-color-on-progress: #ffffff;
+  --md-custom-color-progress-container: #bde9ff;
+  --md-custom-color-on-progress-container: #001f2a;
+  --md-custom-color-success: #006747;
+  --md-custom-color-on-success: #ffffff;
+  --md-custom-color-success-container: #64fcbf;
+  --md-custom-color-on-success-container: #002114;
+  --md-custom-color-warning: #963e17;
+  --md-custom-color-on-warning: #ffffff;
+  --md-custom-color-warning-container: #ffdbce;
+  --md-custom-color-on-warning-container: #370e00;
+  --md-custom-color-danger: #a02f53;
+  --md-custom-color-on-danger: #ffffff;
+  --md-custom-color-danger-container: #ffd9df;
+  --md-custom-color-on-danger-container: #3f0018;
+  --md-custom-color-uncertain: #7f4f00;
+  --md-custom-color-on-uncertain: #ffffff;
+  --md-custom-color-uncertain-container: #ffddb8;
+  --md-custom-color-on-uncertain-container: #2a1700;
+  --md-custom-color-expired: #4a4643;
+  --md-custom-color-on-expired: #ffffff;
+  --md-custom-color-expired-container: #e9e1dd;
+  --md-custom-color-on-expired-container: #1e1b19;
+  --md-custom-color-parked: #9125a5;
+  --md-custom-color-on-parked: #ffffff;
+  --md-custom-color-parked-container: #ffd6ff;
+  --md-custom-color-on-parked-container: #350040;
+  --state-neutral-fg: #615b74;
   --state-neutral-bg: transparent;
   --state-neutral-border: transparent;
-
-  --state-progress-fg: #036672;
-  --state-progress-bg: rgb(3 102 114 / 0.08);
-  --state-progress-border: rgb(3 102 114 / 0.24);
-
-  --state-success-fg: #166534;
+  --state-progress-fg: #00617d;
+  --state-progress-bg: rgb(0 97 125 / 0.08);
+  --state-progress-border: rgb(0 97 125 / 0.24);
+  --state-success-fg: #006747;
   --state-success-bg: transparent;
   --state-success-border: transparent;
+  --state-warning-fg: #963e17;
+  --state-warning-bg: rgb(150 62 23 / 0.08);
+  --state-warning-border: rgb(150 62 23 / 0.24);
+  --state-danger-fg: #a02f53;
+  --state-danger-bg: rgb(160 47 83 / 0.08);
+  --state-danger-border: rgb(160 47 83 / 0.24);
+  --state-uncertain-fg: #7f4f00;
+  --state-uncertain-bg: rgb(127 79 0 / 0.08);
+  --state-uncertain-border: rgb(127 79 0 / 0.24);
+  --state-expired-fg: #4a4643;
+  --state-expired-bg: rgb(74 70 67 / 0.08);
+  --state-expired-border: rgb(74 70 67 / 0.24);
+  --state-parked-fg: #9125a5;
+  --state-parked-bg: rgb(145 37 165 / 0.08);
+  --state-parked-border: rgb(145 37 165 / 0.24);
+  --subtle-foreground: #6a5f8b;
+  --edge-strong: #b6aadb;
+  --ring-subtle: rgb(87 85 169 / 0.18);
+  /* </md3:generated theme="light"> */
 
-  --state-warning-fg: #9a3412;
-  --state-warning-bg: rgb(154 52 18 / 0.08);
-  --state-warning-border: rgb(154 52 18 / 0.24);
+  /* Same ramp as dark, and deliberately NOT lightened toward white.
 
-  /* Darker than the flat check alone required. `#be123c` cleared 4.97:1
-     on the bare `--surface-3` and only 4.36:1 once its own 8% fill was
-     composited under the label — the *loud* pill case, which the gate
-     did not measure until it was extended to. `#a80f35` clears 5.20:1
-     composited and stays ΔE 26 from `warning`. */
-  --state-danger-fg: #a80f35;
-  --state-danger-bg: rgb(168 15 53 / 0.08);
-  --state-danger-border: rgb(168 15 53 / 0.24);
-
-  --state-uncertain-fg: #854d0e;
-  --state-uncertain-bg: rgb(133 77 14 / 0.08);
-  --state-uncertain-border: rgb(133 77 14 / 0.24);
-
-  /* Same correction as `danger`: 4.71:1 flat, 4.29:1 loud. `#5c544e`
-     clears 5.24:1 composited and holds ΔE 18 from `neutral`, the pair
-     this palette has always had to work hardest to keep apart. */
-  --state-expired-fg: #5c544e;
-  --state-expired-bg: rgb(92 84 78 / 0.08);
-  --state-expired-border: rgb(92 84 78 / 0.24);
-
-  --state-parked-fg: #6d28d9;
-  --state-parked-bg: rgb(109 40 217 / 0.08);
-  --state-parked-border: rgb(109 40 217 / 0.24);
-
-  /* Same ramp, bound the same way — and deliberately NOT lightened.
-
-     The obvious idea here is wrong, and it was tried and measured before
-     being rejected. The light theme's `--state-*-fg` values are dark,
-     because they are chosen to clear 4.5:1 as **text** on a near-white
-     page, and a glow carries no text — so mixing each stop toward white
-     "to free it from a type constraint" looks like the principled move.
-     Rendered, it is the opposite: a tint mixed toward white sits *closer*
-     to a white ground, so every stop lost the contrast that made it
-     visible at all and the mesh went from green-and-lilac to flat grey.
-     On a light ground, saturation against the ground is the whole budget.
-
-     So light keeps the darker, more chromatic values and spends its
-     budget on alpha instead — lower than dark's, because the same values
-     do more work here (at dark's strengths the light skeleton reads as
-     periwinkle rather than as a tint), but not so low that the hues stop
-     separating. `.aurora-glow` carries its own light-theme override for
-     the same reason. */
-  --aurora-1: var(--state-progress-fg);
-  --aurora-2: var(--state-parked-fg);
-  --aurora-3: color-mix(in oklab, var(--state-parked-fg) 55%, var(--state-danger-fg));
-  --aurora-4: var(--state-success-fg);
-
+     The light status foregrounds are dark, because they clear 4.5:1 as
+     **text** on a near-white page, and a glow carries no text — so mixing
+     each stop toward white "to free it from a type constraint" looks like
+     the principled move. Rendered, it is the opposite: a tint mixed toward
+     white sits *closer* to a white ground, so every stop lost the contrast
+     that made it visible at all and the mesh went flat grey. On a light
+     ground, saturation against the ground is the whole budget, so light
+     spends it on alpha instead — lower than dark's, because the same
+     values do more work here. `.aurora-glow` carries its own light-theme
+     override for the same reason. */
   --skeleton-aurora-1: color-mix(in oklab, var(--aurora-1) 20%, transparent);
   --skeleton-aurora-2: color-mix(in oklab, var(--aurora-2) 17%, transparent);
   --skeleton-aurora-3: color-mix(in oklab, var(--aurora-3) 15%, transparent);
   --skeleton-aurora-4: color-mix(in oklab, var(--aurora-4) 10%, transparent);
 
-  /* Same falloff as dark's, reused unchanged — see the dark block's
-     comment on `--skeleton-tonal-1`. */
   --skeleton-tonal-1: color-mix(in oklab, var(--color-base-content) 20%, transparent);
   --skeleton-tonal-2: color-mix(in oklab, var(--color-base-content) 17%, transparent);
   --skeleton-tonal-3: color-mix(in oklab, var(--color-base-content) 15%, transparent);
   --skeleton-tonal-4: color-mix(in oklab, var(--color-base-content) 10%, transparent);
+}
 
-  --scrim: rgb(20 23 28 / 0.32);
+/*
+ * The library's own tokens, mapped onto M3 roles — once, for every theme.
+ *
+ * Declared on `[data-theme]` as well as `:root` so the mapping re-resolves
+ * on any element that carries a theme: a custom property's `var()` is
+ * substituted where the property is *declared*, so a mapping declared only
+ * on `:root` would hand a nested `data-theme="light"` subtree dark values,
+ * computed once at the root and inherited. Nothing here differs by theme;
+ * the roles it points at do.
+ *
+ * # The surface ladder
+ *
+ * `base-100/200/300` (the daisyUI block) are M3's `surface`,
+ * `surface-container-low` and `surface-container`. `--surface-3` — the row
+ * hover, pressed and selected fill, and a `Dialog`'s panel, which M3 fills
+ * with `SurfaceContainerHigh` (`DialogTokens.ContainerColor`) — is
+ * `surface-container-high`. `--surface-4` is where `surface-3` steps to
+ * inside `.surface-raised` (see that utility), `surface-container-highest`.
+ * Five library steps, the five M3 containers above the page, in order.
+ *
+ * # Edges
+ *
+ * - `--edge-subtle` — a hairline inside a surface (table row dividers):
+ *   `surface-container-highest`, one step past the ladder.
+ * - `--edge` — the default container border: `outline-variant`, M3's role
+ *   for dividers and outlined cards (`OutlinedCardTokens.OutlineColor`).
+ * - `--edge-strong` — selection-control and pending-pill borders. M3's role
+ *   for that is `outline`, and `outline` is the one role this library
+ *   cannot ship as chrome: it measures 18.8 (dark) and 12.5 (light) from
+ *   the `neutral` status grey, under the ΔE2000 30 floor
+ *   `hct-neutrals.test.ts` holds every surface and edge to. So it is
+ *   generated: the neutral-variant tone (the palette both outline roles
+ *   come from) nearest `outline` that clears the floor.
+ *
+ * # Text tiers
+ *
+ * `--color-base-content` is `on-surface`; `--muted-foreground` is
+ * `on-surface-variant`. M3 stops at two, and this library has always had a
+ * third for metadata, so `--subtle-foreground` is generated: the dimmest
+ * neutral-variant tone that still clears AA on every surface step.
+ *
+ * # Focus, error, scrim, shadows
+ *
+ * `--ring` is `primary`. M3 draws its focus indicator in `secondary`
+ * (`FocusIndicatorColor` in every component token file), and at this seed
+ * Expressive rotates `secondary` into the olive band beside `success` —
+ * the header has the measurement. A focus ring is selection, and selection
+ * is the seed's hue. `--destructive` is `error`. The scrim is M3's: the
+ * `scrim` role (black) at 32%.
+ */
+:root,
+[data-theme] {
+  --surface-3: var(--md-sys-color-surface-container-high);
+  --surface-4: var(--md-sys-color-surface-container-highest);
+
+  --edge-subtle: var(--md-sys-color-surface-container-highest);
+  --edge: var(--md-sys-color-outline-variant);
+
+  --muted-foreground: var(--md-sys-color-on-surface-variant);
+
+  --ring: var(--md-sys-color-primary);
+
+  --destructive: var(--md-sys-color-error);
+  --destructive-foreground: var(--md-sys-color-on-error);
+
+  --scrim: color-mix(in srgb, var(--md-sys-color-scrim) 32%, transparent);
+
+  /* M3 elevation, as the design kit's two-layer drop shadows (key 30%,
+     ambient 15%): menus and popovers sit at level 2
+     (`MenuTokens.ContainerElevation`), dialogs and snackbars at level 3
+     (`DialogTokens`/`SnackbarTokens`). Plus the `--edge` hairline this
+     library has always put on a floating layer: it lands on grounds it
+     does not know, and a black shadow on a near-black page is invisible. */
+  --md-sys-elevation-level1: 0 1px 2px 0 rgb(0 0 0 / 0.3), 0 1px 3px 1px rgb(0 0 0 / 0.15);
+  --md-sys-elevation-level2: 0 1px 2px 0 rgb(0 0 0 / 0.3), 0 2px 6px 2px rgb(0 0 0 / 0.15);
+  --md-sys-elevation-level3: 0 1px 3px 0 rgb(0 0 0 / 0.3), 0 4px 8px 3px rgb(0 0 0 / 0.15);
+  --shadow-popover: var(--md-sys-elevation-level2), 0 0 0 1px var(--edge);
+  --shadow-dialog: var(--md-sys-elevation-level3), 0 0 0 1px var(--edge);
+
+  /* The aurora ramp — the one place *chrome* carries hue, and it carries
+     the status hues on purpose: a placeholder should belong to the same
+     world as the thing it stands in for, and `color-mix` binds every stop
+     to a real token so the ramp cannot drift from the palette. What makes
+     it chrome is the absence of meaning: no status surface reads this
+     ramp, and nothing infers state from it. It is deliberately *not* the
+     seed's primary: that is the interactive hue, and a glow is not a
+     control.
+
+     The third stop is mixed rather than borrowed so the arc spans the
+     wheel — cyan → fuchsia → rose → green — instead of two neighbours
+     breathing. Opaque here; each use site applies its own alpha. */
+  --aurora-1: var(--state-progress-fg);
+  --aurora-2: var(--state-parked-fg);
+  --aurora-3: color-mix(in oklab, var(--state-parked-fg) 55%, var(--state-danger-fg));
+  --aurora-4: var(--state-success-fg);
 }
 
 /*
@@ -1345,6 +1306,23 @@
   --color-state-progress-fg: var(--state-progress-fg);
   --color-state-progress-bg: var(--state-progress-bg);
   --color-state-progress-border: var(--state-progress-border);
+
+  /* The M3 roles components paint with directly, under their spec names
+     (`bg-primary-container`, `text-on-surface-variant`,
+     `bg-inverse-surface`, …). Only roles some component in this package
+     reads are registered — Tailwind emits nothing for an unused one, and a
+     registered name nobody uses is a name a reader has to check for. The
+     full set is still there as `--md-sys-color-*` for consumers. The
+     secondary and tertiary families are absent on purpose: the header
+     explains why no component paints them. */
+  --color-surface-container-low: var(--md-sys-color-surface-container-low);
+  --color-primary-container: var(--md-sys-color-primary-container);
+  --color-on-primary-container: var(--md-sys-color-on-primary-container);
+  --color-on-surface: var(--md-sys-color-on-surface);
+  --color-on-surface-variant: var(--md-sys-color-on-surface-variant);
+  --color-surface-container-highest: var(--md-sys-color-surface-container-highest);
+  --color-inverse-surface: var(--md-sys-color-inverse-surface);
+  --color-outline-variant: var(--md-sys-color-outline-variant);
 }
 
 /*
@@ -1362,10 +1340,9 @@
  * inside). So inside this class `surface-1` reads as `surface-2`,
  * `surface-2` as `surface-3` and `surface-3` as `--surface-4`, one step
  * past the top of the ladder. Relative order — resting, hover, selected —
- * is what components communicate with, and that is preserved; the step
- * itself is half the ladder's (contrast 1.049 between `surface-3` and
- * `--surface-4`, against 1.076 between `surface-2` and `surface-3`),
- * because `--surface-4` is bounded by the contrast gate. daisyUI's own
+ * is what components communicate with, and that is preserved — the step is
+ * M3's own, `surface-container-high` to `surface-container-highest`, and
+ * `contrast.test.ts` measures every foreground on it. daisyUI's own
  * reads of `--color-base-200/300` move with it — a disabled input's fill
  * and border, the ghost and secondary buttons' hover — in the same order.
  *
@@ -1395,232 +1372,363 @@
 }
 
 /*
- * Theme-invariant tokens: radius, fonts, type scale. Redeclaring Tailwind's
- * own `--radius-sm` / `--radius-md` / `--font-sans` / `--font-mono` /
- * `--text-*` keys overrides Tailwind's stock scale app-wide, which is the
- * point — `rounded-sm` now literally means 12px everywhere, not Tailwind's
- * default 0.125rem. D8: aliased onto the same register as
- * `--radius-field`/`--radius-box` above so `rounded-sm`/`rounded-md` read
- * consistently with daisyUI's own `rounded-field`/`rounded-box` utilities
- * rather than reintroducing a fourth, disconnected scale.
+ * Theme-invariant M3 system tokens: the corner scale and the type scale.
+ *
+ * Plain custom properties on `:root`, not `@theme`, so they reach a
+ * consumer as `--md-sys-*` exactly as M3 names them without Tailwind
+ * generating a utility per token. The Tailwind scales in the `@theme` block
+ * below are mapped onto them.
+ *
+ * Both are transcribed from androidx-main's
+ * `compose/material3/material3/src/commonMain/kotlin/androidx/compose/
+ * material3/tokens/` at commit 4611dbdb89a41bbe5d61199c155ca67da4987d81:
+ * `ShapeTokens.kt` for the corners, `TypeScaleTokens.kt` for the type
+ * (sizes and line heights in sp, read 1:1 as px; tracking in sp, also px).
+ */
+:root {
+  /* The full M3 Expressive corner scale: the baseline steps plus the
+     Expressive "increased" ones (`large-increased`,
+     `extra-large-increased`, `extra-extra-large`). */
+  --md-sys-shape-corner-none: 0px;
+  --md-sys-shape-corner-extra-small: 4px;
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-large: 16px;
+  --md-sys-shape-corner-large-increased: 20px;
+  --md-sys-shape-corner-extra-large: 28px;
+  --md-sys-shape-corner-extra-large-increased: 32px;
+  --md-sys-shape-corner-extra-extra-large: 48px;
+  --md-sys-shape-corner-full: 9999px;
+
+  /* Type. M3 names two faces — *brand* (display, headline, title-large)
+     and *plain* (everything else) — and the vaam-apps house face, Roboto
+     Flex, is both, as it is on the docs hub (`vitepress-md3`). The stacks
+     fall back through the system faces when a consumer has not loaded it.
+
+     Each role's *emphasized* variant is the same size and line height at
+     the next weight up (Regular → Medium, Medium → Bold) with its own
+     tracking — `TypeScaleTokens.kt`'s `*Emphasized*` entries, which that
+     file itself flags `// TODO update with the generated tokens once
+     available`: provisional upstream, so read them as Google's current
+     intent rather than a frozen spec. */
+  --md-sys-typescale-brand-font:
+    "Roboto Flex", "Roboto Flex Variable", Roboto, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --md-sys-typescale-plain-font:
+    "Roboto Flex", "Roboto Flex Variable", Roboto, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --md-sys-typescale-display-large-font: var(--md-sys-typescale-brand-font);
+  --md-sys-typescale-display-large-size: 57px;
+  --md-sys-typescale-display-large-line-height: 64px;
+  --md-sys-typescale-display-large-tracking: -0.2px;
+  --md-sys-typescale-display-large-weight: 400;
+  --md-sys-typescale-emphasized-display-large-weight: 500;
+  --md-sys-typescale-emphasized-display-large-tracking: 0px;
+  --md-sys-typescale-display-medium-font: var(--md-sys-typescale-brand-font);
+  --md-sys-typescale-display-medium-size: 45px;
+  --md-sys-typescale-display-medium-line-height: 52px;
+  --md-sys-typescale-display-medium-tracking: 0px;
+  --md-sys-typescale-display-medium-weight: 400;
+  --md-sys-typescale-emphasized-display-medium-weight: 500;
+  --md-sys-typescale-emphasized-display-medium-tracking: 0px;
+  --md-sys-typescale-display-small-font: var(--md-sys-typescale-brand-font);
+  --md-sys-typescale-display-small-size: 36px;
+  --md-sys-typescale-display-small-line-height: 44px;
+  --md-sys-typescale-display-small-tracking: 0px;
+  --md-sys-typescale-display-small-weight: 400;
+  --md-sys-typescale-emphasized-display-small-weight: 500;
+  --md-sys-typescale-emphasized-display-small-tracking: 0px;
+  --md-sys-typescale-headline-large-font: var(--md-sys-typescale-brand-font);
+  --md-sys-typescale-headline-large-size: 32px;
+  --md-sys-typescale-headline-large-line-height: 40px;
+  --md-sys-typescale-headline-large-tracking: 0px;
+  --md-sys-typescale-headline-large-weight: 400;
+  --md-sys-typescale-emphasized-headline-large-weight: 500;
+  --md-sys-typescale-emphasized-headline-large-tracking: 0px;
+  --md-sys-typescale-headline-medium-font: var(--md-sys-typescale-brand-font);
+  --md-sys-typescale-headline-medium-size: 28px;
+  --md-sys-typescale-headline-medium-line-height: 36px;
+  --md-sys-typescale-headline-medium-tracking: 0px;
+  --md-sys-typescale-headline-medium-weight: 400;
+  --md-sys-typescale-emphasized-headline-medium-weight: 500;
+  --md-sys-typescale-emphasized-headline-medium-tracking: 0px;
+  --md-sys-typescale-headline-small-font: var(--md-sys-typescale-brand-font);
+  --md-sys-typescale-headline-small-size: 24px;
+  --md-sys-typescale-headline-small-line-height: 32px;
+  --md-sys-typescale-headline-small-tracking: 0px;
+  --md-sys-typescale-headline-small-weight: 400;
+  --md-sys-typescale-emphasized-headline-small-weight: 500;
+  --md-sys-typescale-emphasized-headline-small-tracking: 0px;
+  --md-sys-typescale-title-large-font: var(--md-sys-typescale-brand-font);
+  --md-sys-typescale-title-large-size: 22px;
+  --md-sys-typescale-title-large-line-height: 28px;
+  --md-sys-typescale-title-large-tracking: 0px;
+  --md-sys-typescale-title-large-weight: 400;
+  --md-sys-typescale-emphasized-title-large-weight: 500;
+  --md-sys-typescale-emphasized-title-large-tracking: 0px;
+  --md-sys-typescale-title-medium-font: var(--md-sys-typescale-plain-font);
+  --md-sys-typescale-title-medium-size: 16px;
+  --md-sys-typescale-title-medium-line-height: 24px;
+  --md-sys-typescale-title-medium-tracking: 0.2px;
+  --md-sys-typescale-title-medium-weight: 500;
+  --md-sys-typescale-emphasized-title-medium-weight: 700;
+  --md-sys-typescale-emphasized-title-medium-tracking: 0.15px;
+  --md-sys-typescale-title-small-font: var(--md-sys-typescale-plain-font);
+  --md-sys-typescale-title-small-size: 14px;
+  --md-sys-typescale-title-small-line-height: 20px;
+  --md-sys-typescale-title-small-tracking: 0.1px;
+  --md-sys-typescale-title-small-weight: 500;
+  --md-sys-typescale-emphasized-title-small-weight: 700;
+  --md-sys-typescale-emphasized-title-small-tracking: 0.1px;
+  --md-sys-typescale-body-large-font: var(--md-sys-typescale-plain-font);
+  --md-sys-typescale-body-large-size: 16px;
+  --md-sys-typescale-body-large-line-height: 24px;
+  --md-sys-typescale-body-large-tracking: 0.5px;
+  --md-sys-typescale-body-large-weight: 400;
+  --md-sys-typescale-emphasized-body-large-weight: 500;
+  --md-sys-typescale-emphasized-body-large-tracking: 0.15px;
+  --md-sys-typescale-body-medium-font: var(--md-sys-typescale-plain-font);
+  --md-sys-typescale-body-medium-size: 14px;
+  --md-sys-typescale-body-medium-line-height: 20px;
+  --md-sys-typescale-body-medium-tracking: 0.2px;
+  --md-sys-typescale-body-medium-weight: 400;
+  --md-sys-typescale-emphasized-body-medium-weight: 500;
+  --md-sys-typescale-emphasized-body-medium-tracking: 0.25px;
+  --md-sys-typescale-body-small-font: var(--md-sys-typescale-plain-font);
+  --md-sys-typescale-body-small-size: 12px;
+  --md-sys-typescale-body-small-line-height: 16px;
+  --md-sys-typescale-body-small-tracking: 0.4px;
+  --md-sys-typescale-body-small-weight: 400;
+  --md-sys-typescale-emphasized-body-small-weight: 500;
+  --md-sys-typescale-emphasized-body-small-tracking: 0.4px;
+  --md-sys-typescale-label-large-font: var(--md-sys-typescale-plain-font);
+  --md-sys-typescale-label-large-size: 14px;
+  --md-sys-typescale-label-large-line-height: 20px;
+  --md-sys-typescale-label-large-tracking: 0.1px;
+  --md-sys-typescale-label-large-weight: 500;
+  --md-sys-typescale-emphasized-label-large-weight: 700;
+  --md-sys-typescale-emphasized-label-large-tracking: 0.1px;
+  --md-sys-typescale-label-medium-font: var(--md-sys-typescale-plain-font);
+  --md-sys-typescale-label-medium-size: 12px;
+  --md-sys-typescale-label-medium-line-height: 16px;
+  --md-sys-typescale-label-medium-tracking: 0.5px;
+  --md-sys-typescale-label-medium-weight: 500;
+  --md-sys-typescale-emphasized-label-medium-weight: 700;
+  --md-sys-typescale-emphasized-label-medium-tracking: 0.5px;
+  --md-sys-typescale-label-small-font: var(--md-sys-typescale-plain-font);
+  --md-sys-typescale-label-small-size: 11px;
+  --md-sys-typescale-label-small-line-height: 16px;
+  --md-sys-typescale-label-small-tracking: 0.5px;
+  --md-sys-typescale-label-small-weight: 500;
+  --md-sys-typescale-emphasized-label-small-weight: 700;
+  --md-sys-typescale-emphasized-label-small-tracking: 0.5px;
+}
+
+/*
+ * Tailwind's own scales, remapped onto the M3 tokens above. Redeclaring a
+ * stock key (`--radius-sm`, `--font-sans`) changes it app-wide, which is the
+ * point: `rounded-sm` *is* M3's `small` corner everywhere, not a fourth,
+ * disconnected scale beside daisyUI's tiers.
  */
 @theme {
   /*
-   * `--radius-xs` is the one step D8's three-tier register does not have,
-   * and it exists because of a fact about how `border-radius` resolves
-   * rather than a change of taste: **a radius larger than half the box is
-   * clamped to half, and the result is a circle.** `--radius-selector`
-   * (8px) is exactly half of the 16px checkbox every form in this system
-   * renders, so `rounded-selector` on a `size-4` box produced a perfectly
-   * round checkbox — visually identical to a radio button, in a library
-   * that ships both. Found by looking at the two side by side in
-   * Storybook, not by reading the token.
+   * Radius: Tailwind's steps, in order, are M3's corner scale, in order —
+   * `rounded-xs` extra-small (4px) through `rounded-4xl` extra-extra-large
+   * (48px). `rounded-full` is already Tailwind's 9999px.
    *
-   * 4px is the largest value that still reads as a *square with softened
-   * corners* at 16px, and it keeps the ladder honest: 4 → 8 → 12 → 20,
-   * each step visibly distinct from its neighbour. It overrides
-   * Tailwind's stock `--radius-xs` (2px) for the same reason `--radius-sm`
-   * and `--radius-md` below override theirs — one register, no fourth
-   * disconnected scale.
+   * `rounded-xs` keeps the job it was declared for: a 16px checkbox needs
+   * a corner well under half its box, because a radius past half the box
+   * clamps to a circle — `rounded-selector` (8px) on `size-4` once rendered
+   * a perfectly round checkbox beside a radio button. M3's checkbox
+   * container corner is 2dp; extra-small is the nearest scale step.
    */
-  --radius-xs: 4px;
-  --radius-sm: 12px;
-  --radius-md: 20px;
+  --radius-xs: var(--md-sys-shape-corner-extra-small);
+  --radius-sm: var(--md-sys-shape-corner-small);
+  --radius-md: var(--md-sys-shape-corner-medium);
+  --radius-lg: var(--md-sys-shape-corner-large);
+  --radius-xl: var(--md-sys-shape-corner-large-increased);
+  --radius-2xl: var(--md-sys-shape-corner-extra-large);
+  --radius-3xl: var(--md-sys-shape-corner-extra-large-increased);
+  --radius-4xl: var(--md-sys-shape-corner-extra-extra-large);
   /*
-   * `--radius-sheet` is not a fourth step of the register — it is the one
-   * corner a *phone bottom sheet* and a *dialog* wear, and nothing else may
-   * use it: M3's `CornerExtraLarge`, which `SheetBottomTokens` puts on a
-   * sheet's top corners and `DialogTokens.ContainerShape` on all four of a
-   * dialog's (read as `rounded-sheet` there).
-   * M3's `SheetBottomTokens.DockedContainerShape` is `CornerExtraLargeTop`,
-   * 28dp on the top two corners only (`ShapeTokens.kt`). The shape-scale
-   * audit in the daisyUI theme block above kept this value out on the
-   * belief that the library had no phone sheets — mistaken then, since
-   * `DetailDrawerContent` has been one below 768px since D14, and more so
-   * now that `SelectContent` is one below 640px. Two sheets, one corner:
-   * two literals would drift. Read as `rounded-t-sheet`; `cn.ts`
+   * `--radius-sheet` is the one corner a *phone bottom sheet* and a
+   * *dialog* wear: M3's `CornerExtraLarge`, which `SheetBottomTokens` puts
+   * on a sheet's top corners and `DialogTokens.ContainerShape` on all four
+   * of a dialog's. Read as `rounded-sheet` / `rounded-t-sheet`; `cn.ts`
    * registers the name so `tailwind-merge` resolves it against any other
-   * `rounded-t-*` a caller passes.
+   * `rounded-t-*` a caller passes. Kept as a named role rather than written
+   * `rounded-2xl` at each site, so the two sheets and the dialog cannot
+   * drift apart.
    */
-  --radius-sheet: 28px;
-  /* --radius-full (9999px) is already Tailwind's default; not redeclared. */
+  --radius-sheet: var(--md-sys-shape-corner-extra-large);
 
   /*
    * Four voices, and the roles are the point rather than the faces.
    *
-   * - `--font-display` — screen titles, card and dialog headings. A serif
-   *   gives a dense console one calm anchor per surface without reading
-   *   as a magazine.
-   * - `--font-sans` — everything else. The body face carries labels,
-   *   controls and prose at 11–14px, so it is chosen for density and
-   *   legibility, not personality.
+   * - `--font-display` — screen titles, card and dialog headings: M3's
+   *   *brand* face.
+   * - `--font-sans` — everything else: M3's *plain* face. In Roboto Flex
+   *   the two are one family, so the difference between them is the type
+   *   role (size, weight, tracking), which is how M3 draws it.
    * - `--font-italic` — **a person wrote this.** On a screen of emitted
- *   facts, italic marks human prose written *to* the operator, as
- *   distinct from the system reporting its own state: a `StateTimeline`
- *   annotation ("sent, but no receipt ever arrived; it will not be
- *   resubmitted") explaining a decision, a `FormField` hint ("Three to
- *   eleven characters."), a `RadioGroupOption` or `ChipOption`
- *   description ("Needs a reason.") stating a constraint. Someone wrote
- *   each of those sentences for a reader.
- *
- *   The line, and it is worth being able to apply it: **could this string
- *   be a template that only fills in a value the system already has** — a
- *   count, a ratio, a unit, an id, a label? Then it is an emitted fact and
- *   stays `font-sans` however small and however muted. `StatTile`'s
- *   caption ("98.2% of 12,710 terminal") and `InlineEmptyState`'s message
- *   ("No messages match these filters") both fail that test and both stay
- *   upright, which is the point — the role only carries meaning because
- *   something is excluded.
- *
- *   That is the status system's own logic — redundant channels, never
- *   colour alone — applied to type. Set it with `italic` beside
- *   `font-italic`; the token names the *family*, not the style.
- * - `--font-mono` — data. Unchanged, and deliberately so.
+   *   facts, italic marks human prose written *to* the operator, as
+   *   distinct from the system reporting its own state: a `StateTimeline`
+   *   annotation ("sent, but no receipt ever arrived; it will not be
+   *   resubmitted") explaining a decision, a `FormField` hint ("Three to
+   *   eleven characters."), a `RadioGroupOption` or `ChipOption`
+   *   description ("Needs a reason.") stating a constraint. Someone wrote
+   *   each of those sentences for a reader.
    *
-   * IBM Plex is one superfamily drawn to work together, which is worth
-   * more here than four individually optimal faces. The mono is the
-   * exception: `--font-mono` stays JetBrains Mono because this system
-   * leans on its slashed zero — "an operator tells `0` from `O` in a
-   * `cs_cuid()` at 12px only because of the slash" — and Plex Mono would
-   * be more coherent on paper and a worse instrument for that job.
+   *   The line, and it is worth being able to apply it: **could this string
+   *   be a template that only fills in a value the system already has** — a
+   *   count, a ratio, a unit, an id, a label? Then it is an emitted fact and
+   *   stays `font-sans` however small and however muted. `StatTile`'s
+   *   caption ("98.2% of 12,710 terminal") and `InlineEmptyState`'s message
+   *   ("No messages match these filters") both fail that test and both stay
+   *   upright, which is the point — the role only carries meaning because
+   *   something is excluded.
+   *
+   *   Kept through the move to M3, because nothing in M3 contradicts it:
+   *   M3's type roles say how big and how heavy, never whether a string is
+   *   a fact or a sentence, so italic is an orthogonal channel rather than
+   *   a competing role. It is the status system's own logic — redundant
+   *   channels, never colour alone — applied to type. Set it with `italic`
+   *   beside `font-italic`; the token names the *family*. Roboto Flex has
+   *   no italic face, only a slant axis (`slnt`, 0 to −10°), which is what
+   *   the browser draws `italic` with.
+   * - `--font-mono` — data. JetBrains Mono, unchanged, and deliberately so:
+   *   an operator tells `0` from `O` in a `cs_cuid()` at 12px only because
+   *   of its slashed zero, and no M3 role has a monospace opinion to
+   *   override that with.
    *
    * **These are stacks, not `@font-face` rules.** This package ships no
-   * font files, exactly as before: a consumer loads the faces (Google
-   * Fonts, self-hosted, or not at all) and the stack falls back through
-   * `ui-serif`/`system-ui`/`ui-monospace` if they do not. Shipping
-   * ~200KB of woff2 for four faces is a packaging decision this library
-   * has consistently declined, and nothing here changes that.
+   * font files: a consumer loads the faces (Google Fonts, self-hosted, or
+   * not at all) and the stacks fall back through the system faces if they
+   * do not.
    */
-  --font-display: "IBM Plex Serif", ui-serif, Georgia, "Times New Roman", serif;
-  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-italic: "IBM Plex Serif", ui-serif, Georgia, serif;
+  --font-display: var(--md-sys-typescale-brand-font);
+  --font-sans: var(--md-sys-typescale-plain-font);
+  --font-italic: var(--md-sys-typescale-plain-font);
   --font-mono:
     "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Mono", Menlo,
     monospace;
 
-  --text-micro: 11px;
-  --text-micro--line-height: 16px;
-  --text-caption: 12px;
-  --text-caption--line-height: 18px;
-  --text-body: 13px;
-  --text-body--line-height: 20px;
-  --text-prose: 14px;
-  --text-prose--line-height: 21px;
-  --text-title-sm: 16px;
-  --text-title-sm--line-height: 24px;
-  --text-title: 20px;
-  --text-title--line-height: 28px;
-  --text-metric: 28px;
-  --text-metric--line-height: 34px;
-  --text-metric-lg: 40px;
-  --text-metric-lg--line-height: 44px;
-}
+  /*
+   * The fifteen M3 roles as utilities (`text-body-medium`,
+   * `text-headline-small`, …), each carrying its line height, tracking and
+   * weight. A `font-*` utility beside one still wins on weight — that is
+   * how the emphasized variant is written: `text-label-large font-bold`.
+   */
+  --text-display-large: var(--md-sys-typescale-display-large-size);
+  --text-display-large--line-height: var(--md-sys-typescale-display-large-line-height);
+  --text-display-large--letter-spacing: var(--md-sys-typescale-display-large-tracking);
+  --text-display-large--font-weight: var(--md-sys-typescale-display-large-weight);
+  --text-display-medium: var(--md-sys-typescale-display-medium-size);
+  --text-display-medium--line-height: var(--md-sys-typescale-display-medium-line-height);
+  --text-display-medium--letter-spacing: var(--md-sys-typescale-display-medium-tracking);
+  --text-display-medium--font-weight: var(--md-sys-typescale-display-medium-weight);
+  --text-display-small: var(--md-sys-typescale-display-small-size);
+  --text-display-small--line-height: var(--md-sys-typescale-display-small-line-height);
+  --text-display-small--letter-spacing: var(--md-sys-typescale-display-small-tracking);
+  --text-display-small--font-weight: var(--md-sys-typescale-display-small-weight);
+  --text-headline-large: var(--md-sys-typescale-headline-large-size);
+  --text-headline-large--line-height: var(--md-sys-typescale-headline-large-line-height);
+  --text-headline-large--letter-spacing: var(--md-sys-typescale-headline-large-tracking);
+  --text-headline-large--font-weight: var(--md-sys-typescale-headline-large-weight);
+  --text-headline-medium: var(--md-sys-typescale-headline-medium-size);
+  --text-headline-medium--line-height: var(--md-sys-typescale-headline-medium-line-height);
+  --text-headline-medium--letter-spacing: var(--md-sys-typescale-headline-medium-tracking);
+  --text-headline-medium--font-weight: var(--md-sys-typescale-headline-medium-weight);
+  --text-headline-small: var(--md-sys-typescale-headline-small-size);
+  --text-headline-small--line-height: var(--md-sys-typescale-headline-small-line-height);
+  --text-headline-small--letter-spacing: var(--md-sys-typescale-headline-small-tracking);
+  --text-headline-small--font-weight: var(--md-sys-typescale-headline-small-weight);
+  --text-title-large: var(--md-sys-typescale-title-large-size);
+  --text-title-large--line-height: var(--md-sys-typescale-title-large-line-height);
+  --text-title-large--letter-spacing: var(--md-sys-typescale-title-large-tracking);
+  --text-title-large--font-weight: var(--md-sys-typescale-title-large-weight);
+  --text-title-medium: var(--md-sys-typescale-title-medium-size);
+  --text-title-medium--line-height: var(--md-sys-typescale-title-medium-line-height);
+  --text-title-medium--letter-spacing: var(--md-sys-typescale-title-medium-tracking);
+  --text-title-medium--font-weight: var(--md-sys-typescale-title-medium-weight);
+  --text-title-small: var(--md-sys-typescale-title-small-size);
+  --text-title-small--line-height: var(--md-sys-typescale-title-small-line-height);
+  --text-title-small--letter-spacing: var(--md-sys-typescale-title-small-tracking);
+  --text-title-small--font-weight: var(--md-sys-typescale-title-small-weight);
+  --text-body-large: var(--md-sys-typescale-body-large-size);
+  --text-body-large--line-height: var(--md-sys-typescale-body-large-line-height);
+  --text-body-large--letter-spacing: var(--md-sys-typescale-body-large-tracking);
+  --text-body-large--font-weight: var(--md-sys-typescale-body-large-weight);
+  --text-body-medium: var(--md-sys-typescale-body-medium-size);
+  --text-body-medium--line-height: var(--md-sys-typescale-body-medium-line-height);
+  --text-body-medium--letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+  --text-body-medium--font-weight: var(--md-sys-typescale-body-medium-weight);
+  --text-body-small: var(--md-sys-typescale-body-small-size);
+  --text-body-small--line-height: var(--md-sys-typescale-body-small-line-height);
+  --text-body-small--letter-spacing: var(--md-sys-typescale-body-small-tracking);
+  --text-body-small--font-weight: var(--md-sys-typescale-body-small-weight);
+  --text-label-large: var(--md-sys-typescale-label-large-size);
+  --text-label-large--line-height: var(--md-sys-typescale-label-large-line-height);
+  --text-label-large--letter-spacing: var(--md-sys-typescale-label-large-tracking);
+  --text-label-large--font-weight: var(--md-sys-typescale-label-large-weight);
+  --text-label-medium: var(--md-sys-typescale-label-medium-size);
+  --text-label-medium--line-height: var(--md-sys-typescale-label-medium-line-height);
+  --text-label-medium--letter-spacing: var(--md-sys-typescale-label-medium-tracking);
+  --text-label-medium--font-weight: var(--md-sys-typescale-label-medium-weight);
+  --text-label-small: var(--md-sys-typescale-label-small-size);
+  --text-label-small--line-height: var(--md-sys-typescale-label-small-line-height);
+  --text-label-small--letter-spacing: var(--md-sys-typescale-label-small-tracking);
+  --text-label-small--font-weight: var(--md-sys-typescale-label-small-weight);
 
-/*
- * M3 Expressive's "emphasised" type register — investigated for this
- * redesign, and deliberately not built as a new size scale or a new
- * custom-property family. What follows is the finding and the reasoning,
- * transcribed the same way the motion tokens above were: from androidx
- * source rather than m3.material.io, which publishes no numbers in a
- * fetchable form.
- *
- * `compose/material3/material3/src/commonMain/kotlin/androidx/compose/
- * material3/tokens/TypefaceTokens.kt` (`v0_103`) carries fifteen
- * `*Emphasized*` entries — one per baseline role (Display/Headline/
- * Title/Body/Label × Large/Medium/Small) — each pairing 1:1 with its
- * baseline in `TypeScaleTokens.kt`. Comparing the two files role by
- * role: **size and line-height are byte-identical between a role and its
- * emphasised counterpart, every single time.** The only thing that
- * changes is `FontWeight`, and it moves exactly one named step up the
- * same Regular → Medium → Bold axis this system already uses:
- * Display/Headline/BodyLarge/BodyMedium/BodySmall/TitleLarge go
- * Regular → Medium; TitleMedium/TitleSmall/Label(L/M/S) go
- * Medium → Bold. (A handful of roles also nudge `letter-spacing` by
- * ±0.05–0.1sp, e.g. BodyLarge 0.5sp → 0.15sp — too small and
- * inconsistent in direction to be a rule worth porting into a system
- * that already overrides tracking with a single `-0.011em` on `html`.)
- * `Typography.kt`'s own doc comment confirms this is an emphasis
- * *toggle*, not a heavier theme: "used to further stylize select pieces
- * of text... pragmatic uses, such as creating clearer division of
- * content and drawing users' eyes to relevant material" — i.e. opt-in,
- * per instance, among structurally identical peers.
- *
- * **One caveat on how much those values are worth, which the motion
- * tokens above do not carry.** The line immediately before the first
- * `*Emphasized*` declaration in `TypeScaleTokens.kt` reads `// TODO
- * update with the generated tokens once available` — so the whole
- * emphasised block is hand-written placeholder, flagged as provisional by
- * androidx itself, unlike the generated baseline roles above it and
- * unlike `ExpressiveMotionTokens.kt`'s real constants. Weight-only is the
- * best reading available today and everything below follows from it, but
- * it is a claim about a file Google has marked not-final. If a later
- * androidx drop generates these for real and the sizes diverge, this
- * paragraph is where to start — and the fact that nothing here declares a
- * new `--text-*` step is exactly what makes that cheap to revisit.
- *
- * Two things that finding rules out, both worth saying explicitly
- * because they were the two ways this could have gone wrong:
- *
- * 1. **No new `--text-*` step.** "Emphasised" is not a fourteenth size —
- *    it is an existing size at a different weight. Adding
- *    `--text-metric-emphasized` or similar would be a second, redundant
- *    way to say a size this scale already has a name for, which is the
- *    exact drift `--radius-xs`'s own comment above warns about for the
- *    radius ladder.
- * 2. **No new custom property for the weight step either.** The
- *    emphasised weight is always one of Tailwind's own stock
- *    `font-medium` (500) or `font-bold` (700) — both already in use
- *    elsewhere in this package (`side-nav.tsx`'s active rail item is
- *    `font-medium` over an unweighted sibling; `calendar.tsx`'s `today`
- *    is `font-semibold`). There is nothing to register: `font-weight`
- *    is not a custom scale the way `--text-*` is, so `tailwind-merge`
- *    already resolves conflicting weight utilities with no entry in
- *    `cn.ts`'s `ExtraClassGroupId` list.
- *
- * **The variable-font axis Compose leans on is for animating smoothly
- * *between* the two weights** (`MaterialExpressiveTheme` can tween a
- * `FontVariation.Settings('wght', …)` as a value changes) — it is not
- * needed to render either endpoint. Both endpoints here are ordinary
- * named weights (400/500/700), which every stack above already renders
- * correctly with zero font files shipped: a static, non-variable
- * fallback (`system-ui`, `ui-serif`, `ui-monospace`, …) matches or
- * synthesises those weights the same way it already does for the
- * `font-medium`/`font-semibold` this package ships today. So the
- * self-hosting gap noted in the four-voices comment above is not a
- * blocker for the register itself — only for the motion half (animating
- * *through* the weight axis), which is out of scope on this branch
- * regardless (`--ease-*`/`--dur-*` above belong to a sibling branch) and
- * was never going to be attempted here.
- *
- * **Where it actually lands: `StatTile`'s `emphasized` prop**
- * (`src/components/data/stat-tile.tsx`), and nowhere else, on purpose.
- * `StatTile`'s own doc comment for `tone` already names the exact
- * scenario M3 Expressive's emphasis toggle exists for — "leave unset
- * unless the number's own colour carries meaning; a wall of coloured
- * tiles makes the one that matters harder to find" — and then offers no
- * other way to do it, because colour is reserved for status
- * (`--state-*`) and a tile singled out for *importance* is not carrying
- * status. That was a genuine, load-bearing gap: `InstrumentPanel`'s own
- * dashboard story (`instrument-panel.stories.tsx`) renders three tiles
- * of equal weight — Delivered, Unresolved, Spend — with no way to say
- * which one a reader should find first without reaching for colour and
- * lying about what it means. `font-medium` on the value only (never the
- * label or caption, which stay the reference the reader compares the
- * emphasised figure against) is the Regular → Medium step this system's
- * own headline-scale roles (`--text-metric`/`--text-metric-lg`) take in
- * M3 Expressive, applied the same way `side-nav.tsx` already applies it
- * to a selected rail item — completing a pattern this library had
- * already arrived at independently, not inventing one. It does not
- * touch `font-variant-numeric: tabular-nums slashed-zero` (§3.3 above):
- * that is a glyph-substitution feature, orthogonal to weight, and the
- * slash survives at 500 exactly as it does at 400.
- */
+  /*
+   * The library's own steps, which every component already uses, now *are*
+   * M3 roles rather than near neighbours of them — several components'
+   * comments used to apologise for the gap ("`text-prose` (14/21) is this
+   * library's nearest rung"). Size, line height and tracking come from the
+   * role; weight does not, so a component's own `font-medium` keeps
+   * working.
+   *
+   *   micro     → label-small     11/16      caption   → body-small   12/16
+   *   body      → body-medium     14/20      prose     → body-large   16/24
+   *   title-sm  → title-medium    16/24      title     → title-large  22/28
+   *   metric    → headline-medium 28/36      metric-lg → display-small 36/44
+   *
+   * `body` and `prose` grew (13→14, 14→16): M3 has no 13px role, and
+   * `prose` is the input and reading text M3 sets in `body-large`
+   * (`OutlinedTextFieldTokens.InputFont`). `cn.ts` registers every name
+   * here with `tailwind-merge`; `theme-tokens.test.ts` keeps the two lists
+   * equal.
+   */
+  --text-micro: var(--md-sys-typescale-label-small-size);
+  --text-micro--line-height: var(--md-sys-typescale-label-small-line-height);
+  --text-micro--letter-spacing: var(--md-sys-typescale-label-small-tracking);
+  --text-caption: var(--md-sys-typescale-body-small-size);
+  --text-caption--line-height: var(--md-sys-typescale-body-small-line-height);
+  --text-caption--letter-spacing: var(--md-sys-typescale-body-small-tracking);
+  --text-body: var(--md-sys-typescale-body-medium-size);
+  --text-body--line-height: var(--md-sys-typescale-body-medium-line-height);
+  --text-body--letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+  --text-prose: var(--md-sys-typescale-body-large-size);
+  --text-prose--line-height: var(--md-sys-typescale-body-large-line-height);
+  --text-prose--letter-spacing: var(--md-sys-typescale-body-large-tracking);
+  --text-title-sm: var(--md-sys-typescale-title-medium-size);
+  --text-title-sm--line-height: var(--md-sys-typescale-title-medium-line-height);
+  --text-title-sm--letter-spacing: var(--md-sys-typescale-title-medium-tracking);
+  --text-title: var(--md-sys-typescale-title-large-size);
+  --text-title--line-height: var(--md-sys-typescale-title-large-line-height);
+  --text-title--letter-spacing: var(--md-sys-typescale-title-large-tracking);
+  --text-metric: var(--md-sys-typescale-headline-medium-size);
+  --text-metric--line-height: var(--md-sys-typescale-headline-medium-line-height);
+  --text-metric--letter-spacing: var(--md-sys-typescale-headline-medium-tracking);
+  --text-metric-lg: var(--md-sys-typescale-display-small-size);
+  --text-metric-lg--line-height: var(--md-sys-typescale-display-small-line-height);
+  --text-metric-lg--letter-spacing: var(--md-sys-typescale-display-small-tracking);
+}
 
 @layer base {
   :root {
-    /* §3.8 motion tokens. Not Tailwind-registered (no `duration-*` utility
-       needs them beyond the couple of components below) — used directly
-       via `var()` in the status wash and inline pending states. */
+    /* §3.8 timing tokens for the few things that are not a spring: the
+       cubic-bezier fallback the springs degrade to (below), and the timed
+       status wash / pending states, which hold and decay on a clock rather
+       than settle. Not Tailwind-registered — used via `var()`. */
     --dur-instant: 90ms;
     --dur-fast: 150ms;
     --dur-state: 240ms;
@@ -1630,23 +1738,24 @@
     --ease-linear: linear;
 
     /* ── M3 Expressive motion ────────────────────────────────────────────
-       The spring scheme `MaterialExpressiveTheme` installs, transcribed
-       from androidx rather than from the design site, which publishes no
-       numbers: `compose/material3/material3/src/commonMain/kotlin/
-       androidx/compose/material3/tokens/ExpressiveMotionTokens.kt`, with
-       `StandardMotionTokens.kt` beside it for the comparison below.
-       Compose's `SpringSpec` has mass = 1, so omega-n = sqrt(stiffness).
+       The spring scheme `MaterialExpressiveTheme` installs — the only
+       motion scheme this library has. Transcribed from androidx rather
+       than from the design site, which publishes no numbers:
+       `compose/material3/material3/src/commonMain/kotlin/androidx/compose/
+       material3/tokens/ExpressiveMotionTokens.kt`. Compose's `SpringSpec`
+       has mass = 1, so omega-n = sqrt(stiffness).
 
-                        standard (z/k)   expressive (z/k)
-         spatial default   0.9 / 700        0.8 / 380
-         spatial fast      0.9 / 1400       0.6 / 800
-         spatial slow      0.9 / 300        0.8 / 200
-         effects (all 3)   1.0 / ...        1.0 / ...   <- identical
+                         damping z   stiffness k
+         spatial fast       0.6         800
+         spatial default    0.8         380
+         spatial slow       0.8         200
+         effects fast       1.0        3800
+         effects default    1.0        1600
+         effects slow       1.0         800
 
-       **Expressive changes spatial motion and nothing else.** All three
-       effects springs carry the same constants in both schemes, so colour
-       and opacity animation is not part of this: reach for `--ease-out`
-       there and you are still on spec.
+       *Spatial* springs move things — position, size, shape (the press
+       morph) — and may overshoot. *Effects* springs fade and recolour and
+       never do. Reach for the effects pair for colour and opacity.
 
        Three curves, not six, and that is derived rather than a shortcut.
        A spring's *normalised* step response depends on z alone; stiffness
@@ -1660,14 +1769,12 @@
          --ease-spatial        1.5%   (z 0.8)
          --ease-spatial-fast   9.5%   (z 0.6)  <- the signature bounce
          --ease-effects        0%     (z 1.0, critically damped)
-       Standard's spatial springs peak at 0.2%, i.e. nothing a reader can
-       see. That gap is the whole difference between the two schemes.
 
        **An easing and its duration are one unit.** These are `linear()`
        samples of a spring across its own settling time; pairing
        `--ease-spatial-fast` with `--dur-fast` does not give a quicker
        bounce, it gives a curve that is no longer that spring. Change one,
-       change both. */
+       change both. `motion-tokens.test.ts` re-integrates every one. */
     --dur-spatial: 435ms;
     --dur-spatial-fast: 360ms;
     --dur-spatial-slow: 599ms;
@@ -1692,6 +1799,22 @@
     --ease-spatial: var(--ease-out);
     --ease-spatial-fast: var(--ease-out);
     --ease-effects: var(--ease-out);
+
+    /* The same six springs under M3's own names, for a consumer who reads
+       the spec rather than this file. Aliases, not copies: one easing per
+       damping ratio, as above. */
+    --md-sys-motion-spring-spatial-fast: var(--ease-spatial-fast);
+    --md-sys-motion-spring-spatial-fast-duration: var(--dur-spatial-fast);
+    --md-sys-motion-spring-spatial-default: var(--ease-spatial);
+    --md-sys-motion-spring-spatial-default-duration: var(--dur-spatial);
+    --md-sys-motion-spring-spatial-slow: var(--ease-spatial);
+    --md-sys-motion-spring-spatial-slow-duration: var(--dur-spatial-slow);
+    --md-sys-motion-spring-effects-fast: var(--ease-effects);
+    --md-sys-motion-spring-effects-fast-duration: var(--dur-effects-fast);
+    --md-sys-motion-spring-effects-default: var(--ease-effects);
+    --md-sys-motion-spring-effects-default-duration: var(--dur-effects);
+    --md-sys-motion-spring-effects-slow: var(--ease-effects);
+    --md-sys-motion-spring-effects-slow-duration: var(--dur-effects-slow);
   }
 
   @supports (animation-timing-function: linear(0, 1)) {
@@ -1786,10 +1909,6 @@
     }
   }
 
-  html {
-    letter-spacing: -0.011em;
-  }
-
   /* §3.3: mono is the voice of data. tabular-nums + slashed-zero everywhere
      JetBrains Mono is used — an operator tells `0` from `O` in a `cs_cuid()`
      at 12px only because of the slash. */
@@ -1802,9 +1921,9 @@
    * as this said before it was measured.
    *
    * daisyUI ships its own `:focus-visible` rules for `.btn` and `.input`,
-   * and they win: a focused button computes
-   * `2px solid rgb(232, 234, 237)` — `currentColor` — while `--ring` is
-   * `#5b8def`. Proven by mutation rather than inspection: setting the
+   * and they win: a focused button's outline computes to `currentColor`
+   * (measured, when the ring was still a separate blue), not `--ring`.
+   * Proven by mutation rather than inspection: setting the
    * outline colour below to `transparent` left the button and the input
    * ringed and removed the ring only from a rail link and a tab, which
    * are the elements this rule actually owns.
@@ -2196,10 +2315,11 @@
  * a different thing from one standing in for a number that has not
  * arrived. And the stops are capped at 14%, because a gradient ground
  * breaks the one-surface-one-contrast-ratio assumption every other check
- * in this system relies on. Measured over `--surface-1`, worst case across
- * the four blobs: `--subtle-foreground` falls to 4.41:1 in dark and 4.45:1
- * in light — *below* AA — while `--muted-foreground` holds at 5.29:1 and
- * above. So `InstrumentPanel` steps its own caption tier up from subtle to
+ * in this system relies on. Measured over `--surface-1` at each blob's
+ * peak alpha (the generated M3 palette, oklab mixes as declared):
+ * `--subtle-foreground` falls to 4.15:1 in dark and 4.25:1 in light —
+ * *below* AA — while `--muted-foreground` holds at 6.10:1 and 4.68:1.
+ * So `InstrumentPanel` steps its own caption tier up from subtle to
  * muted rather than leaving that to the caller, the same move `StatusPill`
  * already makes when a loud tint lands under its label.
  * ------------------------------------------------------------------------- */
@@ -2307,6 +2427,106 @@
         color-mix(in oklab, var(--aurora-4) 8%, transparent),
         transparent 68%
       );
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * M3 Expressive component details that only CSS can reach.
+ *
+ * Most of the M3 restyle lives in each component's own class strings. These
+ * are the few that have to be selectors: daisyUI components this library
+ * wraps without owning their markup, and the loading indicator's keyframes.
+ * ------------------------------------------------------------------------- */
+
+/*
+ * The plain tooltip: `PlainTooltipTokens` — `inverse-surface` container,
+ * `inverse-on-surface` text, `extra-small` corner (daisyUI's tooltip already
+ * reads `--radius-field`, which is that corner), `body-small` type.
+ * daisyUI paints it in `--color-neutral`, which this theme maps to a
+ * container step for badges — a tooltip on that would sit on the page in
+ * the page's own colours. Unlayered so it outranks daisyUI's nested layer;
+ * only custom properties and the text style, nothing a caller sets.
+ */
+.tooltip {
+  --tt-bg: var(--md-sys-color-inverse-surface);
+}
+.tooltip > .tooltip-content,
+.tooltip[data-tip]::before {
+  color: var(--md-sys-color-inverse-on-surface);
+  font-size: var(--md-sys-typescale-body-small-size);
+  line-height: var(--md-sys-typescale-body-small-line-height);
+  letter-spacing: var(--md-sys-typescale-body-small-tracking);
+}
+
+/*
+ * M3 Expressive's loading indicator (`LoadingIndicator`,
+ * `LoadingIndicatorTokens`: a 38dp active indicator in a 48dp container,
+ * `Primary` by default). Compose morphs it through seven polygons from the
+ * Expressive shape library — soft burst, cookie, pentagon, pill, sunny,
+ * four-leaf cookie, oval — while it rotates. CSS cannot interpolate between
+ * polygons with different vertex counts, so this keeps what CSS *can*
+ * hold of it: one continuous shape, its corners morphing through seven
+ * asymmetric `border-radius` states while the whole turns, never a
+ * spinning ring. The proportions are M3's (the shape fills 38/48 of its
+ * box); the colour is `currentColor`, as the spinner it replaced was, so a
+ * caller (or a filled button's label) decides it.
+ *
+ * Seven states over one turn; the spatial spring's curve would make each
+ * hop overshoot, which reads as a stutter on a loop (the skeleton drift's
+ * comment has the same argument), so the morph is eased per segment and
+ * the turn is linear. Under `prefers-reduced-motion` the global rule below
+ * stops it on its first frame: a static rounded shape, still announcing
+ * the wait through its `role="status"` label when it has one.
+ */
+@layer components {
+  .loading-indicator {
+    display: inline-grid;
+    place-items: center;
+    flex-shrink: 0;
+    vertical-align: middle;
+  }
+  .loading-indicator::before {
+    content: "";
+    width: calc(100% * 38 / 48);
+    height: calc(100% * 38 / 48);
+    background-color: currentColor;
+    /* The first keyframe, at rest too: reduced motion stops the animation
+       and leaves the element's own style showing. */
+    border-radius: 42% 58% 38% 62% / 55% 38% 62% 45%;
+    animation:
+      md3-loading-morph 1.4s ease-in-out infinite,
+      md3-loading-turn 1.4s linear infinite;
+  }
+}
+
+@keyframes md3-loading-morph {
+  0%,
+  100% {
+    border-radius: 42% 58% 38% 62% / 55% 38% 62% 45%;
+  }
+  14% {
+    border-radius: 50% 50% 22% 50% / 50% 22% 50% 50%;
+  }
+  28% {
+    border-radius: 30% 30% 50% 50% / 30% 30% 50% 50%;
+  }
+  42% {
+    border-radius: 50% / 28%;
+  }
+  57% {
+    border-radius: 38% 62% 62% 38% / 62% 38% 62% 38%;
+  }
+  71% {
+    border-radius: 22% 50% 22% 50% / 50% 22% 50% 22%;
+  }
+  85% {
+    border-radius: 50% / 46%;
+  }
+}
+
+@keyframes md3-loading-turn {
+  to {
+    rotate: 1turn;
   }
 }
 

@@ -17,12 +17,16 @@ import { describe, expect, it } from "vitest";
  * asserts a token is *declared*, this one asserts a token is *correct*.
  *
  * It also pins the three percentages the comment quotes (1.5 / 9.5 / 0),
- * because those are the entire argument for using this scheme over
- * `standard()` and a comment nobody can check is a comment that rots.
+ * because a comment nobody can check is a comment that rots.
+ *
+ * Expressive is the only scheme here. An earlier version of this file also
+ * transcribed `StandardMotionTokens.kt` to prove the two schemes differed
+ * visibly (standard's spatial springs overshoot by 0.2%); with no standard
+ * path left to choose, that comparison argued for a choice nobody can make.
  */
 
 /**
- * `ExpressiveMotionTokens.kt` and `StandardMotionTokens.kt`, from
+ * `ExpressiveMotionTokens.kt`, from
  * `compose/material3/material3/src/commonMain/kotlin/androidx/compose/material3/tokens/`.
  * Transcribed, not derived — if these are wrong, everything below is.
  *
@@ -37,11 +41,6 @@ const SPRINGS = {
     "effects-default": { damping: 1.0, stiffness: 1600 },
     "effects-fast": { damping: 1.0, stiffness: 3800 },
     "effects-slow": { damping: 1.0, stiffness: 800 },
-  },
-  standard: {
-    "spatial-default": { damping: 0.9, stiffness: 700 },
-    "spatial-fast": { damping: 0.9, stiffness: 1400 },
-    "spatial-slow": { damping: 0.9, stiffness: 300 },
   },
 } as const;
 
@@ -199,17 +198,6 @@ describe("the overshoot figures theme.css quotes", () => {
 
   it("critically damped effects never exceed the target", () => {
     expect(overshootPercent(1.0, 1600)).toBe(0);
-  });
-
-  /**
-   * The reason to install this scheme at all. If standard's spatial springs
-   * ever became visibly bouncy, the token set below would be pointless
-   * ceremony rather than a real difference.
-   */
-  it("standard's spatial springs overshoot by nothing a reader can see", () => {
-    for (const spring of Object.values(SPRINGS.standard)) {
-      expect(overshootPercent(spring.damping, spring.stiffness)).toBeLessThan(0.5);
-    }
   });
 });
 

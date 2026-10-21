@@ -109,7 +109,7 @@ function ExchangeBody({
 
 /**
  * Raw provider request/response and DLR bodies, verbatim (design doc §5.3).
- * No syntax-highlighting palette on purpose (§1.3): a rainbow JSON block
+ * No syntax-highlighting palette on purpose (colour means status here): a rainbow JSON block
  * would be the loudest thing on a diagnostic screen. Uses native
  * `<details>` for the accordion behaviour — free keyboard/ARIA semantics,
  * no extra Radix dependency needed for a plain expand/collapse.

@@ -108,7 +108,7 @@ built-ins off leaves nothing to collide with.
 
 This was found by measuring a rendered page, not by reading the cascade:
 `--color-base-100` resolved to `oklch(25.33% .016 252.42)` where the theme
-declares `#0a0b0d`.
+declared its own surface.
 
 ### The theme import must come after the plugin
 
@@ -149,42 +149,42 @@ unaffected by its existence.
 from daisyUI boilerplate, that attribute previously matched nothing and now
 matches. Set `data-theme="dark"` explicitly if that is you.
 
-**Set the attribute even for a dark-only application**, and the reason is
-narrower than "it is tidier". daisyUI's own `--color-base-*` tokens do resolve
-correctly with no attribute present, because of `default: true`. Every *custom*
-property this package declares lives under `[data-theme="dark"] { … }` with no
-`:root` fallback — measured with the attribute removed, `--surface-3` resolves
-to empty and `text-subtle-foreground` collapses to inherited `base-content`. An
-attribute-less page is the dark theme for daisyUI's tokens and not for this
-package's.
+**With no attribute at all, the page is the dark scheme, completely.** It
+used not to be: daisyUI's own `--color-base-*` resolved through
+`default: true`, while every custom property this package declared lived under
+`[data-theme="dark"]` alone, so `--surface-3` resolved to empty. The dark
+block now names `:root` too, and the mappings onto the M3 roles are declared
+on `:root` and on every `[data-theme]` element, so a nested
+`data-theme="light"` subtree re-resolves them as well. Setting the attribute
+explicitly is still the clearer statement of intent.
 
 ## 3. Load the faces, or accept the fallback
 
-`theme.css` names four roles — `--font-display` (IBM Plex Serif), `--font-sans`
-(IBM Plex Sans), `--font-italic` (IBM Plex Serif) and `--font-mono` (JetBrains
-Mono) — as **stacks, not `@font-face` rules**. This package ships no font files
-and has consistently declined to: roughly 200KB of woff2 for four faces is a
-packaging decision, not a styling one, and it belongs to the application.
+`theme.css` names four roles — `--font-display` and `--font-sans` (Roboto
+Flex: M3's *brand* and *plain* faces, and the vaam-apps house face),
+`--font-italic` (Roboto Flex's slant axis) and `--font-mono` (JetBrains Mono) —
+as **stacks, not `@font-face` rules**. This package ships no font files and has
+consistently declined to: woff2 is a packaging decision, not a styling one,
+and it belongs to the application.
 
 Load them however you already load fonts:
 
 ```html
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Serif:ital,wght@0,500;0,600;1,400;1,500&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,slnt,wdth,wght@8..144,-10..0,25..151,100..1000&family=JetBrains+Mono:wght@400;500&display=swap">
 ```
 
-The weights are not arbitrary. Sans carries 400/500/600 plus a 400 italic;
-Serif carries 500/600 for display headings plus 400/500 italic for the
-annotation voice; Mono carries 400/500. That is what this Storybook loads, and
-Storybook is acting as a consumer here rather than as the package — its
-presence in `.storybook/preview.css` is not evidence that the package bundles
-fonts.
+The axes are not arbitrary. Weight 100–1000 covers every M3 role and its
+emphasized step (400 → 500 → 700); slant −10–0 is what `italic` draws the
+annotation voice with, since Roboto Flex has no italic face; width and optical
+size come with the variable font. Mono carries 400/500. That is what this
+Storybook loads, and Storybook is acting as a consumer here rather than as the
+package — its presence in `.storybook/preview.css` is not evidence that the
+package bundles fonts.
 
-Skipping this step is not a failure. The stacks fall back through `ui-serif` /
-`system-ui` / `ui-monospace` and every screen still works. It is a quieter loss
-than the two steps above: the display and italic roles collapse into the same
-system serif, and the four-voice distinction goes with them —
-see [Typography](?path=/docs/docs-typography--docs) for what that distinction is
-carrying.
+Skipping this step is not a failure. The stacks fall back through `system-ui` /
+`ui-monospace` and every screen still works, at every role's size and weight —
+it just stops looking like M3. See [Typography](?path=/docs/docs-typography--docs)
+for what the roles carry.
 
 ## 4. The theme init script
 
@@ -261,7 +261,9 @@ Four failure modes, in the order they are worth ruling out:
 2. **Surfaces and body text look like stock daisyUI, but components are
    otherwise styled.** `themes: false` is missing from the `@plugin` block.
 3. **Some tokens resolve and some do not — `bg-surface-3` is transparent,
-   `text-subtle-foreground` inherits.** No `data-theme` attribute on `<html>`.
-4. **Headings and annotations render in the same serif.** The font stacks are
-   falling back; the faces are not loaded. Harmless — everything still works —
-   and "Load the faces" above is the fix.
+   `text-subtle-foreground` inherits.** `theme.css` is imported before the
+   daisyUI plugin, or not at all; the `--md-sys-color-*` roles every mapping
+   points at are missing.
+4. **Text renders in the system sans rather than Roboto Flex.** The font
+   stacks are falling back; the faces are not loaded. Harmless — everything
+   still works — and "Load the faces" above is the fix.

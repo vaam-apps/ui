@@ -1377,36 +1377,36 @@ const ROW: Record<SelectPresentation, string> = {
     // resting row is `CornerExtraSmall` (4px) and the selected one
     // rounds to `CornerLarge` (16px) as it fills, so the current value
     // reads as a different *object* in the list, not just a tinted row.
-    // 16px is on no rung of `theme.css`'s audited radius register, and
-    // deliberately so, for the same reason `--radius-sheet` is not a
-    // rung: it is M3's corner for this one phone-sheet row, not a
-    // console surface. It is a literal because nothing else uses it.
+    // Corners off M3's scale: `rounded-xs` (extra-small, 4px) at rest,
+    // `rounded-lg` (large, 16px) selected — the Expressive menu's item
+    // shapes.
     //
-    // The fill is `primary` — this library's one neutral accent, the
-    // same pill `SideNav`'s toolbar marks the current page with —
-    // where M3 reaches for a tonal container, which is a hue here and
-    // would read as a status. Focus is a state layer
+    // The fill is `primary-container`, the same pill `SideNav` marks the
+    // current page with, where M3's menu reaches for `TertiaryContainer`:
+    // Expressive rotates the tertiary hue toward olive at this library's
+    // seed, beside `success` (`theme.css`'s header), and a selected row
+    // must not read as a status. Focus is a state layer
     // (`FocusStateLayerOpacity` 10%): the foreground over a resting
     // row, and the selected row's own content colour over its fill,
     // each written for its own case so the two rules never fight over
     // the same property — or keyboard focus on the current value would
     // look exactly like no focus at all.
-    "max-sm:min-h-14 max-sm:rounded-[4px] max-sm:py-2 max-sm:pr-4 max-sm:pl-12 max-sm:text-title-sm",
+    "max-sm:min-h-14 max-sm:rounded-xs max-sm:py-2 max-sm:pr-4 max-sm:pl-12 max-sm:text-title-sm",
     "max-sm:data-focus:not-data-selected:bg-foreground/10",
-    "max-sm:data-selected:rounded-[16px] max-sm:data-selected:bg-primary max-sm:data-selected:font-medium max-sm:data-selected:text-primary-content",
-    "max-sm:data-selected:data-focus:bg-[color-mix(in_oklab,var(--color-primary)_90%,var(--color-primary-content))]",
+    "max-sm:data-selected:rounded-lg max-sm:data-selected:bg-primary-container max-sm:data-selected:font-medium max-sm:data-selected:text-on-primary-container",
+    "max-sm:data-selected:data-focus:bg-[color-mix(in_oklab,var(--md-sys-color-primary-container)_90%,var(--md-sys-color-on-primary-container))]",
     "max-sm:[transition-property:background-color,border-radius]",
-    "max-sm:[transition-duration:var(--dur-fast),var(--dur-spatial-fast)]",
-    "max-sm:[transition-timing-function:var(--ease-out),var(--ease-spatial-fast)]",
+    "max-sm:[transition-duration:var(--dur-effects-fast),var(--dur-spatial-fast)]",
+    "max-sm:[transition-timing-function:var(--ease-effects),var(--ease-spatial-fast)]",
   ),
   modal: cn(
-    "relative flex min-h-14 cursor-pointer items-center rounded-[4px] py-2 pr-4 pl-12 text-title-sm text-foreground outline-none",
+    "relative flex min-h-14 cursor-pointer items-center rounded-xs py-2 pr-4 pl-12 text-title-sm text-foreground outline-none",
     "data-focus:not-data-selected:bg-foreground/10",
-    "data-selected:rounded-[16px] data-selected:bg-primary data-selected:font-medium data-selected:text-primary-content",
-    "data-selected:data-focus:bg-[color-mix(in_oklab,var(--color-primary)_90%,var(--color-primary-content))]",
+    "data-selected:rounded-lg data-selected:bg-primary-container data-selected:font-medium data-selected:text-on-primary-container",
+    "data-selected:data-focus:bg-[color-mix(in_oklab,var(--md-sys-color-primary-container)_90%,var(--md-sys-color-on-primary-container))]",
     "[transition-property:background-color,border-radius]",
-    "[transition-duration:var(--dur-fast),var(--dur-spatial-fast)]",
-    "[transition-timing-function:var(--ease-out),var(--ease-spatial-fast)]",
+    "[transition-duration:var(--dur-effects-fast),var(--dur-spatial-fast)]",
+    "[transition-timing-function:var(--ease-effects),var(--ease-spatial-fast)]",
   ),
 };
 

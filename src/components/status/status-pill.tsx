@@ -147,30 +147,24 @@ export function StatusPill({
           rendered below (`showLiteral`) this would double-announce it, so
           it only exists for the complementary case. */}
       {literal !== undefined && !showLiteral && <span className="sr-only">{literal}</span>}
-      {/* `muted`, not `subtle`, once the pill is loud. A loud pill paints a
-          state tint behind this text, and `--subtle-foreground` does not
-          reach 4.5:1 on a tint over anything lighter than the page
-          background — 4.36:1 over a card, 3.85:1 over a hovered row.
-          Measured, and not fixable by nudging the token: the value that
-          would clear AA on a tint is ΔE 2 from `--muted-foreground`,
-          which collapses the three-tier text ladder into two. So the
-          tier changes with the background instead. */}
+      {/* The pill's own hue, not `subtle`, once the pill is loud. A loud
+          pill paints a state tint behind this text, and neither grey tier
+          survives every tint: measured on the generated M3 palette,
+          `--subtle-foreground` falls to 3.33:1 (dark, loud tint over
+          `surface-container-highest`) and even `--muted-foreground` to
+          4.40:1 (light, same ground) — the second is new with the M3
+          palette, and is why this used to step up to `muted` and no
+          longer does. The hue's own foreground is the one colour
+          `contrast.test.ts` already holds to 4.5:1 over its own tint on
+          every surface (worst 4.80:1), so the literal and the detail read
+          as part of the pill and stay legible on it. */}
       {showLiteral && literal !== undefined && (
-        <span
-          className={cn(
-            "font-mono text-micro",
-            loud ? "text-muted-foreground" : "text-subtle-foreground",
-          )}
-        >
+        <span className={cn("font-mono text-micro", loud ? hue.fg : "text-subtle-foreground")}>
           {literal}
         </span>
       )}
       {detail != null && (
-        <span
-          className={cn("font-mono", loud ? "text-muted-foreground" : "text-subtle-foreground")}
-        >
-          {detail}
-        </span>
+        <span className={cn("font-mono", loud ? hue.fg : "text-subtle-foreground")}>{detail}</span>
       )}
     </Comp>
   );

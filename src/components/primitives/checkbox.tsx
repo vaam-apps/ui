@@ -65,7 +65,12 @@ export function Checkbox({
         // likely to be compared side by side — checked — they'd render
         // the same shape. Declined for the reason already on this line,
         // not a new one.
-        "group relative inline-flex size-4 shrink-0 items-center justify-center rounded-xs border border-edge-strong bg-surface-2",
+        // Colours are `CheckboxTokens`: unselected, an `OnSurfaceVariant`
+        // outline on nothing — a text-tier colour, so the box clears WCAG
+        // 1.4.11's 3:1 against every surface (`--edge-strong` did not
+        // need to, and on the dark ladder did not) — selected, a
+        // `Primary` fill with an `OnPrimary` check.
+        "group relative inline-flex size-4 shrink-0 items-center justify-center rounded-xs border border-on-surface-variant bg-transparent",
         "transition-colors data-checked:border-primary data-checked:bg-primary",
         "data-indeterminate:border-primary data-indeterminate:bg-primary",
         "data-focus:outline-none data-focus:ring-1 data-focus:ring-ring",

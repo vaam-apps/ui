@@ -108,7 +108,9 @@ test.describe("the horizontal floating toolbar, below 640px", () => {
     }
   });
 
-  test("the two schemes are opposite ends of the theme, not two greys", async ({ page }) => {
+  test("the two schemes are a surface step and the seed's container, not two greys", async ({
+    page,
+  }) => {
     await openStory(page, STORY.sideNavToolbarStandard, { width: 375, height: 812 });
     const standard = await page
       .locator(horizontal)
@@ -119,11 +121,19 @@ test.describe("the horizontal floating toolbar, below 640px", () => {
       .evaluate((el) => getComputedStyle(el).backgroundColor);
     const page_ = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
 
-    // Standard is a surface step off the page; vibrant is `primary`,
-    // which is the page's own foreground — the inverse of the page.
+    // Standard is a surface step off the page; vibrant is M3's
+    // `PrimaryContainer` — the seed's hue, which no surface uses. (It was
+    // `primary` while `primary` was the page's achromatic foreground.)
     expect(standard).not.toBe(vibrant);
-    const fg = await page.evaluate(() => getComputedStyle(document.body).color);
-    expect(vibrant, "vibrant is the page's foreground colour").toBe(fg);
+    const container = await page.evaluate(() => {
+      const probe = document.createElement("div");
+      probe.style.background = "var(--md-sys-color-primary-container)";
+      document.body.append(probe);
+      const colour = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return colour;
+    });
+    expect(vibrant, "vibrant is primary-container").toBe(container);
     expect(vibrant).not.toBe(page_);
   });
 });

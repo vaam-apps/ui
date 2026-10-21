@@ -57,23 +57,14 @@ export interface ScreenHeaderProps {
  * relayout the page.
  *
  * `font-display` per `theme.css`'s own comment on the four voices — this
- * is the screen's one calm anchor, not more prose. `tracking-normal`
- * beside it is a correction, not decoration: `html`'s global
- * `letter-spacing: -0.011em` was tuned against the sans body face, and
- * IBM Plex Serif's counters are already narrower than a UI sans's at the
- * same size — stacking a sans-tuned negative tracking on top of that
- * tightens a 20px serif `<h1>` towards the point where descenders and
- * serifs start to crowd each other, which a `<h1>` that exists to be the
- * calm thing on the screen should not do. Reset to `0em` rather than
- * picked-by-eye loosened, because "wrong tool zeroed out" is a smaller,
- * more defensible claim than "the right amount of extra space is N".
+ * is the screen's one calm anchor, not more prose — at M3's
+ * `headline-small` (24/32), the role M3 gives a screen's title; the
+ * utility carries the role's own tracking.
  */
 export function ScreenHeader({ title, description }: ScreenHeaderProps) {
   return (
     <header className="flex min-w-0 flex-col gap-1">
-      <h1 className="font-display font-medium text-foreground text-title tracking-normal">
-        {title}
-      </h1>
+      <h1 className="font-display text-foreground text-headline-small">{title}</h1>
       {description != null && (
         <p className="line-clamp-2 max-w-xl text-body text-muted-foreground">{description}</p>
       )}

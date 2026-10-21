@@ -59,6 +59,7 @@
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
     "format": "biome check --write .",
+    "generate:colors": "node scripts/generate-md3-colors.ts",
     "lint": "biome check . && markdownlint-cli2",
     "prepack": "npm run build",
     "storybook": "storybook dev -p 6006",

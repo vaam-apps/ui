@@ -150,10 +150,7 @@ export interface SideNavProps {
    * floating rails wear. Defaults to `"standard"`. Nothing else in the
    * nav reads it — the in-flow sidebar is not a toolbar.
    *
-   * Both are androidx's own (`FloatingToolbarTokens.kt`), mapped onto this
-   * library's neutral roles rather than onto hues, because §1.3's "one
-   * accent, never a hue" still holds and a tinted bar would read as a
-   * status:
+   * Both are androidx's own (`FloatingToolbarTokens.kt`):
    *
    * - `"standard"` — a `SurfaceContainer` bar (`surface-2` here); the
    *   current page is a filled `Primary` pill (`FilledIconButtonTokens`).
@@ -163,15 +160,15 @@ export interface SideNavProps {
    *   full-contrast mark on the bar. Quiet until you look for it — and,
    *   with no shadow (M3's `Level0`; see `TOOLBAR_CONTAINER`), separated
    *   from whatever scrolls under it by its fill alone.
-   * - `"vibrant"` — a `PrimaryContainer` bar (`primary` here, so the bar
-   *   is the inverse of the page: near-white on the dark theme,
-   *   near-black on the light one) with the current page cut back out of
-   *   it in `SurfaceContainer` (`VibrantButtonSelectedContainerColor`).
-   *   Its fill is the page's own foreground, which no surface uses, so
-   *   its edge holds over every surface — `Card`, `StatTile`, the page —
-   *   where the standard bar's does not. Not over *everything*: a filled
-   *   `primary` control (a primary `Button`) passing under it is the same
-   *   colour.
+   * - `"vibrant"` — a `PrimaryContainer` bar with `OnPrimaryContainer`
+   *   icons, and the current page cut back out of it in
+   *   `SurfaceContainer` (`VibrantButtonSelectedContainerColor`). Its fill
+   *   is the seed's hue, which no surface uses, so its edge holds over
+   *   every surface — `Card`, `StatTile`, the page — where the standard
+   *   bar's does not. Not over *everything*: a filled `primary` control (a
+   *   primary `Button`) passing under it is a near neighbour in the dark
+   *   scheme, where Expressive puts `primary` and `primary-container`
+   *   within a few tones of each other.
    */
   toolbarVariant?: SideNavToolbarVariant | undefined;
   className?: string;
@@ -268,24 +265,26 @@ function NavLink({
 }) {
   const Icon = item.icon;
   const rail = variant === "rail";
-  // M3 Expressive shape audit: `rounded-field` stays constant across
-  // `active`, not a candidate for a selected-state morph. This is a
-  // locked decision, not an oversight — D8's own reference lock (theme.css)
-  // names this exact row: judged against LottieFiles' active nav row,
-  // "not fully pill-shaped either", so `rounded-full` on selection would
-  // directly contradict a cited reference screen. And below in this same
-  // file, a different active row growing to two lines is flagged as a bug
-  // precisely because it "turns the active row's filled rectangle into a
-  // different shape from all the others" — the established reading here
-  // is that every row in a list shares one shape so the *fill* alone
-  // carries selection, which is what `bg-base-300` below already does.
+  // M3's navigation-drawer item: a full pill (`ActiveIndicatorShape`
+  // `CornerFull`, `NavigationDrawerTokens`), the current page filled and
+  // every other row drawing hover as the 8% state layer. This row used to
+  // be locked to a `rounded-field` rectangle by a reference screen
+  // ("not fully pill-shaped either") that the move to M3 Expressive
+  // retired; what that lock protected still holds, because every row
+  // shares the one shape and only the *fill* carries selection.
+  //
+  // The fill is `primary-container`, not M3's `secondary-container`:
+  // Expressive rotates `secondary` toward olive at this seed, next to
+  // `success` (`theme.css`'s header has the measurement), and a selected
+  // row must not read as a status.
   const rowClass = cn(
-    "flex items-center gap-3 rounded-field px-3 py-2 transition-colors",
+    "flex items-center gap-3 rounded-full px-3 py-2 transition-colors",
+    "duration-[var(--dur-effects-fast)] ease-[var(--ease-effects)]",
     dim ? "text-caption" : "text-body",
     rail && "justify-center px-0",
-    active && !dim && "bg-base-300 font-medium text-foreground",
+    active && !dim && "bg-primary-container font-medium text-on-primary-container",
     active && dim && "text-foreground",
-    !active && "text-muted-foreground hover:bg-base-300/60 hover:text-foreground",
+    !active && "text-muted-foreground hover:bg-foreground/8 hover:text-foreground",
     className,
   );
 
@@ -503,16 +502,17 @@ const TOOLBAR_PALETTES: Record<
     ring: "",
   },
   vibrant: {
-    container: "bg-primary text-primary-content",
-    idle: "hover:bg-primary-content/8",
+    container: "bg-primary-container text-on-primary-container",
+    idle: "hover:bg-on-primary-container/8",
     selected: "bg-surface-2 text-foreground",
-    divider: "bg-primary-content/20",
-    // The theme's `--ring` is a mid blue chosen against the dark page;
-    // on a `primary` bar — near-white on the dark theme — it measured
-    // 2.68:1, under WCAG 1.4.11's 3:1 (`e2e/focus.spec.ts`). The bar's
-    // own content colour is the one colour guaranteed to stand off it in
-    // both themes.
-    ring: "focus-visible:outline-primary-content",
+    divider: "bg-on-primary-container/20",
+    // The theme's `--ring` is `primary`, within a few tones of this bar's
+    // `primary-container` fill in the dark scheme, so a ring in it would
+    // all but vanish (and when the ring was a separate mid blue it
+    // measured 2.68:1 on the old inverse bar, under WCAG 1.4.11's 3:1 —
+    // `e2e/focus.spec.ts`). The bar's own content colour is the one
+    // colour guaranteed to stand off it in both themes.
+    ring: "focus-visible:outline-on-primary-container",
   },
 };
 
@@ -527,8 +527,8 @@ const TOOLBAR_PALETTES: Record<
  */
 const TOOLBAR_ITEM_MOTION =
   "[transition-property:color,background-color,border-radius,width,height] " +
-  "[transition-duration:var(--dur-fast),var(--dur-fast),var(--dur-spatial-fast),var(--dur-spatial-fast),var(--dur-spatial-fast)] " +
-  "[transition-timing-function:var(--ease-out),var(--ease-out),var(--ease-spatial-fast),var(--ease-spatial-fast),var(--ease-spatial-fast)]";
+  "[transition-duration:var(--dur-effects-fast),var(--dur-effects-fast),var(--dur-spatial-fast),var(--dur-spatial-fast),var(--dur-spatial-fast)] " +
+  "[transition-timing-function:var(--ease-effects),var(--ease-effects),var(--ease-spatial-fast),var(--ease-spatial-fast),var(--ease-spatial-fast)]";
 
 /**
  * The geometry of one toolbar item, split into the two boxes M3 draws:
@@ -683,21 +683,22 @@ const TOOLBAR_CONTAINER = "fixed z-40 flex rounded-full p-2 gap-1";
  * thing: destinations, with their labels back.
  *
  * - **56px tall, fully round** — `ActiveIndicatorHeight` 56dp,
- *   `ActiveIndicatorShape` `CornerFull`. Not the sidebar's `rounded-field`
- *   rectangle (`NavLink`'s doc has why that one is locked): the sheet is
- *   M3's component, and its current-page pill is the same shape as the
+ *   `ActiveIndicatorShape` `CornerFull`. The sidebar's `NavLink` is the
+ *   same pill at the sidebar's denser height; the sheet is M3's
+ *   component at M3's size, and its current-page pill is the same shape as the
  *   toolbar's that opened it.
  * - **16px leading, 24px trailing, 12px from icon to label** — the item's
  *   own `padding(start = 16.dp, end = 24.dp)` and `Spacer(12.dp)`.
  * - **24px icon** — `IconSize`.
  * - **Label 14px medium** — `LabelTextFont` is `LabelLarge` (14/20,
- *   medium); `text-prose` (14/21) is this library's nearest rung.
+ *   medium): `text-label-large`.
  * - **Colours** — inactive icon and label are `OnSurfaceVariant`
  *   (`muted-foreground`); hover is the 8% state layer the toolbar items
  *   use; the current page is M3's `SecondaryContainer` pill drawn in
- *   `primary` instead — a library choice, the same one `Select`'s phone
- *   sheet and the toolbar make, because a tonal container is a hue here
- *   and would read as a status.
+ *   `primary-container` instead — a library choice, the same one the
+ *   sidebar and the toolbar make, because Expressive rotates `secondary`
+ *   toward olive at this seed, beside `success`, and a selected row must
+ *   not read as a status.
  *
  * A plain primary click closes the sheet before the browser follows the
  * link — androidx's `ModalNavigationDrawerSample` (`DrawerSamples.kt`)
@@ -729,10 +730,10 @@ function NavSheetLink({
       aria-current={active ? "page" : undefined}
       onClick={onClick}
       className={cn(
-        "flex min-h-14 items-center gap-3 rounded-full pr-6 pl-4 font-medium text-prose",
-        "transition-colors duration-[var(--dur-fast)] ease-[var(--ease-out)]",
+        "flex min-h-14 items-center gap-3 rounded-full pr-6 pl-4 text-label-large",
+        "transition-colors duration-[var(--dur-effects-fast)] ease-[var(--ease-effects)]",
         active
-          ? "bg-primary text-primary-content"
+          ? "bg-primary-container text-on-primary-container"
           : "text-muted-foreground hover:bg-foreground/8 hover:text-foreground",
       )}
     >
@@ -1406,7 +1407,9 @@ function HorizontalRail({
                   href={item.href}
                   aria-current={isActive(item.href, currentPath) ? "page" : undefined}
                   className={
-                    isActive(item.href, currentPath) ? "bg-base-300 font-medium" : undefined
+                    isActive(item.href, currentPath)
+                      ? "bg-primary-container font-medium text-on-primary-container"
+                      : undefined
                   }
                 >
                   <item.icon size={16} className="shrink-0" aria-hidden="true" />

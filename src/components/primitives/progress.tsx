@@ -47,7 +47,8 @@ export function Progress({
         aria-valuenow={clamped}
         aria-valuemin={0}
         aria-valuemax={safeMax}
-        className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-surface-3"
+        // 4px, fully round: `LinearProgressIndicatorTokens.Height`.
+        className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-surface-3"
       >
         <div
           // `currentColor` on a text-token class, so the fill tracks the
@@ -61,9 +62,14 @@ export function Progress({
           // determinate value indicator means the bar would visibly
           // read *past* `value` and shrink back — a progress bar lying
           // about progress, the same failure `Progress`'s own doc
-          // comment above bans a spinner for standing in for. Left on
-          // its existing `duration-300` with Tailwind's default easing.
-          className={cn("h-full rounded-full bg-current transition-[width] duration-300", hue.fg)}
+          // comment above bans a spinner for standing in for. It rides
+          // the *effects* spring instead — critically damped, so it
+          // never overshoots — which is the M3 Expressive curve for a
+          // value that must not lie on its way there.
+          className={cn(
+            "h-full rounded-full bg-current transition-[width] duration-[var(--dur-effects)] ease-[var(--ease-effects)]",
+            hue.fg,
+          )}
           style={{ width: `${percent}%` }}
         />
       </div>

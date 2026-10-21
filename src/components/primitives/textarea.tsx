@@ -4,11 +4,10 @@ import { cn } from "../../lib/cn";
 
 export type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement>;
 
-// D8: same reasoning as `input.tsx` — daisyUI's own `.textarea` rule sets
+// Same reasoning as `input.tsx`: daisyUI's own `.textarea` rule sets
 // `border-radius: var(--radius-field)` directly (confirmed by reading
-// `daisyui/components/textarea.css`), so no `rounded-*` class is added
-// here. The class string is unchanged; the token rewrite in Phase 0 is
-// what moved the rendered radius.
+// `daisyui/components/textarea.css`), M3's `extra-small` text-field
+// corner, so no `rounded-*` class is added here.
 //
 // No `textarea-bordered`: same v4-only modifier as `input.tsx`'s own
 // `input-bordered` — `grep -rho '\b[a-z]*-bordered\b' node_modules/daisyui/`

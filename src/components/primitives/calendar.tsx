@@ -45,9 +45,10 @@ const NAV_BUTTON = cn(
  * rather than two `left-*` utilities because a one-day range carries both
  * classes, and two utilities setting `left` is a cascade coin-flip.
  *
- * M3 fills it with `SecondaryContainer`. This palette has one achromatic
- * accent and no secondary container (`theme.css` §1.3), so the band is a
- * 15% wash of the selection colour, which is also what it means.
+ * M3 fills it with `SecondaryContainer`. Expressive rotates `secondary`
+ * toward olive at this library's seed, beside `success` (`theme.css`'s
+ * header), so the band is a 15% wash of the selection colour, `primary`,
+ * which is also what it means.
  */
 const RANGE_BAND =
   "before:absolute before:inset-y-1 before:left-[var(--band-start,0px)] before:right-[var(--band-end,0px)] before:bg-primary/15";
@@ -158,7 +159,7 @@ export function Calendar({
         // M3's today: a 1dp `Primary` ring and a `Primary` label
         // (`DateTodayContainerOutline*`, `DateTodayLabelTextColor`). Not a
         // status hue — "today" is a calendar fact, and `Primary` here is
-        // the palette's one achromatic accent — so it stays inside the
+        // the seed's hue, gated away from every status hue — so it stays inside the
         // colour rule (`radio-group.tsx` documents the same category error
         // for selection). The label colour skips a selected today, where
         // `Primary` on the `Primary` fill would erase the digit; the ring

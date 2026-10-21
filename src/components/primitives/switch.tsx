@@ -23,19 +23,21 @@ export interface SwitchProps {
  * A switch belongs where the write fires on change and the UI can report
  * the result.
  *
- * **M3 Expressive shape audit: no checked-state shape morph.** Both the
- * track and the thumb below are already `rounded-full` in every state —
- * off, on, disabled — so there is no smaller-radius resting shape to
- * morph *from*. The thumb's checked state is already carried by a
- * position change (`translate-x-4`) and a fill change
- * (`bg-foreground` → `bg-primary-content`), which is the real Expressive
- * switch treatment: androidx's own Material3 `Switch` doesn't reshape its
- * thumb on toggle either, it grows it slightly while *pressed* (a size,
- * not a corner-radius, change, and speculative to port here without a
- * measured value — see `press-shape.ts`'s own "measure it or cite a
- * source" standard). Nothing here declines that scaled-thumb idea
- * outright; it just isn't the shape-morph this pass is about, and adding
- * it without a real M3 token to cite would be inventing a number.
+ * **M3's switch, at this library's size.** Colours are `SwitchTokens`:
+ * off, a `SurfaceContainerHighest` track with an outline and a handle in
+ * the outline colour; on, a `Primary` track with an `OnPrimary` handle.
+ * The outline and the off handle are `on-surface-variant` here rather
+ * than M3's `outline`, the same substitution `Checkbox` makes and for the
+ * same reason (`theme.css`'s `--edge-strong` note): `outline` is too close
+ * to the grey status hue to ship as chrome.
+ *
+ * The handle grows rather than reshapes, as M3's does: `UnselectedHandle`
+ * 16dp, `SelectedHandle` 24dp, `PressedHandle` 28dp, on a 32dp track. The
+ * track here stays 20×36 (the dense register; the tap target is what
+ * `.tap-target` grows), so the handle keeps M3's *ratios* on this
+ * library's 14px selected handle: 16/24 off (9.3px), 28/24 held. It is a
+ * `scale` on the handle, so it rides the same `transform` transition as
+ * the travel — one spatial spring, not two.
  */
 export function Switch({ checked, onCheckedChange, disabled, className, ...aria }: SwitchProps) {
   return (
@@ -44,7 +46,7 @@ export function Switch({ checked, onCheckedChange, disabled, className, ...aria 
       onChange={onCheckedChange}
       disabled={disabled ?? false}
       className={cn(
-        "group relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-edge-strong bg-surface-3 transition-colors",
+        "group relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-on-surface-variant bg-surface-container-highest transition-colors",
         "data-checked:border-primary data-checked:bg-primary",
         "data-focus:outline-none data-focus:ring-1 data-focus:ring-ring",
         "data-disabled:cursor-not-allowed data-disabled:opacity-50",
@@ -78,8 +80,9 @@ export function Switch({ checked, onCheckedChange, disabled, className, ...aria 
           // transform`, so `group-data-checked:bg-primary-content` below
           // is not animated at all — it snaps, same as before this
           // change; not touched here since it isn't spatial motion.
-          "pointer-events-none ml-0.5 inline-block size-3.5 rounded-full bg-foreground transition-transform duration-[var(--dur-spatial-fast)] ease-[var(--ease-spatial-fast)]",
-          "group-data-checked:translate-x-4 group-data-checked:bg-primary-content",
+          "pointer-events-none ml-0.5 inline-block size-3.5 scale-[0.667] rounded-full bg-on-surface-variant transition-transform duration-[var(--dur-spatial-fast)] ease-[var(--ease-spatial-fast)]",
+          "group-data-checked:translate-x-4 group-data-checked:scale-100 group-data-checked:bg-primary-content",
+          "group-active:scale-[1.167] group-data-checked:group-active:scale-[1.167]",
         )}
       />
     </HeadlessSwitch>
