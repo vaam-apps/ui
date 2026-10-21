@@ -20,30 +20,49 @@ import { STORY } from "./story-ids";
  * switch handle's colour, the checkbox's check mark, menu rows.
  */
 
+/** What `sampleFrames` reads on each frame. A name rather than a function:
+ * a function cannot cross into the page except as source text. */
+type Reading = "radius" | "opacity" | "after-opacity" | "x";
+
 async function sampleFrames(
   page: Page,
   target: Locator,
-  read: (el: Element) => number,
+  reading: Reading,
   trigger: () => Promise<void>,
   ms = 600,
 ): Promise<number[]> {
   const handle = await target.elementHandle();
   if (handle === null) throw new Error("no element");
   const sampling = page.evaluate(
-    ([el, duration, source]) =>
+    ([el, duration, kind]) =>
       new Promise<number[]>((resolve) => {
-        // biome-ignore lint/security/noGlobalEval: the reader is this file's own arrow function, serialised to cross into the page.
-        const fn = (0, eval)(source as string) as (e: Element) => number;
+        const element = el as Element;
+        const read = (): number => {
+          if (kind === "x") return element.getBoundingClientRect().x;
+          if (kind === "opacity") return Number.parseFloat(getComputedStyle(element).opacity);
+          if (kind === "after-opacity") {
+            return Number.parseFloat(getComputedStyle(element, "::after").opacity);
+          }
+          // The same reading as `topLeftRadius` below.
+          const value = getComputedStyle(element).borderTopLeftRadius.replace(/\s-\s/g, " + -");
+          const percent = /(-?[\d.e+-]+)%/.exec(value);
+          const length = /(-?[\d.e+-]+)px/.exec(value);
+          const width = element.getBoundingClientRect().width;
+          return (
+            (percent ? (Number.parseFloat(percent[1] ?? "0") / 100) * width : 0) +
+            (length ? Number.parseFloat(length[1] ?? "0") : 0)
+          );
+        };
         const out: number[] = [];
         const start = performance.now();
         const tick = () => {
-          out.push(fn(el as Element));
+          out.push(read());
           if (performance.now() - start < (duration as number)) requestAnimationFrame(tick);
           else resolve(out);
         };
         requestAnimationFrame(tick);
       }),
-    [handle, ms, read.toString()] as const,
+    [handle, ms, reading] as const,
   );
   await trigger();
   return await sampling;
@@ -82,7 +101,7 @@ async function expectPressMorph(page: Page, control: Locator, label: string): Pr
   expect(rest, `${label}: resting radius is finite`).toBeLessThan(1000);
 
   await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
-  const down = await sampleFrames(page, control, topLeftRadius, () => page.mouse.down());
+  const down = await sampleFrames(page, control, "radius", () => page.mouse.down());
   await settleTransitions(page);
   const pressed = await control.evaluate(topLeftRadius);
   expect(pressed, `${label}: the press squares it off`).toBeLessThan(rest - 1);
@@ -98,7 +117,7 @@ async function expectPressMorph(page: Page, control: Locator, label: string): Pr
     `${label}: overshoots by a spring's share, never to a square`,
   ).toBeGreaterThan(pressed - Math.max(1, (rest - pressed) * 0.15));
 
-  const up = await sampleFrames(page, control, topLeftRadius, () => page.mouse.up());
+  const up = await sampleFrames(page, control, "radius", () => page.mouse.up());
   await settleTransitions(page);
   expect(await control.evaluate(topLeftRadius), `${label}: springs back`).toBeCloseTo(rest, 0);
   expect(
@@ -170,7 +189,7 @@ test.describe("state changes that used to snap", () => {
     const tabs = storyRoot(page).getByRole("tab");
     const next = tabs.nth(1);
     const opacity = (el: Element) => Number.parseFloat(getComputedStyle(el, "::after").opacity);
-    const samples = await sampleFrames(page, next, opacity, () => next.click());
+    const samples = await sampleFrames(page, next, "after-opacity", () => next.click());
     await settleTransitions(page);
     expect(await next.evaluate(opacity)).toBe(1);
     expect(
@@ -191,7 +210,7 @@ test.describe("state changes that used to snap", () => {
     }
     const x = (el: Element) => el.getBoundingClientRect().x;
     const before = await handle.evaluate(x);
-    const samples = await sampleFrames(page, handle, x, () => toggle.click());
+    const samples = await sampleFrames(page, handle, "x", () => toggle.click());
     await settleTransitions(page);
     const after = await handle.evaluate(x);
     expect(after, "the click moved the handle").not.toBeCloseTo(before, 0);
@@ -204,7 +223,7 @@ test.describe("state changes that used to snap", () => {
     const mark = checkbox.locator("svg");
     const opacity = (el: Element) => Number.parseFloat(getComputedStyle(el).opacity);
     expect(await mark.evaluate(opacity), "premise: checked").toBe(1);
-    const samples = await sampleFrames(page, mark, opacity, () => checkbox.click());
+    const samples = await sampleFrames(page, mark, "opacity", () => checkbox.click());
     await settleTransitions(page);
     expect(await mark.evaluate(opacity)).toBe(0);
     expect(

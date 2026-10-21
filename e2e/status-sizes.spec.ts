@@ -41,6 +41,17 @@ test.describe("status sizes", () => {
     }
   });
 
+  test("md is the default: a pill rendered with no size is the 32px chip", async ({ page }) => {
+    await openStory(page, STORY.statusPillQuietVersusLoud);
+    // The second row is the loud states, rendered with no `size` prop.
+    const loud = storyRoot(page)
+      .locator(":scope > div > div")
+      .nth(1)
+      .locator("span[title]")
+      .first();
+    expect((await box(loud)).height, "a default loud pill is 32px").toBeCloseTo(32, 0);
+  });
+
   test("StateChip md is 28px tall with a 14px label; sm stays dense", async ({ page }) => {
     await openStory(page, STORY.stateChipSizes);
     const rows = storyRoot(page).locator(":scope > div > div");
