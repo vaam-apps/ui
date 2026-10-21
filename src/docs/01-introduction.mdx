@@ -121,15 +121,17 @@ attribute-less application page.
   `--shadow-dialog`, and the light theme redefines both because a near-black
   shadow on a light ground reads as dirt rather than as depth.
 - **Instrument** — dashboards and metric rows. You *scan* these, and the job is
-  to make one number findable in a glance. An aurora mesh ground, no border:
-  a hairline on top of the mesh reads as two competing boundaries.
+  to make one number findable in a glance. An M3 Expressive container — a
+  tonal fill, the 28px corner, no border — with two of M3 Expressive's shapes
+  in its corner: a hairline would make it a big card.
 
 The third register is an exception with a budget, not a loosening of the rule.
 A glow on every card is a glow on none, and borders remain the default
-everywhere the rule was doing work. `InstrumentPanel`'s own mesh is capped at
-14% alpha and the panel steps its caption tier up from `subtle` to `muted`,
-because a gradient ground breaks the assumption every contrast check in the
-system rests on — see [Theming and tokens](?path=/docs/docs-theming-and-tokens--docs).
+everywhere the rule was doing work. `InstrumentPanel`'s shapes are opaque
+tones of `primary-container`, measured by the contrast gate, and the panel
+steps its caption tier up from `subtle` to `muted`, because a shaped ground
+breaks the assumption every contrast check in the system rests on — see
+[Theming and tokens](?path=/docs/docs-theming-and-tokens--docs).
 
 ## What is deliberately not here
 

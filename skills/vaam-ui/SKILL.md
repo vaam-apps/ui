@@ -30,9 +30,10 @@ the console's colours and starts reading every label.
 
 So: **never hardcode a colour for a state.** Declare it in a status
 system (`references/status-system.md`) and let `StatusPill` / `StateChip`
-/ `StateMark` render it. Decorative colour — the aurora glow and mesh —
-deliberately carries no state and cannot be tinted, which is the only
-thing that keeps a coloured surface safe in a system like this.
+/ `StateMark` render it. Decorative colour — the aurora glow, and
+`InstrumentPanel`'s `primary-container` shapes — deliberately carries no
+state and cannot be tinted, which is the only thing that keeps a coloured
+surface safe in a system like this.
 
 ## Setup, and the two ways it fails silently
 
@@ -109,8 +110,9 @@ shipped. The ones that bite integrators most:
   build floating account chrome (a "Menu" pill) of your own. That sheet
   is a drawer: confirm inside the slot with `InlineConfirm`, not a
   `Dialog`.
-- `text-subtle-foreground` is banned on the aurora mesh (it falls below
-  AA there); `InstrumentPanel` already steps its own caption up.
+- `text-subtle-foreground` is banned on an `InstrumentPanel` (it falls
+  below AA on the panel's clover shape); the panel already steps its own
+  caption up.
 - A tooltip inside a scrolling ancestor is clipped. Use a native `title`.
 
 ## Where the real documentation is

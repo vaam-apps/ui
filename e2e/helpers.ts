@@ -469,8 +469,10 @@ const HIDE_TEXT_ATTRIBUTE = "data-e2e-hidden-text";
  * two cases this function exists for: a tinted pill sitting on a hovered
  * row sitting on a table sitting on a surface (four alpha composites, no
  * one of which is written down anywhere), and `InstrumentPanel`'s caption
- * over the aurora mesh (a gradient, so there is no single background
- * colour to look up at all).
+ * over its shapes (three grounds, and which one a given glyph sits on is
+ * a fact about layout, not about tokens). It was written for the aurora
+ * mesh the panel used to paint, a gradient with no single background
+ * colour to look up at all.
  *
  * The backdrop is obtained by painting the element's glyphs transparent
  * and screenshotting its own box: whatever is left is, by construction,

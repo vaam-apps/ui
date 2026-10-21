@@ -821,7 +821,7 @@ export const LongLabelsAndOverflow: Story = {
 
 /**
  * A realistic page to put a floating toolbar over: an instrument panel
- * (the aurora mesh, the busiest surface in the library), stat tiles, and
+ * (its Expressive shapes, the busiest surface in the library), stat tiles, and
  * enough text to scroll under the bar. The toolbar stories below use it
  * so its two colour schemes are judged where they will actually live,
  * not on an empty page where anything reads.
@@ -829,7 +829,7 @@ export const LongLabelsAndOverflow: Story = {
 function BusyPage({ bottomPad }: { bottomPad: string }) {
   return (
     // `space-y-4` on a block, not `flex flex-col gap-4`: the instrument
-    // panel clips its own mesh, and a flex item with `overflow` set has a
+    // panel clips its own shapes, and a flex item with `overflow` set has a
     // zero automatic minimum height, so a flex column squashed it to a
     // 40px sliver the first time this rendered.
     <div className={cn("h-[50rem] space-y-4 overflow-y-auto bg-base-100 p-4", bottomPad)}>
