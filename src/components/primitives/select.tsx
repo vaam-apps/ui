@@ -690,12 +690,12 @@ export function SelectModalHandle({ className }: { className?: string | undefine
         // handle stays put while the options scroll under it, on the
         // sheet's own fill so they do not show through.
         presentation === "modal"
-          ? "sticky top-0 z-10 -mx-2 flex cursor-grab touch-none justify-center bg-surface-2 py-[22px]"
-          : "sticky top-0 z-10 -mx-2 hidden cursor-grab touch-none justify-center bg-surface-2 py-[22px] max-sm:flex",
+          ? "sticky top-0 z-10 -mx-2 flex cursor-grab touch-none justify-center bg-surface-container-low py-[22px]"
+          : "sticky top-0 z-10 -mx-2 hidden cursor-grab touch-none justify-center bg-surface-2 py-[22px] max-sm:flex max-sm:bg-surface-container-low",
         className,
       )}
     >
-      <span className="h-1 w-8 rounded-full bg-muted-foreground" />
+      <span className="h-1 w-8 rounded-full bg-on-surface-variant/40" />
     </div>
   );
 }
@@ -1076,7 +1076,7 @@ const LISTBOX_SURFACE: Record<SelectPresentation, string> = {
     // width, and without this it would replace the width at every width
     // and leave the phone sheet 256px wide, pinned to the left edge.
     "max-sm:fixed max-sm:inset-x-0 max-sm:top-auto max-sm:bottom-0 max-sm:mt-0 max-sm:w-full max-sm:max-h-[85dvh]",
-    "max-sm:overscroll-contain max-sm:rounded-t-sheet max-sm:rounded-b-none max-sm:border-0",
+    "max-sm:overscroll-contain max-sm:rounded-t-sheet max-sm:rounded-b-none max-sm:border-0 max-sm:bg-surface-container-low",
     // `scroll-pt-12` reserves the sticky handle's 48px when Headless
     // UI scrolls the active option into view (`block: "nearest"`).
     // Without it, arrowing up a long list parked the focused row
@@ -1094,7 +1094,7 @@ const LISTBOX_SURFACE: Record<SelectPresentation, string> = {
   // M3's own cap for a modal bottom sheet on a wide window.
   modal: cn(
     "fixed inset-x-0 top-auto bottom-0 z-50 mx-auto w-full max-w-[640px] max-h-[85dvh] overflow-y-auto focus:outline-none",
-    "overscroll-contain rounded-t-sheet rounded-b-none border-0 bg-surface-2 scroll-pt-12",
+    "overscroll-contain rounded-t-sheet rounded-b-none border-0 bg-surface-container-low scroll-pt-12",
     "px-2 pt-0 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))]",
     "shadow-[0_0_0_100vmax_var(--scrim)] starting:shadow-[0_0_0_100vmax_transparent]",
     "starting:translate-y-full",

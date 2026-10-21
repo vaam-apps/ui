@@ -822,27 +822,27 @@ const NAV_SHEET_SURFACE: Record<"bottom" | "side", string> = {
   // bottom edge, and at most `BottomSheetDefaults.SheetMaxWidth` (640dp)
   // wide, centred — which only matters if the window widens while it is
   // open, since the bar that opens it exists below 640px only. Fill,
-  // height cap and elevation are the library's, and are `Select`'s phone
-  // sheet's exactly, so a select opened over this sheet is visibly the
-  // same material: `surface-2` rather than `SurfaceContainerLow`, `85dvh`,
-  // and no `Level1` shadow — the scrim separates it.
+  // height cap and elevation are `Select`'s phone sheet's exactly, so a
+  // select opened over this sheet is visibly the same material:
+  // `SurfaceContainerLow` (M3's own sheet fill, adopted by every sheet in
+  // the library together), `85dvh`, and no `Level1` shadow — the scrim
+  // separates it.
   bottom: cn(
     "fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[85dvh] w-full max-w-[640px] flex-col",
-    "rounded-t-sheet bg-surface-2 outline-none",
+    "rounded-t-sheet bg-surface-container-low outline-none",
   ),
   // M3's modal navigation drawer (`NavigationDrawerTokens.kt`,
   // `DrawerDefaults` in `NavigationDrawer.kt`), from the leading edge:
   // full height; 360dp wide (`ContainerWidth`, `MaximumDrawerWidth`),
   // never under 240dp (`MinimumDrawerWidth`); `CornerLargeEnd` — 16dp on
-  // the two trailing corners only, a literal because 16px is on no rung
-  // of `theme.css`'s radius register (the same call `Select`'s selected
-  // sheet row makes); and no shadow, which here *is* M3's —
-  // `DrawerDefaults.ModalDrawerElevation` is `Level0`. Fill `surface-2`
-  // rather than `ModalContainerColor`'s `SurfaceContainerLow`, as the
-  // bottom sheet above.
+  // the two trailing corners only (`rounded-r-lg`: the radius register's
+  // `lg` is `corner-large`, 16px); and no shadow, which here *is* M3's —
+  // `DrawerDefaults.ModalDrawerElevation` is `Level0`. Fill
+  // `ModalContainerColor`'s `SurfaceContainerLow`, as the bottom sheet
+  // above.
   side: cn(
     "fixed inset-y-0 left-0 z-50 flex h-full w-[360px] min-w-[240px] max-w-full flex-col",
-    "rounded-r-[16px] bg-surface-2 outline-none",
+    "rounded-r-lg bg-surface-container-low outline-none",
   ),
 };
 
@@ -1005,7 +1005,7 @@ function NavSheet({
             // first row; the 4px is where that row's focus ring (2px
             // outline, 2px offset) draws, inside the list's scroll box
             // rather than clipped by it.
-            <DrawerPrimitive.Handle className="mt-[22px] mb-[18px] h-1! w-8! shrink-0 bg-muted-foreground! opacity-100!" />
+            <DrawerPrimitive.Handle className="mt-[22px] mb-[18px] h-1! w-8! shrink-0 rounded-full! bg-on-surface-variant! opacity-40!" />
           )}
           <div
             className={cn(
