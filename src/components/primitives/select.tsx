@@ -1063,11 +1063,11 @@ const LISTBOX_SURFACE: Record<SelectPresentation, string> = {
     // Below `sm`: the M3 modal bottom sheet (`SelectContent`'s doc).
     // The top corners are `SheetBottomTokens.DockedContainerShape`,
     // `CornerExtraLargeTop` (`--radius-sheet`, 28dp), the bottom edge
-    // square. The fill stays `surface-2`, the one every floating
-    // layer here uses — the dropdown above, and `DetailDrawerContent`'s
-    // own phone sheet, which this sheet most often opens over — not
-    // M3's `SurfaceContainerLow`, so that a sheet opened from a sheet
-    // is the same material as the one under it. `85dvh` is this
+    // square. The fill is M3's `SurfaceContainerLow`
+    // (`surface-container-low`), the same as `DetailDrawerContent`'s
+    // own phone sheet, which this sheet most often opens over — so a
+    // sheet opened from a sheet is the same material as the one under
+    // it. The dropdown above stays `surface-2`. `85dvh` is this
     // library's number, not M3's — a modal sheet may grow to the top
     // inset, and a strip of scrim left above it is what says "this is a
     // sheet over the page", not a new page.

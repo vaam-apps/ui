@@ -107,7 +107,7 @@ export function CopyButton({
       aria-label={label ?? `Copy ${value}`}
       style={pressRadiusStyle}
       className={cn(
-        // `[--tap-rest:-4px] p-1 rounded-full`: same hit-area idiom as
+        // `[--tap-rest:-4px] p-1`: same hit-area idiom as
         // the close buttons in `dialog.tsx`/`drawer.tsx`/`toast.tsx` —
         // the resting negative margin (spelled as a property rather than
         // a `-m-1` utility, because `.tap-target` writes `margin` itself;
@@ -125,8 +125,10 @@ export function CopyButton({
         // `masked-value.tsx`'s identical correction for the identical
         // reason. Previously this control had no hit-area padding at
         // all — a bare 12–16px icon, well under any reasonable tap-target
-        // minimum. `rounded-full` circular, per the icon-only-controls-
-        // are-circles convention in `button.tsx`.
+        // minimum. Circular, per the icon-only-controls-are-circles
+        // convention in `button.tsx`: the circle is `PRESS_SHAPE_MORPH`'s
+        // `rounded-[50%]`, a finite radius, not `rounded-full` (see
+        // `press-shape.ts` for why an infinite radius cannot morph).
         //
         // `PRESS_SHAPE_MORPH` (not `transition`): this used to be the bare
         // `transition` utility, chosen because `transition-colors` and

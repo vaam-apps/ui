@@ -74,7 +74,7 @@ export function MaskedValue({
           onClick={() => setRevealed((previous) => !previous)}
           aria-label={revealed ? `Hide ${label}` : `Reveal ${label}`}
           aria-pressed={revealed}
-          // `[--tap-rest:-4px] p-1 rounded-full`: same hit-area idiom as
+          // `[--tap-rest:-4px] p-1`: same hit-area idiom as
           // `copy-button.tsx` and the `dialog`/`drawer`/`toast` close
           // buttons — the resting negative margin (a property rather than
           // a `-m-1` utility, since `.tap-target` writes `margin` itself;

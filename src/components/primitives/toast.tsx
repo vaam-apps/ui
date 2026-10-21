@@ -180,7 +180,8 @@ export function Toaster() {
                 writes `margin` itself, D11) against `p-1`: the same
                 hit-area idiom
                 used there, growing the click target without moving the
-                icon. `rounded-full` matches those two as well — icon-only
+                icon. It is circular like those two as well (the circle is
+                `PRESS_SHAPE_MORPH`'s finite `rounded-[50%]`) — icon-only
                 controls are circular in this package (`button.tsx`'s
                 `icon` size) — and `hover:bg-surface-3` matches the
                 drawer's: a background shift gives hover a signal beyond
