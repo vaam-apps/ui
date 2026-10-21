@@ -13,6 +13,13 @@ decision the way the prose below does. The tradeoff is recorded in the
 pull request that made this change.
 -->
 
+## [0.6.0](https://github.com/vaam-apps/ui/compare/v0.5.0...v0.6.0) (2026-10-21)
+
+
+### Features
+
+* **theme:** move Card glow and the instrument skeleton onto the primary-container hue ([#45](https://github.com/vaam-apps/ui/issues/45)) ([fd38399](https://github.com/vaam-apps/ui/commit/fd383996b9fcd909239a59dfc7b136ff537af332))
+
 ## [0.5.0](https://github.com/vaam-apps/ui/compare/v0.4.0...v0.5.0) (2026-10-21)
 
 
