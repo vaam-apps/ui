@@ -12,6 +12,13 @@ export interface StatusPillProps {
   literal?: string | undefined;
   /** Default `'auto'`: resolved from the state's own `attention` field. */
   variant?: "auto" | "quiet" | "loud";
+  /**
+   * Default `'md'`: M3's chip — 32px tall when loud, a `label-large` (14px)
+   * label, an 18px glyph, 8px leading and 16px trailing padding
+   * (`AssistChipTokens`). `'sm'` is the dense register this pill used to
+   * be at every size: 20px loud, a 12px caption, a 14px glyph — reach for
+   * it in a table row or anywhere a column of pills sets the row height.
+   */
   size?: "sm" | "md";
   /** Render the mono enum literal beside the label. True in detail views,
    * false in tables, where the label alone is enough and the literal is
@@ -82,7 +89,7 @@ export function StatusPill({
   meta,
   literal,
   variant = "auto",
-  size = "sm",
+  size = "md",
   showLiteral = false,
   detail,
   pending = false,
@@ -93,7 +100,14 @@ export function StatusPill({
   const resolvedVariant = variant === "auto" ? meta.attention : variant;
   const loud = resolvedVariant === "loud";
   const hue = HUE_CLASSES[meta.hue];
-  const markSize = size === "md" ? 16 : 14;
+  const md = size === "md";
+  // The glyph keeps its 16-unit geometry (`state-mark.tsx`); only the
+  // rendered size changes. 18px is M3's chip icon (`AssistChipTokens.
+  // IconSize`).
+  const markSize = md ? 18 : 14;
+  // Loud and pending-quiet pills draw a box; these are its dimensions.
+  // `md` is a 32px M3 chip; `sm` is the dense 20px pill.
+  const box = md ? "h-8 rounded-sm border pr-4 pl-2" : "rounded-sm border py-0.5 pr-1.5 pl-[5px]";
 
   const Comp = interactive ? "button" : "span";
 
@@ -119,9 +133,9 @@ export function StatusPill({
       // something to bolt onto every row silently.
       title={meta.tooltip}
       className={cn(
-        "inline-flex items-center gap-[5px] whitespace-nowrap align-middle",
-        "text-caption",
-        loud && [hue.bg, hue.border, "rounded-sm border py-0.5 pr-1.5 pl-[5px] font-medium"],
+        "inline-flex items-center whitespace-nowrap align-middle",
+        md ? "gap-2 text-label-large" : "gap-[5px] text-caption",
+        loud && [hue.bg, hue.border, box, "font-medium"],
         // A dashed outline, and NOT dimming. `pending` used to be
         // `opacity-60`, which took its own text to 2.71:1 against the
         // page — below AA, and unreadable at exactly the moment a reader
@@ -134,7 +148,7 @@ export function StatusPill({
         // loud one has — otherwise `pending` would be invisible on the
         // majority of pills.
         pending && "border-dashed",
-        pending && !loud && "rounded-sm border border-edge-strong py-0.5 pr-1.5 pl-[5px]",
+        pending && !loud && [box, "border-edge-strong"],
         interactive && "cursor-pointer",
         className,
       )}
