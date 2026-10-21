@@ -28,9 +28,10 @@ import { describe, expect, it } from "vitest";
  * mixed*, not of the resulting hex, so it is asserted structurally: every
  * `--skeleton-tonal-*` token must mix `--color-base-content` (the neutral
  * foreground) and none may mix `--aurora-*` or a `--state-*-fg`. The
- * `--skeleton-aurora-*` tokens `Skeleton`'s `instrument` prop opts into
- * are asserted the other way, so a future edit cannot quietly collapse
- * the two paints into one without a test noticing.
+ * `--skeleton-instrument-*` tokens `Skeleton`'s `instrument` prop opts
+ * into are asserted the other way — the seed's primary family, never the
+ * neutral foreground and never a status hue — so a future edit cannot
+ * quietly collapse the two paints into one without a test noticing.
  */
 
 const THEME_CSS = readFileSync(
@@ -68,10 +69,13 @@ function tonalMixSources(): string[] {
   ].map((m) => m[1] as string);
 }
 
-/** Every `--skeleton-aurora-<n>:` declaration's `color-mix` source variable. */
-function auroraMixSources(): string[] {
+/** Every `--skeleton-instrument-<n>:` declaration's `color-mix` source
+ * variable. `in \w+` rather than a fixed space, so changing the mixing
+ * space cannot make this match nothing and pass vacuously — the count
+ * assertion below fails instead. */
+function instrumentMixSources(): string[] {
   return [
-    ...THEME_CSS.matchAll(/--skeleton-aurora-\d:\s*color-mix\(in oklab,\s*var\((--[\w-]+)\)/g),
+    ...THEME_CSS.matchAll(/--skeleton-instrument-\d:\s*color-mix\(\s*in \w+,\s*var\((--[\w-]+)\)/g),
   ].map((m) => m[1] as string);
 }
 
@@ -86,11 +90,11 @@ describe("the tonal drift is a neutral brightness texture, not a coloured one", 
     }
   });
 
-  it("--skeleton-aurora-* still mixes the aurora ramp, for the instrument opt-in", () => {
-    const sources = auroraMixSources();
+  it("--skeleton-instrument-* mixes only the seed's primary family, for the instrument opt-in", () => {
+    const sources = instrumentMixSources();
     expect(sources.length).toBeGreaterThanOrEqual(8);
     for (const source of sources) {
-      expect(source).toMatch(/^--aurora-\d$/);
+      expect(source).toMatch(/^--md-sys-color-primary(-container)?$/);
     }
   });
 });
@@ -101,12 +105,12 @@ describe("the geometry is shared and only the paint switches on .skeleton-instru
     expect(THEME_CSS).toMatch(/\.skeleton-chaos::after\s*{[\s\S]{0,300}--skeleton-tonal-3/);
   });
 
-  it("the .skeleton-instrument modifier repaints with --skeleton-aurora-*", () => {
+  it("the .skeleton-instrument modifier repaints with --skeleton-instrument-*", () => {
     expect(THEME_CSS).toMatch(
-      /\.skeleton-chaos\.skeleton-instrument::before\s*{[\s\S]{0,300}--skeleton-aurora-1/,
+      /\.skeleton-chaos\.skeleton-instrument::before\s*{[\s\S]{0,300}--skeleton-instrument-1/,
     );
     expect(THEME_CSS).toMatch(
-      /\.skeleton-chaos\.skeleton-instrument::after\s*{[\s\S]{0,300}--skeleton-aurora-3/,
+      /\.skeleton-chaos\.skeleton-instrument::after\s*{[\s\S]{0,300}--skeleton-instrument-3/,
     );
   });
 });

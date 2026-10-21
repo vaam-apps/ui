@@ -51,12 +51,13 @@ The corollary is the part people trip over. **If a hue means a state, then a
 coloured surface anywhere else is a lie.** A tinted card, a per-state border on
 a panel, a chrome accent picked because it looked good — each of them invites a
 reader to infer a status that nobody encoded. So there is no per-state tinting
-of chrome in this library, and there is exactly one coloured surface: the
-`--aurora-*` ramp behind `InstrumentPanel` and `Card glow`. It is bound by
-`color-mix` to the system's own hues so it cannot drift into a fifth invented
-palette, and it carries **no meaning at all** — no status is inferable from it,
-there is no per-state variant, and a caller cannot tint it. That absence of
-meaning, not a separate hue, is the only reason a coloured surface is safe here.
+of chrome in this library, and there is exactly one coloured register: the
+instrument register — `InstrumentPanel`'s shapes, `Card glow`'s halo and
+`Skeleton instrument`'s drift — painted in the seed's own `primary-container`,
+the one hue family the system reserves for chrome, and in nothing else. It
+carries **no meaning at all** — no status is inferable from it, there is no
+per-state variant, and a caller cannot tint it. (It used to be the `--aurora-*`
+ramp, bound to the status hues; that ramp is deprecated and nothing renders it.)
 
 ## Three surface registers
 
@@ -147,8 +148,8 @@ should mean arguing with the reason rather than noticing the absence.
   positioning dependency with another was the trade being declined. The
   component also sets a native `title` alongside, as a fallback for the case a
   scrolling ancestor clips the positioned bubble away.
-- **No per-state tinting of chrome.** See above. The aurora ramp is the one
-  coloured surface, and its whole safety argument is that it means nothing.
+- **No per-state tinting of chrome.** See above. The instrument register is the
+  one coloured surface, in the primary family only, and it means nothing.
 - **No success or warning button.** Those hues belong to status. A button is
   primary (M3 filled), secondary (outlined), ghost (text), elevated or
   destructive. Mixing the two vocabularies is how a status language erodes:
@@ -166,8 +167,8 @@ should mean arguing with the reason rather than noticing the absence.
   nothing else to do.
 - **No skeleton shimmer.** A shimmer sweeps on a fixed period, which reads as
   progress a placeholder cannot know about, and a column of them beats like a
-  metronome. `Skeleton` runs a chaotic aurora drift on coprime periods (23s and
-  31s) instead, and stops entirely under `prefers-reduced-motion`.
+  metronome. `Skeleton` runs a chaotic drift on coprime periods (9s and 13s)
+  instead, and stops entirely under `prefers-reduced-motion`.
 - **No toast for anything an operator must act on.** Toasts are for transient
   confirmations — copied, saved, replay queued. A toast that expires while
   somebody is reading a payload is a lost message, so anything actionable is

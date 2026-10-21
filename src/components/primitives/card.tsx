@@ -3,7 +3,9 @@ import { cn } from "../../lib/cn";
 
 export interface CardProps extends HTMLAttributes<HTMLDivElement> {
   /**
-   * Wraps the card in a multi-hue aurora glow.
+   * Wraps the card in a soft halo in the seed's `primary-container` — the
+   * hue family `InstrumentPanel`'s shapes and `Skeleton instrument`'s
+   * drift are drawn in, so the three read as one register.
    *
    * For the **instrument register** only — dashboard and metric surfaces,
    * where the job is to make one number findable. Not for a card in a
@@ -13,7 +15,9 @@ export interface CardProps extends HTMLAttributes<HTMLDivElement> {
    *
    * Carries no meaning. A glow is not a status, cannot be tinted per
    * state, and nothing should be inferred from its presence — the hue
-   * vocabulary stays entirely with `StatusHue`.
+   * vocabulary stays entirely with `StatusHue`. It used to be drawn from
+   * the status hues themselves (the deprecated `.aurora-glow`); the
+   * primary family is chrome by definition and needs no such exception.
    */
   glow?: boolean | undefined;
 }
@@ -53,10 +57,10 @@ export function Card({ className, glow = false, ...props }: CardProps) {
       className={cn(
         "card min-w-0 border border-edge bg-base-300",
         // `shadow-none` is a Tailwind utility and lands unlayered, so it
-        // would outrank `.aurora-glow`'s `@layer components` rule and the
-        // glow would silently not paint. It is emitted only when there is
-        // no glow to suppress.
-        glow ? "aurora-glow" : "shadow-none",
+        // would outrank `.instrument-glow`'s `@layer components` rule and
+        // the glow would silently not paint. It is emitted only when there
+        // is no glow to suppress.
+        glow ? "instrument-glow" : "shadow-none",
         className,
       )}
       {...props}

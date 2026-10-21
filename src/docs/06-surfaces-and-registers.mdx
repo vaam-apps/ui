@@ -20,8 +20,9 @@ doing on that surface**.
   near-black page is invisible.
 - **Instrument** — dashboards and metrics. You *scan* these. The job is
   to make one number findable in a glance. These get chrome no other
-  register wears: `InstrumentPanel`'s Expressive shapes, or `Card glow`'s
-  aurora.
+  register wears: `InstrumentPanel`'s Expressive shapes, `Card glow`'s
+  halo, and `Skeleton instrument`'s drift — all three in one hue family,
+  the seed's `primary-container`.
 
 `theme.css` states the default directly: borders, not shadows, for
 cards, tables and panels; only floating layers get one. The instrument
@@ -81,6 +82,13 @@ discipline: a glow on every card is a glow on none.
 
 <Canvas of={InstrumentPanelStories.GlowAndPlainTogether} />
 
+And `Skeleton instrument` is the register's placeholder. The three are
+drawn from the same two roles — `primary-container`, with `primary` where
+a pale role needs depth — so a panel, a glowing card and the figures still
+loading inside them read as one kind of surface:
+
+<Canvas of={InstrumentPanelStories.OneRegisterOneHue} />
+
 ## The chrome carries no meaning
 
 This is the load-bearing constraint of the whole register, and without it
@@ -95,9 +103,9 @@ the colour is provably incapable of carrying a state. So:
   chrome. Not `secondary` or `tertiary`: Expressive rotates those toward
   the status greens at this seed. And a clover, not a small whole cookie,
   because a scalloped disc beside a figure reads as a "verified" seal.
-- `Card glow` (and the `.aurora-mesh` class the panel used to paint) is
-  drawn from the `--aurora-*` ramp, which is bound by `color-mix` to the
-  system's own hues, so it cannot drift away from the palette.
+- `Card glow`'s halo (`--instrument-glow`) and `Skeleton instrument`'s
+  drift (`--skeleton-instrument-*`) are mixed from the same family, so
+  the register has one palette rather than one per component.
 - There is **no per-state variant** and **no way for a caller to tint
   it**. `InstrumentPanel` takes a title, a caption and children. Nothing
   else.
@@ -105,10 +113,23 @@ the colour is provably incapable of carrying a state. So:
   express one through either.
 
 The hue vocabulary stays entirely with `StatusHue`. That is the only
-reason a coloured surface is safe here, and it is why the ramp is closed
-rather than exposed.
+reason a coloured surface is safe here, and it is why none of these
+paints takes a colour from a caller.
 
-The ramp itself was once less honest than its comment. The first version
+## The aurora ramp, deprecated
+
+`Card glow` and `Skeleton instrument` used to paint with the `--aurora-*`
+ramp — four stops bound by `color-mix` to the status hues, an exception
+to "colour means status" that every comment about it had to argue for.
+The panel moved off it first (its mesh became the Expressive shapes);
+the glow and the skeleton followed, so the register no longer has two
+colour schemes. `--aurora-*`, `--skeleton-aurora-*`, `.aurora-glow` and
+`.aurora-mesh` are still in `theme.css`, unchanged, for a consumer who
+applied them by hand; nothing in the package renders them, and they go
+in the next major.
+
+The history is kept because it is the reasoning the light-theme values
+below still follow. The ramp was once less honest than its comment. The first version
 declared it "named rather than borrowed" while all four values were in
 fact the status palette copy-pasted as literals, with nothing binding
 them and the two themes borrowing inconsistently. They are `color-mix`
@@ -118,8 +139,11 @@ the cyan and the violet it was meant to separate, so the mesh read as one
 hue with a gradient. It is a mix toward `--state-danger-fg` now, a rose
 between `parked`'s fuchsia and `danger`, with the stop alphas raised
 (dark 30/26/22/14, light 20/17/15/10, from 22/18/16/10 and 14/12/11/7).
-The ramp is deliberately not the seed's `primary`: that hue is the
-interactive one, and a glow is not a control.
+It was kept off the seed's `primary` on the argument that the primary hue
+is the interactive one and a glow is not a control. That argument lost to
+a simpler one: two colour schemes in one register read as two registers,
+and the primary family is the only hue this system can paint chrome in
+without arguing for an exception.
 
 ## `--subtle-foreground` is banned on the panel
 
@@ -194,10 +218,12 @@ transform-only on coprime periods for reasons of its own.
 
 This one is worth a section because the principled-looking move was
 measured and rejected, and the finding is written into `theme.css` so
-nobody re-derives it.
+nobody re-derives it. It was found on the deprecated aurora glow; it is
+why the light `--instrument-glow` and `--skeleton-instrument-*` lean on
+`primary` rather than on `primary-container`.
 
-`Card glow` paints four offset shadows in four hues. In dark they read as
-four. **In light they collapsed into one grey-lilac smudge.**
+The aurora glow painted four offset shadows in four hues. In dark they
+read as four. **In light they collapsed into one grey-lilac smudge.**
 
 The cause is a constraint imported from the wrong place. Light's
 `--state-*-fg` values are dark and desaturated *because they are text
@@ -214,22 +240,39 @@ budget.
 What actually works is alpha. Light keeps the darker, more chromatic
 values and spends its budget on opacity instead: a `[data-theme="light"]`
 override takes the four glow stops to **78/72/66/58%**, against dark's
-60/55/50/40%. The skeleton goes the other way — light's stops are *lower*
-than dark's, because the same values do more work on a near-white ground
+60/55/50/40%. The aurora skeleton went the other way — light's stops were
+*lower* than dark's, because the same values do more work on a near-white ground
 and at dark's strengths the light skeleton reads as periwinkle rather
 than as a tint.
 
-One consequence is worth knowing before editing that block. The light
-override is `[data-theme="light"] .aurora-glow`, specificity (0,2,0). The
-reduced-motion softening had to be spelled out for **both** selectors,
-because a bare `.aurora-glow` inside the media query is (0,1,0) and
-specificity beats source order — it would have silently lost, leaving
-reduced-motion readers in the light theme with the full four-hue bloom
-and nothing anywhere reporting it.
+The same rule, applied to one hue: light `primary-container` (#bdbaff) on
+a near-white page is a tint, so the light halo is a `primary-container`
+ring for the colour plus two `primary` shadows (30% and 38%) for the
+depth, where dark gets away with `primary-container` at 18% and 40% and
+one `primary` shadow at 36%. The light skeleton spends 72% and 56% of
+`primary-container` on its strong tiers and 22% and 14% of `primary` on
+its faint ones; dark keeps the tonal falloff, 30/26/22/14%.
+
+Text is never placed on the halo inside the library, but a caller's caption
+can sit under a glowing card, so the halo was measured there — the worst
+pixel of a row below the card, in Chromium. `--muted-foreground` clears
+4.5:1 from 4px below in dark (4.78:1) and from 8px in light (4.55:1);
+`--subtle-foreground` only from 16px (4.75:1 and 4.67:1). The aurora glow
+was worse at every distance: subtle at 3.69:1 and 3.30:1 even 16px away.
+Keep such a caption `muted`, and at least a `gap-2` from the card.
+
+One consequence of the old block is worth knowing. Its light override was
+`[data-theme="light"] .aurora-glow`, specificity (0,2,0), so the
+reduced-motion softening had to be spelled out for **both** selectors:
+a bare `.aurora-glow` inside the media query is (0,1,0), and specificity
+beats source order. `.instrument-glow` avoids the trap by construction:
+the whole shadow list is a per-theme token, `--instrument-glow` (and
+`--instrument-glow-reduced`), so the rule and its reduced-motion form are
+one selector each and there is no theme selector to lose to.
 
 ## Two implementation notes that look like bugs
 
-**The glow is four `box-shadow`s, not a blurred pseudo-element.** The
+**The glow is stacked `box-shadow`s, not a blurred pseudo-element.** The
 pseudo-element version is the obvious one and it does not survive contact
 with a real page: it needs `z-index: -1` to sit behind the card's own
 opaque background, and a negative-z-index element paints in the *root*

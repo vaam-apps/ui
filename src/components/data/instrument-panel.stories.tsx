@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Card, CardBody, CardHeader } from "../primitives/card";
+import { Skeleton, SkeletonText } from "../primitives/skeleton";
 import { InstrumentPanel } from "./instrument-panel";
 import { Money } from "./money";
 import { StatTile } from "./stat-tile";
@@ -110,6 +111,32 @@ export const GlowAndPlainTogether: Story = {
             A plain card — a hairline on a surface step, which is the library's default and stays
             the default.
           </p>
+        </CardBody>
+      </Card>
+    </div>
+  ),
+};
+
+/**
+ * The whole register in one place: the panel, a `Card glow` beside it,
+ * and `Skeleton instrument` standing in for the figures that have not
+ * arrived. One hue family — the panel's shapes, the glow and the drift
+ * are all the seed's `primary-container` (with `primary` for depth) — so
+ * the three read as one kind of surface. Switch the theme: they move
+ * together, because every one of them is mixed from the same two roles.
+ */
+export const OneRegisterOneHue: Story = {
+  render: () => (
+    <div className="grid w-full max-w-[56rem] items-start gap-8 sm:grid-cols-2">
+      <InstrumentPanel title="Delivery" caption="Last 24 hours, loading">
+        <Skeleton className="h-9 w-28" instrument />
+        <SkeletonText lines={2} className="mt-3" instrument />
+      </InstrumentPanel>
+      <Card glow>
+        <CardHeader title="Delivery rate" meta="last 24h" />
+        <CardBody>
+          <p className="font-mono text-metric text-foreground tabular-nums">98.2%</p>
+          <p className="mt-1 text-caption text-muted-foreground">12,481 of 12,710 terminal</p>
         </CardBody>
       </Card>
     </div>

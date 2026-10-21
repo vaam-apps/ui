@@ -17,7 +17,8 @@ reviewer will notice immediately.
   shadow, because they overlap a ground they do not know.
 - **Instrument** — `InstrumentPanel`, and `Card` with `glow`. An M3
   Expressive container (tonal fill, 28px corner, two decorative shapes in
-  its corner; no border, no shadow), or an aurora glow at card scale, for
+  its corner; no border, no shadow), or a `primary-container` halo at card
+  scale, for
   data you _scan_ rather than read: a row of metrics, a headline figure and
   its denominator. Use it sparingly — a screen where every card glows has
   no glow.
@@ -34,11 +35,14 @@ see `status-system.md`. Do not reach for a Tailwind colour to say
 "failed": the whole point is that one failure looks the same on every
 screen in the console.
 
-The decorative colour — the aurora glow, and `InstrumentPanel`'s shapes
-in the seed's `primary-container` — deliberately carries no state, cannot
-be tinted per state, and cannot drift into looking like a signal: the glow
-is bound to the status hue ramp by `color-mix`, and the shapes use the one
-hue family this system reserves for chrome. That is the only reason a
+The decorative colour — the instrument register: `InstrumentPanel`'s
+shapes, `Card glow`'s halo and `Skeleton instrument`'s drift — deliberately
+carries no state, cannot be tinted per state, and cannot drift into
+looking like a signal: all three are mixed from the seed's
+`primary-container` (with `primary` for depth), the one hue family this
+system reserves for chrome, so the register reads as one family. The old
+multi-hue `--aurora-*` ramp, bound to the status hues, is deprecated —
+see `pitfalls.md`. That is the only reason a
 coloured surface is safe in a system whose premise is that colour means
 something.
 

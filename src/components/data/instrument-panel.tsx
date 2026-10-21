@@ -46,7 +46,9 @@ export interface InstrumentPanelProps extends Omit<HTMLAttributes<HTMLDivElement
  *   findable in a glance, and a ground that is visibly a different kind of
  *   surface does that better than a fourth kind of border.
  *
- * `Card glow` is the same register at card scale.
+ * `Card glow` is the same register at card scale, and `Skeleton
+ * instrument` is its placeholder. All three are drawn in one hue family —
+ * see "The shapes carry no meaning" below.
  *
  * # What makes it M3 Expressive, and what each choice is for
  *
@@ -96,8 +98,11 @@ export interface InstrumentPanelProps extends Omit<HTMLAttributes<HTMLDivElement
  *
  * The aurora mesh this replaced was drawn from the status hues, an
  * exception this file used to argue for; a primary-family shape does not
- * need the exception. `Card glow` and `Skeleton instrument` still use the
- * aurora ramp.
+ * need the exception. `Card glow`'s halo (`--instrument-glow`) and
+ * `Skeleton instrument`'s drift (`--skeleton-instrument-*`) are mixed from
+ * the same two roles, `primary-container` and `primary`, so the register
+ * is one colour family. The `--aurora-*` ramp, `.aurora-glow` and
+ * `.aurora-mesh` are deprecated and nothing in the package renders them.
  *
  * # Why the caption tier steps up
  *

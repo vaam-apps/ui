@@ -81,7 +81,25 @@ the 4.5:1 AA bar, while `text-muted-foreground` holds at 5.95:1 and
 4.71:1. On the bare container beside it subtle passes, which is why it
 looks fine until a caption runs into the corner. `InstrumentPanel` already
 steps its own caption up; do not push it back down. The same ban applies
-to the `.aurora-mesh` class, if you apply it by hand.
+to the deprecated `.aurora-mesh` class, if you apply it by hand.
+
+A caption _under_ a `Card glow` sits on its halo. Measured in Chromium,
+`text-muted-foreground` clears 4.5:1 from 4px below the card in dark and
+from 8px in light; `text-subtle-foreground` only from 16px. Keep that
+caption muted and at least a `gap-2` away.
+
+## My hand-applied `.aurora-glow` or `.aurora-mesh` doesn't match the panel
+
+The `--aurora-*` ramp, `--skeleton-aurora-*`, `.aurora-glow` and
+`.aurora-mesh` are **deprecated**. They still render, unchanged, but
+nothing in the package uses them any more: the instrument register is one
+hue family, the seed's `primary-container`, so a multi-hue aurora beside
+an `InstrumentPanel` reads as a second colour scheme. Use `<Card glow>`
+(or the `.instrument-glow` class, whose shadow list is the per-theme
+`--instrument-glow` token) instead of `.aurora-glow`, `<Skeleton
+instrument>` instead of pointing a gradient at `--skeleton-aurora-*`, and
+`<InstrumentPanel>` instead of `.aurora-mesh`. They are removed in the
+next major.
 
 ## My content sits under the nav rail
 

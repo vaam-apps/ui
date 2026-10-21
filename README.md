@@ -476,8 +476,9 @@ Worth knowing before you fight them:
   because they overlap a ground they do not know, and drawers are M3
   sheets: no border, `surface-container-low`, rounded where they meet the
   page. *Instrument*
-  surfaces — dashboards and metrics, the places you **scan** — get an
-  aurora: `InstrumentPanel`'s mesh ground, or `Card glow`. The third one
+  surfaces — dashboards and metrics, the places you **scan** — get chrome
+  in the seed's `primary-container`: `InstrumentPanel`'s Expressive
+  shapes, `Card glow`'s halo, `Skeleton instrument`'s drift. The third one
   is a deliberate exception, not a loosening: a glow on every card is a
   glow on none, and the rule still holds everywhere it was doing work.
 - **There is no success or warning *button*, and no tonal one.** Those
@@ -488,13 +489,15 @@ Worth knowing before you fight them:
   how a status language erodes.
 - **Empty states are inline status lines, not centred placards** — see
   `InlineEmptyState`.
-- **Hue means status, with exactly one exception.** The `--aurora-*` ramp
-  — the skeleton's drift, `InstrumentPanel`'s mesh, `Card glow` — is
-  chrome: bound by `color-mix` to the system's own hues so it cannot
-  drift, and carrying no meaning at all. Nothing infers a state from it
-  and no caller can express one through it, which is the only reason a
-  coloured surface is safe in a system whose premise is that colour
-  means something.
+- **Hue means status; chrome is the primary family.** The instrument
+  register — `InstrumentPanel`'s shapes, `Card glow`, `Skeleton
+  instrument` — is painted in `primary-container` and `primary` alone,
+  and carries no meaning at all. Nothing infers a state from it and no
+  caller can express one through it, which is the only reason a coloured
+  surface is safe in a system whose premise is that colour means
+  something. The old `--aurora-*` ramp, bound to the status hues, is
+  deprecated (with `.aurora-glow` and `.aurora-mesh`): nothing renders
+  it, and it goes in the next major.
 - **Two of the eight status hues are quiet.** `neutral` and `success`
   declare `transparent` for their own fill and border on purpose, so a
   screen where most rows succeeded is a column of glyphs and words rather
