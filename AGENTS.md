@@ -82,9 +82,11 @@ devDependency, patched (`pnpm-workspace.yaml` says why); consumers get
 static CSS.
 
 **Colour means something, and the status system owns it.** `StatusHue` is
-the vocabulary. Decorative chrome (the aurora glow and mesh) carries no
-state, cannot be tinted per state, and is bound to the same hues precisely
-so it cannot drift into looking like a signal. Do not add a coloured
+the vocabulary. Decorative chrome (the instrument register: the panel's
+shapes, `Card glow`, `Skeleton instrument`) carries no state, cannot be
+tinted per state, and is painted in `primary-container`/`primary` only.
+The `--aurora-*` ramp it used to draw from is deprecated, unused, and
+goes in the next major. Do not add a coloured
 surface that a reader could mistake for a status. Only the seed's
 `primary` family is chrome: Expressive rotates `secondary`/`tertiary`
 toward the status greens at this seed, so where M3 draws a selection in
@@ -93,8 +95,9 @@ toward the status greens at this seed, so where M3 draws a selection in
 **Three surface registers**, described in full in
 `src/components/data/instrument-panel.tsx`: *diagnostic* (a hairline on a
 surface step — most of the library), *floating* (a shadow, because it
-overlaps a ground it does not know), *instrument* (the aurora mesh; you
-scan it rather than read it).
+overlaps a ground it does not know), *instrument* (the panel's Expressive
+shapes, `Card glow`, `Skeleton instrument`, all in `primary-container`;
+you scan it rather than read it).
 
 **`surface-3` is two things: the ladder's top step and the hover,
 pressed and selected fill.** A panel painted `surface-3` (a `Dialog`, M3's
@@ -137,7 +140,7 @@ bugs.
 
 **daisyUI emits into nested cascade layers.** An unlayered Tailwind utility
 outranks a nested sublayer, so `rounded-field` in a base class string beats
-`.btn-circle`, and a `shadow-none` utility would beat `.aurora-glow`. When a
+`.btn-circle`, and a `shadow-none` utility would beat `.instrument-glow`. When a
 daisyUI component class appears not to apply, this is why. It has happened
 twice.
 

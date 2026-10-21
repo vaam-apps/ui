@@ -61,8 +61,11 @@
  * why there is no tonal button: M3 defines it as `secondary-container`
  * with an `on-secondary-container` label, and that label measured 12.98
  * from light `success` — under the floor two status hues must clear.
- * Decorative chrome (the aurora glow and mesh) is still bound to the status
- * hues by `color-mix` and still carries no state.
+ * The instrument register's chrome — `InstrumentPanel`'s shapes, `Card
+ * glow`, `Skeleton instrument`'s drift — is mixed from `primary-container`
+ * and `primary` alone, and carries no state. The `--aurora-*` ramp it used
+ * to draw from was bound to the status hues; it is deprecated and nothing
+ * in the package reads it.
  *
  * # Themes
  *
@@ -994,9 +997,12 @@
   --ring-subtle: rgb(207 205 255 / 0.24);
   /* </md3:generated theme="dark"> */
 
-  /* Decorative paint for the skeleton drift and the instrument register;
-     the ramp itself is in the shared block below. Dark spends more alpha
-     than light because the same hue does less on a dark ground. */
+  /* Deprecated, and nothing in this package reads them any more: the
+     multi-hue skeleton paint `Skeleton instrument` used before the
+     instrument register moved onto the seed's `primary-container`
+     (`--skeleton-instrument-*` below). Kept, byte for byte, for a consumer
+     who points a gradient of their own at them; removed in the next
+     major. The ramp itself is `--aurora-*`, in the shared block below. */
   --skeleton-aurora-1: color-mix(in oklab, var(--aurora-1) 30%, transparent);
   --skeleton-aurora-2: color-mix(in oklab, var(--aurora-2) 26%, transparent);
   --skeleton-aurora-3: color-mix(in oklab, var(--aurora-3) 22%, transparent);
@@ -1004,8 +1010,9 @@
 
   /* The default drift's paint (§3.8, "the skeleton's chaotic gradient"
      below). `--color-base-content` is `on-surface`, a near-achromatic tone
-     of the neutral palette, so the same four-tier falloff the aurora ramp
-     uses reads as a brightness texture instead of a tint. */
+     of the neutral palette, so the four-tier falloff (the one
+     `--skeleton-instrument-*` below shares in this theme) reads as a
+     brightness texture instead of a tint. */
   --skeleton-tonal-1: color-mix(in oklab, var(--color-base-content) 30%, transparent);
   --skeleton-tonal-2: color-mix(in oklab, var(--color-base-content) 26%, transparent);
   --skeleton-tonal-3: color-mix(in oklab, var(--color-base-content) 22%, transparent);
@@ -1030,6 +1037,43 @@
     var(--md-sys-color-primary-container) 5%,
     var(--instrument-container)
   );
+
+  /* The rest of the instrument register, in the same hue family as the
+     panel's shapes. `Skeleton instrument`'s drift (§3.8, "the skeleton's
+     chaotic gradient" below): the tonal drift's four-tier falloff
+     (30/26/22/14%), unchanged, alternating `primary-container` with
+     `primary`. In dark the two are one tone apart (#c0bdfe, #cfcdff), so
+     the alternation is a brightness step inside one hue, not two hues.
+     `in srgb` with `transparent` keeps each stop the role's own channels
+     at an alpha, which is what lets the real-browser gate check that the
+     paint is the role and not a status hue. */
+  --skeleton-instrument-1: color-mix(
+    in srgb,
+    var(--md-sys-color-primary-container) 30%,
+    transparent
+  );
+  --skeleton-instrument-2: color-mix(in srgb, var(--md-sys-color-primary) 26%, transparent);
+  --skeleton-instrument-3: color-mix(
+    in srgb,
+    var(--md-sys-color-primary-container) 22%,
+    transparent
+  );
+  --skeleton-instrument-4: color-mix(in srgb, var(--md-sys-color-primary) 14%, transparent);
+
+  /* `Card glow`: a halo, not a drop shadow. Three stacked box-shadows,
+     tight to wide, the two inner ones `primary-container` and the widest
+     `primary`. A whole shadow list per theme, so `.instrument-glow` is one
+     rule and its reduced-motion form cannot lose a specificity fight with
+     a theme selector (the trap the deprecated `.aurora-glow` below fell
+     into and had to spell its way out of). Dark needs little: a light
+     lavender on a near-black page carries on its own. */
+  --instrument-glow:
+    0 0 0 1px color-mix(in srgb, var(--md-sys-color-primary-container) 18%, transparent),
+    0 2px 24px -4px color-mix(in srgb, var(--md-sys-color-primary-container) 40%, transparent),
+    0 18px 48px -18px color-mix(in srgb, var(--md-sys-color-primary) 36%, transparent);
+  --instrument-glow-reduced:
+    0 0 0 1px color-mix(in srgb, var(--md-sys-color-primary-container) 14%, transparent),
+    0 4px 14px -8px color-mix(in srgb, var(--md-sys-color-primary-container) 26%, transparent);
 }
 
 /*
@@ -1197,7 +1241,12 @@
   --ring-subtle: rgb(87 85 169 / 0.18);
   /* </md3:generated theme="light"> */
 
-  /* Same ramp as dark, and deliberately NOT lightened toward white.
+  /* Deprecated with the dark set above: nothing in this package reads
+     these. The reasoning below is what they were drawn by, and it is why
+     the light `--skeleton-instrument-*` and `--instrument-glow` further
+     down lean on the dark `primary` rather than a pale role.
+
+     Same ramp as dark, and deliberately NOT lightened toward white.
 
      The light status foregrounds are dark, because they clear 4.5:1 as
      **text** on a near-white page, and a glow carries no text — so mixing
@@ -1207,8 +1256,8 @@
      that made it visible at all and the mesh went flat grey. On a light
      ground, saturation against the ground is the whole budget, so light
      spends it on alpha instead — lower than dark's, because the same
-     values do more work here. `.aurora-glow` carries its own light-theme
-     override for the same reason. */
+     values do more work here. The deprecated `.aurora-glow` carries its
+     own light-theme override for the same reason. */
   --skeleton-aurora-1: color-mix(in oklab, var(--aurora-1) 20%, transparent);
   --skeleton-aurora-2: color-mix(in oklab, var(--aurora-2) 17%, transparent);
   --skeleton-aurora-3: color-mix(in oklab, var(--aurora-3) 15%, transparent);
@@ -1235,6 +1284,37 @@
     var(--md-sys-color-primary-container) 16%,
     var(--instrument-container)
   );
+
+  /* Light inverts the split dark uses, for the reason the deprecated
+     aurora tokens above record: on a pale ground a pale role is invisible.
+     Light `primary-container` (#bdbaff) on `surface-3` (#ede4ff) is a
+     tint, so it carries the two strong tiers at a high share; `primary`
+     (#5755a9) is dark, so it carries the two faint ones, a little above
+     the tonal drift's light shares (22/14% against 17/10%) so the darker
+     ribbons still read as texture through the tint. */
+  --skeleton-instrument-1: color-mix(
+    in srgb,
+    var(--md-sys-color-primary-container) 72%,
+    transparent
+  );
+  --skeleton-instrument-2: color-mix(in srgb, var(--md-sys-color-primary) 22%, transparent);
+  --skeleton-instrument-3: color-mix(
+    in srgb,
+    var(--md-sys-color-primary-container) 56%,
+    transparent
+  );
+  --skeleton-instrument-4: color-mix(in srgb, var(--md-sys-color-primary) 14%, transparent);
+
+  /* On a near-white page the halo needs the dark role to show at all: a
+     `primary-container` ring for the colour, and two `primary` shadows
+     for the depth. */
+  --instrument-glow:
+    0 0 0 1px color-mix(in srgb, var(--md-sys-color-primary-container) 60%, transparent),
+    0 2px 24px -4px color-mix(in srgb, var(--md-sys-color-primary) 30%, transparent),
+    0 18px 48px -18px color-mix(in srgb, var(--md-sys-color-primary) 38%, transparent);
+  --instrument-glow-reduced:
+    0 0 0 1px color-mix(in srgb, var(--md-sys-color-primary-container) 50%, transparent),
+    0 4px 14px -8px color-mix(in srgb, var(--md-sys-color-primary) 22%, transparent);
 }
 
 /*
@@ -1321,8 +1401,15 @@
   --shadow-popover: var(--md-sys-elevation-level2), 0 0 0 1px var(--edge);
   --shadow-dialog: var(--md-sys-elevation-level3), 0 0 0 1px var(--edge);
 
-  /* The aurora ramp — the one place *chrome* carries hue, and it carries
-     the status hues on purpose: a placeholder should belong to the same
+  /* **Deprecated.** The aurora ramp. Nothing in this package reads it any
+     more: the instrument register — `InstrumentPanel`, `Card glow`,
+     `Skeleton instrument` — is drawn in `primary-container` and `primary`
+     (`--instrument-shape`, `--instrument-glow`, `--skeleton-instrument-*`).
+     Kept, unchanged, with `.aurora-glow` and `.aurora-mesh`, for a consumer
+     who applies them by hand; removed in the next major.
+
+     What follows is the reasoning it was drawn by. It carried the status
+     hues on purpose: a placeholder should belong to the same
      world as the thing it stands in for, and `color-mix` binds every stop
      to a real token so the ramp cannot drift from the palette. What makes
      it chrome is the absence of meaning: no status surface reads this
@@ -2135,7 +2222,7 @@
  * *spatial* (state-to-state) and *effects* (opacity/colour) motion — its
  * own token set has no ambient-loop category to reach for here either.
  *
- * # Colour: tonal by default, aurora by explicit opt-in
+ * # Colour: tonal by default, the primary family by explicit opt-in
  *
  * The drift used to paint with the `--aurora-*` ramp unconditionally —
  * decorative chrome bound to the system's status hues, everywhere a
@@ -2157,22 +2244,27 @@
  * for a surface this stylesheet cannot express as an actual extra surface
  * level (`--surface-3` is already the ladder's top step; see the surface
  * ladder comment above). `Skeleton`'s `instrument` prop switches the same
- * geometry back onto `--skeleton-aurora-*`, for the one case the register
+ * geometry onto `--skeleton-instrument-*`, for the one case the register
  * doctrine actually calls for it: a placeholder standing in for content
- * inside `InstrumentPanel`/`StatTile`, the scanned dashboard surfaces the
- * aurora ramp was drawn for in the first place.
+ * inside `InstrumentPanel`/`StatTile`, the scanned dashboard surfaces. That
+ * paint is the panel's own hue — `primary-container`, with `primary` on
+ * the alternate tiers — so a placeholder inside a panel is the same family
+ * as the shapes behind it. It was the multi-hue `--skeleton-aurora-*`
+ * until the panel moved off the aurora mesh; those tokens are deprecated.
  *
  * Three properties are deliberate and worth not undoing:
  *
  * - **Transform only.** Both layers animate `transform`, never
  *   `background-position` or `background-image`, so the whole effect is
  *   composited and a table of 200 skeleton cells costs no layout and no
- *   repaint. Swapping the paint between tonal and aurora is a static
+ *   repaint. Swapping the paint between tonal and instrument is a static
  *   `background-image` chosen by class at render time, not an animated
  *   property — it does not touch this.
  * - **Low amplitude, low contrast.** Four fields at 14–30% in dark and
- *   10–20% in light (both variants share the same falloff — see
- *   `--skeleton-tonal-1`'s comment above), over `--surface-3`. At a
+ *   10–20% in light for the tonal paint, over `--surface-3`. The
+ *   instrument paint keeps dark's shares and spends more in light, where
+ *   a pale role on a pale ground needs it (`--skeleton-instrument-1`'s
+ *   light comment has the numbers). At a
  *   glance it should read as a texture, not as a moving object —
  *   "silent".
  * - **Off under `prefers-reduced-motion`, and still correct.** Pausing
@@ -2251,10 +2343,10 @@
    *
    * Tonal by default (`--skeleton-tonal-*`); `Skeleton`'s `instrument`
    * prop adds `.skeleton-instrument`, which repaints the identical
-   * geometry onto `--skeleton-aurora-*` below. Same specificity trick as
-   * `.aurora-glow`'s light override: `.skeleton-chaos.skeleton-instrument`
-   * is (0,2,1) against this rule's (0,1,1), so it wins on specificity and
-   * does not depend on source order.
+   * geometry onto `--skeleton-instrument-*` below.
+   * `.skeleton-chaos.skeleton-instrument` is (0,2,1) against this rule's
+   * (0,1,1), so it wins on specificity and does not depend on source
+   * order.
    */
   .skeleton-chaos::before {
     background-image:
@@ -2270,21 +2362,21 @@
     animation: skeleton-drift-b 13s cubic-bezier(0.32, 0, 0.5, 0.9) infinite;
   }
 
-  /* The instrument-register opt-in: the same two layers, repainted with
-     the hued aurora ramp instead of the neutral one. For a placeholder
-     standing in for content inside `InstrumentPanel`/`StatTile` — the
-     scanned dashboard surfaces `--aurora-*` exists for — not for general
-     use; see the header comment above. */
+  /* The instrument-register opt-in: the same two layers, repainted in the
+     seed's primary family instead of the neutral one — the hue
+     `InstrumentPanel`'s shapes are drawn in. For a placeholder standing in
+     for content inside `InstrumentPanel`/`StatTile`, not for general use;
+     see the header comment above. */
   .skeleton-chaos.skeleton-instrument::before {
     background-image:
-      radial-gradient(58% 120% at 18% 30%, var(--skeleton-aurora-1), transparent 68%),
-      radial-gradient(46% 110% at 72% 78%, var(--skeleton-aurora-2), transparent 70%);
+      radial-gradient(58% 120% at 18% 30%, var(--skeleton-instrument-1), transparent 68%),
+      radial-gradient(46% 110% at 72% 78%, var(--skeleton-instrument-2), transparent 70%);
   }
 
   .skeleton-chaos.skeleton-instrument::after {
     background-image:
-      radial-gradient(70% 130% at 58% 12%, var(--skeleton-aurora-3), transparent 66%),
-      radial-gradient(40% 90% at 8% 88%, var(--skeleton-aurora-4), transparent 72%);
+      radial-gradient(70% 130% at 58% 12%, var(--skeleton-instrument-3), transparent 66%),
+      radial-gradient(40% 90% at 8% 88%, var(--skeleton-instrument-4), transparent 72%);
   }
 
   /*
@@ -2401,7 +2493,8 @@
 }
 
 /* ---------------------------------------------------------------------------
- * The instrument register: aurora glow, aurora mesh, and the panel.
+ * The instrument register: the panel, the glow, and the deprecated aurora
+ * classes.
  *
  * A third surface treatment, and it is a deliberate exception to "borders,
  * not shadows" rather than a loosening of it. The rule holds where it was
@@ -2412,15 +2505,21 @@
  * the job is to make one number findable rather than to keep forty rows
  * legible.
  *
- * The glow and the mesh draw from the `--aurora-*` ramp above, which is
- * bound by `color-mix` to the system's own hues. Neither carries meaning:
- * no status is inferable from a glow, and a caller cannot express one
- * through it. That is what keeps this out of the status vocabulary's way.
- * `InstrumentPanel` no longer uses the mesh — it is an M3 Expressive
- * container with two shapes in the seed's `primary-container`
- * (`.instrument-panel`, at the end of this layer) — so `.aurora-mesh`
- * stays only as a class a consumer may have applied by hand; nothing in
- * this package renders it.
+ * One hue family for all of it: the seed's `primary-container`, with
+ * `primary` where a pale role needs depth. `InstrumentPanel`'s two shapes
+ * (`.instrument-panel`, at the end of this layer), `Card glow`'s halo
+ * (`.instrument-glow`) and `Skeleton instrument`'s drift (in the skeleton
+ * block above) are all mixed from those two roles, so the register reads
+ * as one kind of surface rather than three. None of it carries meaning:
+ * no status is inferable from a shape, a halo or a drift, and a caller
+ * cannot express one through them. The primary family is the hue this
+ * system reserves for chrome, so that needs no argument.
+ *
+ * It used to need one. The glow and the mesh drew from the `--aurora-*`
+ * ramp, bound by `color-mix` to the status hues, and every comment about
+ * them justified the exception. `.aurora-glow` and `.aurora-mesh` are kept
+ * below, unchanged, and **deprecated**: nothing in this package renders
+ * either, and both go in the next major.
  *
  * # No `filter: blur()` here either, and this heading used to say the
  * opposite
@@ -2438,7 +2537,7 @@
  * demonstrate. Recorded rather than quietly deleted: `grep blur
  * src/styles/theme.css` returns comments only, and that is the check.
  *
- * # The mesh is static, and the alpha is capped
+ * # The (deprecated) mesh is static, and the alpha is capped
  *
  * No animation: a drifting field behind a number you are trying to read is
  * a different thing from one standing in for a number that has not
@@ -2454,8 +2553,48 @@
  * ------------------------------------------------------------------------- */
 @layer components {
   /*
-   * A multi-hue glow, as four offset coloured `box-shadow`s rather than a
-   * blurred pseudo-element.
+   * `Card glow`: a halo in the seed's primary family, as stacked
+   * `box-shadow`s rather than a blurred pseudo-element (the next comment
+   * has the autopsy of the pseudo-element). The shadow list is a per-theme
+   * token, `--instrument-glow`, declared beside `--instrument-shape`, so
+   * this is one rule for both themes and the reduced-motion override below
+   * needs no theme selector to win.
+   *
+   * `Card` drops its `shadow-none` when `glow` is set — a Tailwind
+   * utility is unlayered and would outrank this whole block.
+   *
+   * No text sits on the halo inside the library, but a caller's caption
+   * can sit under a glowing card, so it was measured there: the worst
+   * pixel of a row N px below the card, against the text tiers, in
+   * Chromium. `--muted-foreground` clears 4.5:1 from 4px below in dark
+   * (4.78:1) and from 8px in light (4.55:1); `--subtle-foreground` only
+   * from 16px in both (4.75:1 dark, 4.67:1 light). The multi-hue
+   * `.aurora-glow` it replaces was worse at every distance — subtle at
+   * 3.69:1 and 3.30:1 even 16px away — so this is a gain, but keep a
+   * caption under a glowing card `muted`, and at least a `gap-2` away.
+   */
+  .instrument-glow {
+    box-shadow: var(--instrument-glow);
+  }
+
+  /* Softened, not removed — a bloom is often part of what a reduced-motion
+     reader is asking to be spared, but the card keeps its identity as an
+     instrument surface. */
+  @media (prefers-reduced-motion: reduce) {
+    .instrument-glow {
+      box-shadow: var(--instrument-glow-reduced);
+    }
+  }
+
+  /*
+   * **Deprecated**: `.aurora-glow`, the multi-hue glow `Card glow` painted
+   * before the instrument register moved onto `primary-container`. Nothing
+   * in this package emits the class any more; it is kept unchanged for a
+   * consumer who applied it by hand, and removed in the next major. Move
+   * to `<Card glow>`, or to `.instrument-glow`.
+   *
+   * It was four offset coloured `box-shadow`s rather than a blurred
+   * pseudo-element, and the reason still holds for `.instrument-glow`.
    *
    * The pseudo-element version is the obvious one and it does not survive
    * contact with a real page. It needs `z-index: -1` to sit behind the
@@ -2473,9 +2612,6 @@
    * get in front of it. Four shadows at different offsets and hues give
    * the multicolour bleed a single shadow cannot, and it costs no filter,
    * no extra layer and no stacking-context assumptions.
-   *
-   * `Card` drops its `shadow-none` when `glow` is set — a Tailwind
-   * utility is unlayered and would outrank this whole block.
    */
   .aurora-glow {
     box-shadow:
@@ -2524,6 +2660,10 @@
     }
   }
 
+  /* **Deprecated**: the multi-hue mesh `InstrumentPanel` painted before
+     its M3 Expressive shapes. Nothing in this package renders it; kept,
+     unchanged, for a consumer who applied it by hand, and removed in the
+     next major. Move to `<InstrumentPanel>`. */
   .aurora-mesh {
     position: relative;
     isolation: isolate;

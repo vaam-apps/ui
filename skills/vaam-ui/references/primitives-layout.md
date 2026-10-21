@@ -15,13 +15,13 @@ The diagnostic surface: a hairline border on a `surface-2` step
 (`bg-base-300`), no shadow. This is the default container for a section of a screen — a
 provider's configuration, a delivery's detail, a group of related fields.
 
-| Prop                        | Type                    | Notes                                                       |
-| --------------------------- | ----------------------- | ----------------------------------------------------------- |
-| `Card` `glow`               | `boolean`               | Aurora glow. The instrument register only. Default `false`. |
-| `CardHeader` `title`        | `React.ReactNode`       | Rendered as a heading, truncated to one line.               |
-| `CardHeader` `headingLevel` | `2 \| 3 \| 4 \| 5 \| 6` | Default `3`.                                                |
-| `CardHeader` `meta`         | `React.ReactNode`       | A mono line under the title — ids, priorities, counts.      |
-| `CardHeader` `action`       | `React.ReactNode`       | Right-aligned slot, usually buttons.                        |
+| Prop                        | Type                    | Notes                                                                      |
+| --------------------------- | ----------------------- | -------------------------------------------------------------------------- |
+| `Card` `glow`               | `boolean`               | A `primary-container` halo. The instrument register only. Default `false`. |
+| `CardHeader` `title`        | `React.ReactNode`       | Rendered as a heading, truncated to one line.                              |
+| `CardHeader` `headingLevel` | `2 \| 3 \| 4 \| 5 \| 6` | Default `3`.                                                               |
+| `CardHeader` `meta`         | `React.ReactNode`       | A mono line under the title — ids, priorities, counts.                     |
+| `CardHeader` `action`       | `React.ReactNode`       | Right-aligned slot, usually buttons.                                       |
 
 `headingLevel` is a prop rather than a constant because a heading level
 belongs to the page's outline, not to the card. A card placed directly
@@ -32,7 +32,10 @@ screen-reader user experiences as a missing section.
 **`glow` carries no meaning.** It cannot be tinted per state and nothing
 should be read into its presence — the hue vocabulary stays entirely with
 the status system. It is for a surface whose job is to make one number
-findable, and a screen where every card glows has no glow.
+findable, and a screen where every card glows has no glow. The halo is
+the same hue family as `InstrumentPanel`'s shapes and `Skeleton
+instrument`'s drift, so the three read as one register; it used to be the
+multi-hue aurora (`.aurora-glow`, now deprecated).
 
 ```tsx
 import { Card, CardHeader, CardBody, DetailList, DetailRow } from "@vaam-apps/ui";
@@ -545,12 +548,12 @@ A placeholder for content whose shape is known but whose value has not
 arrived. Match the real element's height exactly, so nothing shifts when
 it lands.
 
-| Prop                           | Type      | Notes                                                                                                              |
-| ------------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------ |
-| `animated`                     | `boolean` | Default `true`. `false` is the flat block, for a placeholder inside something already moving.                      |
-| `instrument`                   | `boolean` | Default `false`. Paints the drift with the `--aurora-*` hue ramp instead of the neutral tonal default — see below. |
-| `SkeletonText` `lines`         | `number`  | Default `3`.                                                                                                       |
-| `SkeletonText` `lineClassName` | `string`  | Match the real text's line-height.                                                                                 |
+| Prop                           | Type      | Notes                                                                                                                 |
+| ------------------------------ | --------- | --------------------------------------------------------------------------------------------------------------------- |
+| `animated`                     | `boolean` | Default `true`. `false` is the flat block, for a placeholder inside something already moving.                         |
+| `instrument`                   | `boolean` | Default `false`. Paints the drift in the seed's `primary-container` instead of the neutral tonal default — see below. |
+| `SkeletonText` `lines`         | `number`  | Default `3`.                                                                                                          |
+| `SkeletonText` `lineClassName` | `string`  | Match the real text's line-height.                                                                                    |
 
 **It animates itself — do not add a pulse.** What runs is not a shimmer:
 a shimmer is a highlight sweeping on a fixed period, which reads as a
@@ -567,7 +570,11 @@ the stylesheet — no call site has to decide that.
 fields) and colour is chrome reserved for the instrument register (see
 `InstrumentPanel` in `data-display.md`). Set `instrument` only on a
 placeholder standing in for content that will itself render inside
-`InstrumentPanel`/`StatTile`; everywhere else, leave it off.
+`InstrumentPanel`/`StatTile`; everywhere else, leave it off. With it, the
+drift is the panel's own hue (`primary-container`, with `primary` on
+alternate tiers), so the placeholder and the shapes behind it read as one
+surface. It used to paint the multi-hue `--skeleton-aurora-*` ramp, which
+is deprecated.
 
 `SkeletonText`'s last line is short on purpose, which is why it is a
 component rather than a loop: a stack of equal-width bars reads as a table

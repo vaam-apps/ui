@@ -13,8 +13,9 @@ export interface SkeletonProps extends HTMLAttributes<HTMLDivElement> {
    */
   animated?: boolean;
   /**
-   * Paints the drift with the `--aurora-*` hue ramp instead of the
-   * neutral default.
+   * Paints the drift in the seed's `primary-container` (with `primary` on
+   * alternate tiers) instead of the neutral default — the hue
+   * `InstrumentPanel`'s shapes and `Card glow` are drawn in.
    *
    * `false` (the default) is the *tonal* drift: the same geometry, mixed
    * with `--color-base-content` instead of a hue, so it reads as a
@@ -26,11 +27,16 @@ export interface SkeletonProps extends HTMLAttributes<HTMLDivElement> {
    *
    * Set it `true` only for a placeholder standing in for content that
    * will itself render inside `InstrumentPanel`/`StatTile` — a scanned
-   * dashboard metric, not read prose. The hued chrome that surface is
-   * built for is decorative there for the same reason `Card`'s `glow`
-   * prop is opt-in rather than default: coloured chrome on every
-   * placeholder makes the one inside a real instrument panel no longer
-   * distinctive, and it is chrome a table cell has no business wearing.
+   * dashboard metric, not read prose. There it belongs to the panel's
+   * own hue family, so the placeholder and the shapes behind it read as
+   * one surface. Opt-in rather than default for the same reason `Card`'s
+   * `glow` prop is: coloured chrome on every placeholder makes the one
+   * inside a real instrument panel no longer distinctive, and it is
+   * chrome a table cell has no business wearing.
+   *
+   * It painted the multi-hue `--skeleton-aurora-*` ramp until the
+   * instrument register moved onto `primary-container`; those tokens are
+   * deprecated and nothing here reads them.
    */
   instrument?: boolean;
 }

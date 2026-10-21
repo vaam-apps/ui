@@ -23,9 +23,10 @@ const meta = {
           "know about, and a column of them beats in unison; a drift says only “still " +
           "waiting, not stuck”. Turn your OS reduced-motion setting on and reload: the " +
           "gradients stay, frozen where they stand. The drift itself paints tonal by " +
-          "default — a brightness texture, no hue — and only turns to the `--aurora-*` " +
-          "chrome when `instrument` is set, for a placeholder standing in for content that " +
-          "will itself render inside `InstrumentPanel`/`StatTile`.",
+          "default — a brightness texture, no hue — and only turns to the seed's " +
+          "`primary-container` when `instrument` is set, for a placeholder standing in for " +
+          "content that will itself render inside `InstrumentPanel`/`StatTile`: the same hue " +
+          "family as the panel's shapes and `Card glow`.",
       },
     },
   },
@@ -157,11 +158,11 @@ export const InsideACardAndStill: Story = {
  * The register split. Left: the default, tonal drift — a brightness
  * texture with no hue in it, the right paint for the table cells and
  * form fields most skeletons stand in for. Right: `instrument`, the same
- * geometry repainted onto the `--aurora-*` ramp, for a placeholder that
- * will itself render inside an `InstrumentPanel` — the one register that
- * chrome belongs to. The panel itself no longer paints the aurora — its
- * ground is an M3 container with two `primary-container` shapes — so the
- * two now share a register rather than a palette: hued chrome, only here.
+ * geometry repainted in the seed's `primary-container` (with `primary` on
+ * alternate tiers), for a placeholder that will itself render inside an
+ * `InstrumentPanel` — the one register that chrome belongs to. It is the
+ * hue of the panel's own clover and cookie behind it, so the placeholder
+ * and its ground read as one surface: one register, one palette.
  */
 export const TonalVsInstrument: Story = {
   render: () => (

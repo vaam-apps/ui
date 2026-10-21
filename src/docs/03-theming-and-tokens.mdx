@@ -540,15 +540,37 @@ collision set is *exactly* the one known pair, so a new one fails the build,
 and `Docs/Accessibility` carries it as a known gap. Closing it means changing
 what compact renders, which is a product decision rather than a token one.
 
-## The aurora ramp
+## The instrument register's paint
 
-Four stops, and they are the one place in the system where chrome carries hue:
-`--aurora-1` through `--aurora-4`, feeding `Skeleton`'s `instrument` drift,
-`Card glow` and the `.aurora-mesh` class. `InstrumentPanel` used to paint the
-mesh and now paints two `primary-container` shapes instead — chrome in the
-seed's own hue family, which needs none of the argument below.
+The instrument register — `InstrumentPanel`, `Card glow`, `Skeleton
+instrument` — is drawn in one hue family, the seed's own, from two roles:
+`primary-container`, and `primary` where a pale role needs depth. The tokens,
+all declared per theme:
 
-They are drawn from the system's own hues — `progress`, `parked`, a mix of
+- `--instrument-container` — the panel's fill, `surface-container`.
+- `--instrument-shape`, `--instrument-shape-quiet` — the clover and the cookie
+  halo, opaque mixes of `primary-container` into the container.
+- `--instrument-glow`, `--instrument-glow-reduced` — `Card glow`'s whole
+  `box-shadow` list, and its softer reduced-motion form.
+- `--skeleton-instrument-1` … `-4` — `Skeleton instrument`'s four drift tiers,
+  alternating `primary-container` and `primary`.
+
+Every glow and skeleton stop is a `color-mix(in srgb, <role> N%, transparent)`,
+so it is the role's own channels at an alpha — which is what lets the
+real-browser gate check that the paint is the role and not a status hue. The
+light values lean on `primary` for the reason the ramp below records: on a
+pale ground a pale role is invisible.
+
+## The aurora ramp (deprecated)
+
+Nothing in the package reads it any more. `--aurora-1` through `--aurora-4`
+fed `Skeleton`'s `instrument` drift (through `--skeleton-aurora-*`), `Card glow`
+(through `.aurora-glow`) and `InstrumentPanel`'s old mesh (`.aurora-mesh`);
+all three now paint in the primary family above. The tokens and both classes
+are kept, unchanged, for a consumer who applied them by hand, and go in the
+next major. The rest of this section is what they were, and why.
+
+They were the one place in the system where chrome carried hue. They are drawn from the system's own hues — `progress`, `parked`, a mix of
 `parked` and `danger`, and `success` — and bound to them by `color-mix` so they
 cannot drift. An earlier version claimed the same thing in a comment while
 actually copy-pasting four literals, which is the failure class this changelog

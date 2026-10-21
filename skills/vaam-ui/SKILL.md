@@ -30,8 +30,9 @@ the console's colours and starts reading every label.
 
 So: **never hardcode a colour for a state.** Declare it in a status
 system (`references/status-system.md`) and let `StatusPill` / `StateChip`
-/ `StateMark` render it. Decorative colour — the aurora glow, and
-`InstrumentPanel`'s `primary-container` shapes — deliberately carries no
+/ `StateMark` render it. Decorative colour — the instrument register:
+`InstrumentPanel`'s shapes, `Card glow`'s halo and `Skeleton instrument`'s
+drift, all in the seed's `primary-container` — deliberately carries no
 state and cannot be tinted, which is the only thing that keeps a coloured
 surface safe in a system like this.
 

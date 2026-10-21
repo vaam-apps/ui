@@ -19,6 +19,11 @@ export const STORY = {
   checkboxAndSwitch: "primitives-form-controls--checkbox-and-switch",
   instrumentPanelDashboard: "data-instrumentpanel--as-a-dashboard",
   instrumentPanelSubtle: "data-instrumentpanel--why-subtle-is-banned",
+  // The instrument register's other two members, in the panel's hue
+  // (`e2e/instrument-register.spec.ts`).
+  instrumentPanelGlow: "data-instrumentpanel--glow-and-plain-together",
+  instrumentPanelOneRegister: "data-instrumentpanel--one-register-one-hue",
+  skeletonTonalVsInstrument: "primitives-skeleton--tonal-vs-instrument",
   maskedValueDefault: "data-maskedvalue--default",
   // Two more reveal/copy pairs than `Default` has, and the reason
   // `e2e/tap-targets.spec.ts`'s compact-collision gate covers every story
