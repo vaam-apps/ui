@@ -1,13 +1,15 @@
 import type { InputHTMLAttributes } from "react";
 import { forwardRef } from "react";
 import { cn } from "../../lib/cn";
+import { FIELD_SHAPE } from "../../lib/field-shape";
 
 export type InputProps = InputHTMLAttributes<HTMLInputElement>;
 
-// No explicit `rounded-*` class: daisyUI's own `.input` rule sets every
-// corner from `--radius-field`, which `theme.css` maps to M3's
-// `extra-small` corner (4px) — `OutlinedTextFieldTokens.ContainerShape`.
-// The rendered radius follows the token with no component code to touch.
+// Shape: `FIELD_SHAPE` (`src/lib/field-shape.ts`) — a stadium at rest that
+// pulls in to a rounded rectangle while focused, on M3 Expressive's
+// spatial spring. It overrides daisyUI's own `--radius-field` corners
+// (unlayered utility over a nested layer, the mechanism described below),
+// and a caller's `rounded-*` still overrides it through `cn()`.
 //
 // No `input-bordered`: it is a daisyUI v4 modifier that v4's own `.input`
 // rule needed to turn a border on at all. daisyUI 5 does not have it —
@@ -38,6 +40,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({ className, ...p
     ref={ref}
     className={cn(
       "input w-full font-sans text-prose",
+      FIELD_SHAPE,
       "aria-invalid:border-state-danger-border aria-invalid:text-state-danger-fg",
       className,
     )}

@@ -99,7 +99,7 @@ export function Checkbox({
         <Check
           size={12}
           strokeWidth={2.5}
-          className="text-primary-content opacity-0 group-data-checked:opacity-100"
+          className="text-primary-content opacity-0 transition-opacity duration-[var(--dur-effects-fast)] ease-[var(--ease-effects)] group-data-checked:opacity-100"
         />
       )}
     </HeadlessCheckbox>

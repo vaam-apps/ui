@@ -71,7 +71,14 @@ export const DrawerContent = forwardRef<
       ref={ref}
       className={cn(
         "fixed inset-y-0 right-0 z-50 flex h-full w-full max-w-[560px] flex-col",
-        "border-edge border-l bg-surface-2 shadow-[var(--shadow-dialog)]",
+        // M3's modal side sheet (`SheetSideTokens`): no outline, the
+        // `surface-container-low` fill, `Level1` elevation, and
+        // `CornerLarge` (16dp) on the leading edge only — the edge it
+        // slides in from stays square against the window. This used to be
+        // a hairline `border-l` on `surface-2` with `--shadow-dialog`,
+        // whose own second layer is a 1px `--edge` ring: two borders and
+        // four straight corners, the "not M3" the owner reported.
+        "rounded-l-lg bg-surface-container-low shadow-[var(--md-sys-elevation-level1)] outline-none",
         className,
       )}
       {...props}
@@ -360,18 +367,31 @@ function DetailDrawerContent({
           // A `Select` open inside closes alone — see `keepOpenForSelect`.
           onPointerDownOutside={keepOpenForSelect}
           className={cn(
-            "fixed z-50 flex flex-col bg-surface-2 shadow-[var(--shadow-dialog)] outline-none",
+            // M3's sheets have no outline: the fill and the scrim (or, for
+            // the undimmed quick drawer, `Level1` elevation) are what set
+            // them off. `surface-container-low` is `SheetBottomTokens`'
+            // and `SheetSideTokens`' container colour; this used to be
+            // `surface-2` with a hairline border on its open edge and
+            // `--shadow-dialog`, whose second layer is a 1px `--edge`
+            // ring — a sheet outlined twice.
+            "fixed z-50 flex flex-col bg-surface-container-low shadow-[var(--md-sys-elevation-level1)] outline-none",
+            // The undimmed quick drawer has no scrim to set it off, and on
+            // the dark theme `surface-container-low` is one tone from the
+            // page; it takes `Level2` so its edge still reads without a
+            // border.
+            !dimmed && "shadow-[var(--md-sys-elevation-level2)]",
             // Phone: bottom sheet, with M3's own sheet corner — 28dp on
             // the top two only (`--radius-sheet`, `theme.css`) — the same
             // corner `Select`'s phone sheet wears, so a select opened from
             // inside this sheet is visibly the same kind of object.
-            "inset-x-0 bottom-0 rounded-t-sheet border-edge border-t",
+            "inset-x-0 bottom-0 rounded-t-sheet",
             // `md`+: right-hand panel — every sheet-only property above is
-            // reset explicitly (inset, rounding, border side, max-height),
-            // not just overridden by a wider max-width, per this file's
-            // own D12-correction note above.
+            // reset explicitly (inset, rounding, max-height), not just
+            // overridden by a wider max-width, per this file's own
+            // D12-correction note above. The side sheet's corner is
+            // `CornerLarge` (16dp) on the leading edge only.
             "md:inset-x-auto md:inset-y-0 md:right-0 md:h-full md:max-h-none",
-            "md:w-full md:rounded-t-none md:rounded-l-box md:border-t-0 md:border-l",
+            "md:w-full md:rounded-t-none md:rounded-l-lg",
             // D10, forced: see this file's own header comment, directly
             // above `DetailDrawerProps`, for the full density decision
             // and its reasoning. `max-md:` — absent at `md:`+, so the
@@ -439,13 +459,18 @@ function DetailDrawerContent({
               So every property vaul writes is `!` here, and the values
               are M3's `DragHandle` (`SheetDefaults.kt`): 32×4
               (`SheetBottomTokens.DockedDragHandleWidth`/`Height`) in
-              `OnSurfaceVariant` (`muted-foreground`), at full opacity,
+              `OnSurfaceVariant` at 40% (`DockedDragHandleOpacity`),
               22dp above it (`DragHandleVerticalPadding`) and 22dp below
               — 6px of margin plus the header row's own 16px. The same
-              handle `Select`'s phone sheet draws. */}
-          <DrawerPrimitive.Handle className="mt-[22px] mb-1.5 h-1! w-8! shrink-0 bg-muted-foreground! opacity-100! md:hidden!" />
+              handle `Select`'s phone sheet draws. The opacity is the
+              spec's again now that the sheet is `surface-container-low`:
+              the full-opacity handle above was a fix for vaul's own 0.7
+              grey, not a reading of M3. */}
+          <DrawerPrimitive.Handle className="mt-[22px] mb-1.5 h-1! w-8! shrink-0 rounded-full! bg-on-surface-variant! opacity-40! md:hidden!" />
 
-          <div className="flex items-start justify-between gap-3 border-edge border-b px-5 py-4">
+          {/* No divider under the header or over the footer: M3's sheets
+              separate their regions with space, not hairlines. */}
+          <div className="flex items-start justify-between gap-3 px-5 py-4">
             <div className="min-w-0">
               <DrawerTitle className="truncate">{title}</DrawerTitle>
               <DrawerDescription className={description == null ? "sr-only" : "mt-1"}>
@@ -498,7 +523,7 @@ function DetailDrawerContent({
             // holds or what they are. `md:justify-end` restores the
             // packed, right-aligned console row unchanged once this is
             // genuinely the desktop panel.
-            <div className="flex shrink-0 items-center gap-2 border-edge border-t px-5 py-4 max-md:flex-col max-md:items-stretch md:justify-end">
+            <div className="flex shrink-0 items-center gap-2 px-5 py-4 max-md:flex-col max-md:items-stretch md:justify-end">
               {footer}
             </div>
           )}

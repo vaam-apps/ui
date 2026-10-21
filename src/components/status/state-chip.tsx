@@ -74,15 +74,32 @@ export type StateChipTone = StatusHue;
 
 export interface StateChipProps extends HTMLAttributes<HTMLSpanElement> {
   tone?: StateChipTone | undefined;
+  /**
+   * Default `'md'`: a 28px chip with a `label-large` (14px) label and 12px
+   * of inline padding — `StatusPill`'s `md` register, a step smaller
+   * because this one sits inline in prose and card headers as often as
+   * on its own. `'sm'` is the dense chip this used to be at every size
+   * (a 12px caption, 6px of padding, about 20px tall): use it in table
+   * cells and anywhere it shares a line with dense data.
+   */
+  size?: "sm" | "md" | undefined;
 }
 
-export function StateChip({ className, tone = "uncertain", ...props }: StateChipProps) {
+export function StateChip({
+  className,
+  tone = "uncertain",
+  size = "md",
+  ...props
+}: StateChipProps) {
   const hue = HUE_CLASSES[tone];
   const quiet = isQuietHue(tone);
   return (
     <span
       className={cn(
-        "rounded-sm border px-1.5 py-0.5 text-caption",
+        "rounded-sm border",
+        size === "md"
+          ? "inline-flex h-7 items-center px-3 align-middle text-label-large"
+          : "px-1.5 py-0.5 text-caption",
         // Quiet tones borrow the same neutral bordered surface the
         // rest of the library uses for a quiet box (`border-edge` +
         // `bg-surface-2`, the same pair `InlineBanner`'s `neutral`

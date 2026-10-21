@@ -154,6 +154,9 @@ const DELIVERY = defineStatusSystem({
     tooltip: "The provider rejected it.",
   },
 });
+// Rendered `size="sm"` in every table below: `StatusPill`'s default is the
+// 32px M3 chip, and in a column it would make every loud row taller than
+// its quiet neighbours. `sm` is the dense pill, for exactly this.
 const DeliveryPill = createStatusPill(DELIVERY);
 
 const FULL_ROWS = [
@@ -195,7 +198,7 @@ export const AsAScreenUsesIt: Story = {
         {FULL_ROWS.map((row) => (
           <TableRow key={row.id}>
             <TableCell>
-              <DeliveryPill state={row.state} />
+              <DeliveryPill state={row.state} size="sm" />
             </TableCell>
             <TableCell>
               <IdDisplay value={row.id} truncateTo={14} />
@@ -323,7 +326,7 @@ export const HeaderScrollsAwayOnAPage: Story = {
             return (
               <TableRow key={row.key}>
                 <TableCell>
-                  <DeliveryPill state={row.state} />
+                  <DeliveryPill state={row.state} size="sm" />
                 </TableCell>
                 <TableCell mono>
                   {`${row.id.slice(0, 14)}${String(row.key).padStart(2, "0")}`}
@@ -375,7 +378,7 @@ export const BoundedStickyHeader: Story = {
           return (
             <TableRow key={row.key}>
               <TableCell>
-                <DeliveryPill state={row.state} />
+                <DeliveryPill state={row.state} size="sm" />
               </TableCell>
               <TableCell mono>
                 {`${row.id.slice(0, 14)}${String(row.key).padStart(2, "0")}`}

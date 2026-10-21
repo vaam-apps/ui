@@ -33,6 +33,14 @@ next to `success`.
 changed only how they look (a `ghost` label is `primary`-coloured now, M3's
 text button).
 
+The resting pill is **half the button's height**, written
+`rounded-(--btn-rest-radius)`, not `rounded-full`. That is deliberate and
+it is why the press morph animates: `rounded-full` is an infinite length,
+and a radius springing from infinity to 8px strobes round → square →
+round instead of morphing. If you resize a `Button` with a height utility
+rather than `size`, pass a matching `rounded-[…]` too; and never put
+`rounded-full` on anything whose radius you then animate.
+
 Everything else is `<button>`'s own attributes, and the ref lands on the
 element. `ButtonVariant` and `ButtonSize` are exported if you need to
 thread one through your own component. Note that no `type` is set for
@@ -83,6 +91,23 @@ follows from the same attribute a screen reader is reading.
 <Input id="payout-msisdn" inputMode="tel" defaultValue="+237650000000" />
 <Textarea id="payout-note" rows={3} placeholder="Why this payout was held" />
 ```
+
+**Shape.** Every field-shaped control — `Input`, `Textarea`,
+`SelectTrigger`, `DatePickerTrigger` — rests almost circular and pulls its
+corners in while focused, on M3 Expressive's spatial spring:
+
+| Control                                 | At rest                         | Focused (compact / comfortable) |
+| --------------------------------------- | ------------------------------- | ------------------------------- |
+| `Input`, `SelectTrigger`, date triggers | a stadium: 20px / 28px radius   | 12px / 16px                     |
+| `Textarea`                              | 28px (`corner-extra-large`)     | 12px / 16px                     |
+
+A trigger keeps the focused shape while its popup is open
+(`aria-expanded`), because focus has moved into the popup. The focus ring
+is the field's `outline` and follows the radius on its own. Inline padding
+is 16px. Both radii are custom properties on the daisyUI classes
+(`--field-radius-rest`, `--field-radius-focus`) — override those on a
+subtree rather than passing `rounded-*`, or the morph has nothing to move
+between. Reduced motion is honoured globally.
 
 ## Label
 
@@ -437,6 +462,11 @@ interface CheckboxProps {
 `onCheckedChange` is **required**: `Checkbox` allows it to be omitted for
 a display-only box inside a row whose whole surface handles the click,
 and a switch has no equivalent case.
+
+**`Switch` is M3's size**: a 52×32 track with a 2px outline, a handle
+that is 16px off, 24px on and 28px while held. It was a 36×20 track before
+the M3 Expressive polish release, so a row that budgeted for the old size
+is 12px taller and the switch 16px wider. There is no smaller size.
 
 `CheckboxFieldProps` / `SwitchFieldProps` drop the two aria props and add
 `label: ReactNode` and `description?: ReactNode`. Descriptions clamp to two

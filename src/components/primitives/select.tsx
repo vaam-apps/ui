@@ -30,6 +30,7 @@ import {
 } from "react";
 import { cn } from "../../lib/cn";
 import { useDropdownPlacement } from "../../lib/dropdown-placement";
+import { FIELD_SHAPE } from "../../lib/field-shape";
 import { omitUndefined } from "../../lib/omit-undefined";
 import { flattenParts } from "../../lib/parts";
 import { usePopupModality } from "../../lib/popup-modality";
@@ -454,10 +455,16 @@ export function SelectGroup({ children }: { children: ReactNode }) {
  * in the library (`DatePicker`, the nav disclosure, `Pagination`) — the
  * CSS triangle matches nothing else.
  *
- * `pe-3` goes with it. daisyUI reserves `padding-inline-end: 1.75rem` for
- * the arrow it is no longer drawing; left alone, the chevron would float
- * 28px off the right edge while the leading edge sits at 12px, which
- * looks like a mistake even to someone who cannot say why.
+ * Symmetric inline padding goes with it. daisyUI reserves
+ * `padding-inline-end: 1.75rem` for the arrow it is no longer drawing;
+ * left alone, the chevron would float 28px off the right edge. It is
+ * `FIELD_SHAPE`'s `px-4` now (this used to be a `pe-3` against daisyUI's
+ * 12px start), the 16dp both ends need once the corners are a semicircle.
+ *
+ * Shape: `FIELD_SHAPE` (`src/lib/field-shape.ts`) — a stadium at rest, a
+ * rounded rectangle while focused *or while its popup is open*
+ * (`aria-expanded`), since focus moves into the listbox and the trigger
+ * would otherwise spring back to a stadium under it.
  *
  * No `select-bordered` here (or `input-bordered` on `DatePicker`'s
  * trigger, styled the same way). It was daisyUI v4; in v5 `.select`/
@@ -515,7 +522,8 @@ export function SelectTrigger({
       aria-label={ariaLabel}
       aria-labelledby={ariaLabelledBy}
       className={cn(
-        "select flex w-full items-center justify-between gap-2 bg-none pe-3 font-sans text-prose",
+        "select flex w-full items-center justify-between gap-2 bg-none font-sans text-prose",
+        FIELD_SHAPE,
         className,
       )}
     >
@@ -682,12 +690,12 @@ export function SelectModalHandle({ className }: { className?: string | undefine
         // handle stays put while the options scroll under it, on the
         // sheet's own fill so they do not show through.
         presentation === "modal"
-          ? "sticky top-0 z-10 -mx-2 flex cursor-grab touch-none justify-center bg-surface-2 py-[22px]"
-          : "sticky top-0 z-10 -mx-2 hidden cursor-grab touch-none justify-center bg-surface-2 py-[22px] max-sm:flex",
+          ? "sticky top-0 z-10 -mx-2 flex cursor-grab touch-none justify-center bg-surface-container-low py-[22px]"
+          : "sticky top-0 z-10 -mx-2 hidden cursor-grab touch-none justify-center bg-surface-2 py-[22px] max-sm:flex max-sm:bg-surface-container-low",
         className,
       )}
     >
-      <span className="h-1 w-8 rounded-full bg-muted-foreground" />
+      <span className="h-1 w-8 rounded-full bg-on-surface-variant/40" />
     </div>
   );
 }
@@ -1055,11 +1063,11 @@ const LISTBOX_SURFACE: Record<SelectPresentation, string> = {
     // Below `sm`: the M3 modal bottom sheet (`SelectContent`'s doc).
     // The top corners are `SheetBottomTokens.DockedContainerShape`,
     // `CornerExtraLargeTop` (`--radius-sheet`, 28dp), the bottom edge
-    // square. The fill stays `surface-2`, the one every floating
-    // layer here uses — the dropdown above, and `DetailDrawerContent`'s
-    // own phone sheet, which this sheet most often opens over — not
-    // M3's `SurfaceContainerLow`, so that a sheet opened from a sheet
-    // is the same material as the one under it. `85dvh` is this
+    // square. The fill is M3's `SurfaceContainerLow`
+    // (`surface-container-low`), the same as `DetailDrawerContent`'s
+    // own phone sheet, which this sheet most often opens over — so a
+    // sheet opened from a sheet is the same material as the one under
+    // it. The dropdown above stays `surface-2`. `85dvh` is this
     // library's number, not M3's — a modal sheet may grow to the top
     // inset, and a strip of scrim left above it is what says "this is a
     // sheet over the page", not a new page.
@@ -1068,7 +1076,7 @@ const LISTBOX_SURFACE: Record<SelectPresentation, string> = {
     // width, and without this it would replace the width at every width
     // and leave the phone sheet 256px wide, pinned to the left edge.
     "max-sm:fixed max-sm:inset-x-0 max-sm:top-auto max-sm:bottom-0 max-sm:mt-0 max-sm:w-full max-sm:max-h-[85dvh]",
-    "max-sm:overscroll-contain max-sm:rounded-t-sheet max-sm:rounded-b-none max-sm:border-0",
+    "max-sm:overscroll-contain max-sm:rounded-t-sheet max-sm:rounded-b-none max-sm:border-0 max-sm:bg-surface-container-low",
     // `scroll-pt-12` reserves the sticky handle's 48px when Headless
     // UI scrolls the active option into view (`block: "nearest"`).
     // Without it, arrowing up a long list parked the focused row
@@ -1086,7 +1094,7 @@ const LISTBOX_SURFACE: Record<SelectPresentation, string> = {
   // M3's own cap for a modal bottom sheet on a wide window.
   modal: cn(
     "fixed inset-x-0 top-auto bottom-0 z-50 mx-auto w-full max-w-[640px] max-h-[85dvh] overflow-y-auto focus:outline-none",
-    "overscroll-contain rounded-t-sheet rounded-b-none border-0 bg-surface-2 scroll-pt-12",
+    "overscroll-contain rounded-t-sheet rounded-b-none border-0 bg-surface-container-low scroll-pt-12",
     "px-2 pt-0 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))]",
     "shadow-[0_0_0_100vmax_var(--scrim)] starting:shadow-[0_0_0_100vmax_transparent]",
     "starting:translate-y-full",
@@ -1366,9 +1374,9 @@ export interface SelectItemProps {
 // on the `auto` entry.
 const ROW: Record<SelectPresentation, string> = {
   dropdown:
-    "relative flex cursor-pointer items-center rounded-sm py-1.5 pr-2 pl-7 text-body text-foreground outline-none data-focus:bg-surface-3",
+    "relative flex cursor-pointer items-center rounded-sm py-1.5 pr-2 pl-7 text-body text-foreground outline-none data-focus:bg-surface-3 [transition-property:background-color] [transition-duration:var(--dur-effects-fast)] [transition-timing-function:var(--ease-effects)]",
   auto: cn(
-    "relative flex cursor-pointer items-center rounded-sm py-1.5 pr-2 pl-7 text-body text-foreground outline-none data-focus:bg-surface-3",
+    "relative flex cursor-pointer items-center rounded-sm py-1.5 pr-2 pl-7 text-body text-foreground outline-none data-focus:bg-surface-3 [transition-property:background-color] [transition-duration:var(--dur-effects-fast)] [transition-timing-function:var(--ease-effects)]",
     // Below `sm`, a row of `SelectContent`'s bottom sheet: an M3
     // Expressive list item (`ListTokens.kt`). 56px one-line height
     // (`ItemOneLineContainerHeight`), 16px of leading and trailing

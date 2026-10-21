@@ -1,13 +1,16 @@
 import type { TextareaHTMLAttributes } from "react";
 import { forwardRef } from "react";
 import { cn } from "../../lib/cn";
+import { FIELD_SHAPE } from "../../lib/field-shape";
 
 export type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement>;
 
-// Same reasoning as `input.tsx`: daisyUI's own `.textarea` rule sets
-// `border-radius: var(--radius-field)` directly (confirmed by reading
-// `daisyui/components/textarea.css`), M3's `extra-small` text-field
-// corner, so no `rounded-*` class is added here.
+// Shape: `FIELD_SHAPE`, as `Input` — but a multi-line box cannot be a
+// stadium (its first and last lines would run into the curve), so
+// `theme.css` gives `.textarea` an `extra-large` (28dp) resting corner
+// instead of half a height, and the same rounded rectangle on focus.
+// `py-3` with it: daisyUI's 8px block padding put the first line's
+// leading glyph inside a 28px corner's curve.
 //
 // No `textarea-bordered`: same v4-only modifier as `input.tsx`'s own
 // `input-bordered` — `grep -rho '\b[a-z]*-bordered\b' node_modules/daisyui/`
@@ -27,6 +30,8 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
       ref={ref}
       className={cn(
         "textarea w-full font-sans text-prose",
+        FIELD_SHAPE,
+        "py-3",
         "aria-invalid:border-state-danger-border aria-invalid:text-state-danger-fg",
         className,
       )}

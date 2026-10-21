@@ -114,6 +114,15 @@ export const STORY = {
   sideNavToolbarUnderASheet: "primitives-sidenav--toolbar-under-a-phone-sheet",
   statusPillQuietVersusLoud: "status-statuspill--quiet-versus-loud",
   tokensSprings: "foundations-tokens--springs",
+  // The second M3 Expressive round (`e2e/field-shape.spec.ts`,
+  // `e2e/state-motion.spec.ts`, `e2e/sheets.spec.ts`,
+  // `e2e/status-sizes.spec.ts`).
+  selectDefault: "primitives-select--default",
+  plainDrawer: "primitives-overlays--plain-drawer",
+  menusAndTips: "primitives-overlays--menus-and-tips",
+  tabsWithCounts: "primitives-tabs--with-counts",
+  statusPillSizes: "status-statuspill--sizes",
+  stateChipSizes: "status-statechip--sizes",
 } as const;
 
 export type StoryKey = keyof typeof STORY;

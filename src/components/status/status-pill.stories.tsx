@@ -262,3 +262,26 @@ export const EveryHue: Story = {
     </div>
   ),
 };
+
+/**
+ * The two sizes. `md` is the default: M3's chip — 32px tall when loud,
+ * a 14px `label-large` label and an 18px glyph. `sm` is the dense pill
+ * this used to be at every size — 20px, a 12px caption and a 14px glyph —
+ * and is what a table row wants: a column of `md` pills makes every row
+ * with a loud state 8px taller than the rows without one
+ * (`Primitives/Table`'s stories pass `size="sm"` for that reason).
+ */
+export const Sizes: Story = {
+  render: () => (
+    <div className="flex flex-col gap-4">
+      {(["md", "sm"] as const).map((size) => (
+        <div key={size} className="flex flex-wrap items-center gap-4">
+          <p className="w-8 font-mono text-caption text-subtle-foreground">{size}</p>
+          {HUES.map((hue) => (
+            <StatusPill key={hue} meta={hueSample(hue, "loud")} size={size} />
+          ))}
+        </div>
+      ))}
+    </div>
+  ),
+};

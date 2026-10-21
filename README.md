@@ -470,10 +470,12 @@ here so it is not.
 Worth knowing before you fight them:
 
 - **Three surface registers, and borders are still the default.**
-  *Diagnostic* surfaces — tables, drawers, detail panes, the places you
+  *Diagnostic* surfaces — tables, detail panes, the places you
   **read** — are a 1px border on a surface step, and that is most of the
-  library. *Floating* layers (popover, dialog, drawer, toast) get a
-  shadow, because they overlap a ground they do not know. *Instrument*
+  library. *Floating* layers (popover, dialog, toast) get a shadow,
+  because they overlap a ground they do not know, and drawers are M3
+  sheets: no border, `surface-container-low`, rounded where they meet the
+  page. *Instrument*
   surfaces — dashboards and metrics, the places you **scan** — get an
   aurora: `InstrumentPanel`'s mesh ground, or `Card glow`. The third one
   is a deliberate exception, not a loosening: a glow on every card is a

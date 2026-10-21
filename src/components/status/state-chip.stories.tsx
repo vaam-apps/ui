@@ -79,3 +79,23 @@ export const InContext: Story = {
     </p>
   ),
 };
+
+/**
+ * `md`, the default, is a 28px chip with a 14px label; `sm` is the dense
+ * 20px chip for table cells and lines of dense data.
+ */
+export const Sizes: Story = {
+  render: () => (
+    <div className="flex flex-col gap-3">
+      {(["md", "sm"] as const).map((size) => (
+        <div key={size} className="flex flex-wrap items-center gap-2">
+          {TONES.map((tone) => (
+            <StateChip key={tone} tone={tone} size={size}>
+              {tone}
+            </StateChip>
+          ))}
+        </div>
+      ))}
+    </div>
+  ),
+};

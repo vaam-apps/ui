@@ -343,8 +343,8 @@ function expectSize(
  * sitting on its neighbour, which is precisely the defect
  * `tap-targets.spec.ts` exists to catch. 48 is a minimum *and* the
  * number the formula computes, so both bounds are assertable here and
- * both are asserted; `Switch`'s two axes reach it by different per-side
- * amounts (see that test's own comment) and still land on 48.
+ * both are asserted. (`Switch` is the one control below wider than 48px
+ * on one axis, so its test asserts its exact target instead — see there.)
  *
  * ±0.5px for the same reason `expectSize` above carries it: Chromium's
  * layout is not required to land on an integer.
@@ -386,28 +386,71 @@ test.describe("D11 — comfortable tap-target floor (48dp) on icon-only affordan
     expectTapTarget(await tapTargetSize(checkedComfortable));
   });
 
-  test("Switch: 36×20 visual track, unchanged; tap target reaches 48×48 on both axes", async ({
-    page,
-  }) => {
+  test("Switch: M3's 52×32 track; comfortable tap target is 52×48", async ({ page }) => {
     await openStory(page, STORY.checkboxAndSwitch);
     const toggle = storyRoot(page).getByRole("switch", { name: "Toggle" });
-    expectSize(await box(toggle), { width: 36, height: 20 }, "compact visual box");
-    // 36 - 2×1, 20 - 2×1 — the same padding-edge-vs-border-edge gap the
-    // `Checkbox` test above explains; this host is `border` (1px) too.
-    expectSize(await tapTargetSize(toggle), { width: 34, height: 18 }, "compact tap target");
+    // `SwitchTokens.TrackWidth`/`TrackHeight`. This used to be a dense
+    // 36×20 track; the owner asked for bigger toggles, and M3's own size
+    // is the answer.
+    expectSize(await box(toggle), { width: 52, height: 32 }, "compact visual box");
+    // 52 - 2×2, 32 - 2×2 — the padding-edge-vs-border-edge gap the
+    // `Checkbox` test above explains, at this host's 2px `border-2`.
+    expectSize(await tapTargetSize(toggle), { width: 48, height: 28 }, "compact tap target");
 
     await openStory(page, STORY.checkboxAndSwitch, { density: "comfortable" });
     const toggleComfortable = storyRoot(page).getByRole("switch", { name: "Toggle" });
     expectSize(
       await box(toggleComfortable),
-      { width: 36, height: 20 },
+      { width: 52, height: 32 },
       "comfortable visual box, unchanged",
     );
-    // The narrower axis (height, 20px) needs a bigger per-side expansion
-    // than the wider one (width, 36px) to reach the same 48px floor —
-    // exactly the case `--tap-w`/`--tap-h` (rather than one `--tap-size`)
-    // exists for. `expectFloor` checks both axes independently.
-    expectTapTarget(await tapTargetSize(toggleComfortable));
+    // Only the short axis (32px) grows now: the track is already wider
+    // than 48px, so the reservation on that axis is zero and the target is
+    // the track's own border box, 52px. That is still the case
+    // `--tap-w`/`--tap-h` (rather than one `--tap-size`) exists for, and
+    // why this is an exact size rather than `expectTapTarget`'s 48×48: a
+    // 48px ceiling on the long axis would be asking the target to be
+    // smaller than the control.
+    expectSize(
+      await tapTargetSize(toggleComfortable),
+      { width: 52, height: 48 },
+      "comfortable tap target",
+    );
+  });
+
+  /**
+   * The handle, measured rather than read off the class string: M3's
+   * `UnselectedHandleWidth` 16dp, `SelectedHandleWidth` 24dp and
+   * `PressedHandleWidth` 28dp, each centred 16dp from its own end of the
+   * track. One 24px element scaled, so the rendered box (`getBoundingClientRect`
+   * includes `scale`) is what has to come out at those numbers.
+   */
+  test("Switch: the handle is 16px off, 24px on and 28px held, centred 16px from its end", async ({
+    page,
+  }) => {
+    await openStory(page, STORY.checkboxAndSwitch);
+    const root = storyRoot(page);
+    const on = root.getByRole("switch", { name: "Toggle" });
+    const off = root.getByRole("switch", { name: "Off" });
+    const handle = (sw: typeof on) => sw.locator("span[aria-hidden]");
+
+    const onTrack = await box(on);
+    const onHandle = await box(handle(on));
+    expectSize(onHandle, { width: 24, height: 24 }, "selected handle");
+    expect(onTrack.x + onTrack.width - (onHandle.x + onHandle.width / 2)).toBeCloseTo(16, 0);
+
+    const offTrack = await box(off);
+    const offHandle = await box(handle(off));
+    expectSize(offHandle, { width: 16, height: 16 }, "unselected handle");
+    expect(offHandle.x + offHandle.width / 2 - offTrack.x).toBeCloseTo(16, 0);
+
+    // Held: the press grows the handle. `mouse.down` without `up` keeps
+    // `:active` on the track; `settleTransitions` waits out the spring.
+    await on.hover();
+    await page.mouse.down();
+    await settleTransitions(page);
+    expectSize(await box(handle(on)), { width: 28, height: 28 }, "pressed handle");
+    await page.mouse.up();
   });
 
   test("CopyButton: 20×20 visual box (default size=12), unchanged; tap target reaches 48×48", async ({

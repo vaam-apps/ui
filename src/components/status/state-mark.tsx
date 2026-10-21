@@ -8,7 +8,7 @@ export interface StateMarkProps extends Omit<SVGProps<SVGSVGElement>, "className
   /** Rendered size in px. Below 12 the glyph loses its interior mark and
    * should not be used — at that size the silhouette alone is doing all
    * the work and a plain dot would be more honest. */
-  size?: 12 | 14 | 16;
+  size?: 12 | 14 | 16 | 18;
   className?: string | undefined;
 }
 

@@ -74,7 +74,7 @@ export function MaskedValue({
           onClick={() => setRevealed((previous) => !previous)}
           aria-label={revealed ? `Hide ${label}` : `Reveal ${label}`}
           aria-pressed={revealed}
-          // `[--tap-rest:-4px] p-1 rounded-full`: same hit-area idiom as
+          // `[--tap-rest:-4px] p-1`: same hit-area idiom as
           // `copy-button.tsx` and the `dialog`/`drawer`/`toast` close
           // buttons — the resting negative margin (a property rather than
           // a `-m-1` utility, since `.tap-target` writes `margin` itself;
@@ -143,7 +143,7 @@ export function MaskedValue({
           // `PRESS_SHAPE_MORPH` reads `--btn-press-radius` rather than
           // naming a value itself, per its own header.
           className={cn(
-            "relative shrink-0 rounded-full p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
+            "relative shrink-0 p-1 text-subtle-foreground hover:bg-surface-3 hover:text-foreground",
             "[--btn-press-radius:calc(20px*0.1)]",
             // D11 (`theme.css`'s own header on `.tap-target`): this
             // control's own fixed 20×20 box (12px icon plus `p-1`, and

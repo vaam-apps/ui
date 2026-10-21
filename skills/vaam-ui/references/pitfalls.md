@@ -46,6 +46,22 @@ nav indicators as full pills, M3's corner and type scales. `text-body` is
 screen that budgeted for 13px rows may need a look. Nothing was renamed —
 the same components and class names, re-skinned.
 
+The polish release after it made four more defaults bigger or rounder:
+fields rest as stadiums (and round in on focus), `Switch` is M3's 52×32,
+drawers and sheets lose their borders, and `StatusPill`/`StateChip`
+default to `size="md"`. In a dense table, pass `size="sm"` to the pills.
+
+## A button or a field doesn't animate between states
+
+Almost always a radius animating from `rounded-full`. That class is
+`calc(infinity * 1px)`, and a transition between infinity and a finite
+radius holds round, overshoots to square and snaps — it never reads as a
+morph. Rest at a finite length instead (half the height, or `50%` on a
+square box); the library's own controls do. The second cause is a
+`transition-property` list that does not name the property: two
+`transition-*` utilities on one element clobber each other, so write one
+`[transition-property:…]` list.
+
 ## My class didn't apply to a component
 
 Two causes, both real:

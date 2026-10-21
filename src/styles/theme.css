@@ -453,6 +453,76 @@
 }
 
 /*
+ * The resting radius every `.btn` morphs *from*: half its own height,
+ * which draws exactly the stadium (and, on `.btn-circle`, exactly the
+ * disc) `rounded-full` draws — but as a finite length.
+ *
+ * That is the whole point. `rounded-full` is `calc(infinity * 1px)`, which
+ * computes to 3.35544e+07px, and a transition between that and the 8px
+ * press radius is a transition across seven orders of magnitude: measured
+ * frame by frame on `Button` before this existed, the radius stayed
+ * clamped round for six frames, overshot past 8 to *zero* on the spring's
+ * bounce (square corners for nine frames), leapt back to 294905px (round
+ * again) on the rebound and only then landed on 8 — round, square, round,
+ * rounded, in under half a second, which reads as no animation at all.
+ * Release was a one-frame jump. `side-nav.tsx`'s toolbar found the same
+ * thing ("round → square → round again") and fixed it with a literal
+ * `rounded-[20px]`; this is the same fix for a control whose height is a
+ * custom property.
+ *
+ * `Button`'s class string reads it as `rounded-(--btn-rest-radius)`, so a
+ * caller's own `rounded-*` still overrides it through `cn()`. A caller
+ * who resizes a button with a height utility instead of `size` should
+ * pass a matching radius too; `--size` is what this follows.
+ */
+.btn {
+  --btn-rest-radius: calc(var(--size) / 2);
+}
+
+/*
+ * M3 Expressive text fields, the owner's way round: **almost circular at
+ * rest, merely rounded while focused** — the field's corners pull in when
+ * it takes focus, the way a pressed button's do, and spring back out on
+ * blur. `src/lib/field-shape.ts` is the class string that reads these
+ * two properties; this is where their values live, beside the two
+ * density hooks every field already reads.
+ *
+ * - **Rest** is half the field's own height on `.input`/`.select` (a
+ *   stadium: 20px compact, 28px comfortable), finite for the reason
+ *   `--btn-rest-radius`'s note above gives — a radius morphing from
+ *   `rounded-full` does not animate, it strobes. `.textarea` has no
+ *   `--size` (it grows with its rows), and a stadium on a multi-line box
+ *   is a lozenge whose first and last lines run into the curve, so it
+ *   rests at `extra-large` (28dp), the largest step that still reads as a
+ *   rectangle with soft corners.
+ * - **Focus** is `medium` (12dp) at compact and `large` (16dp) at
+ *   comfortable — the same small-to-medium-with-density step
+ *   `--btn-press-radius` takes, one rung up because a field is a larger
+ *   surface than a button. M3's own `OutlinedTextFieldTokens.ContainerShape`
+ *   is `extra-small` (4dp); this is deliberately rounder, at the owner's
+ *   request, and the focus shape is still the one that reads as "a box
+ *   you are typing into".
+ *
+ * Declared on the daisyUI classes themselves (unlayered, custom properties
+ * only — nothing a Tailwind utility sets), for the same reason
+ * `--size-field` is: `calc()` re-evaluates against `--size` and `--density`
+ * where it is declared, so the radius follows a comfortable subtree.
+ */
+.input,
+.select,
+.textarea {
+  --field-radius-rest: calc(var(--size, 40px) / 2);
+  --field-radius-focus: calc(
+    var(--md-sys-shape-corner-medium) +
+    var(--density, 0) *
+    (var(--md-sys-shape-corner-large) - var(--md-sys-shape-corner-medium))
+  );
+}
+.textarea {
+  --field-radius-rest: var(--md-sys-shape-corner-extra-large);
+}
+
+/*
  * The rest of an M3 Expressive button's anatomy, per size bucket, through
  * daisyUI's own `.btn` hooks (`--btn-p` is its inline padding, `--fontsize`
  * its label size) so nothing else about `.btn` has to be restated.
@@ -486,7 +556,7 @@
  * reveal toggle, `DialogClose`, the drawer and toast dismiss buttons,
  * `DatePicker`'s inline Clear button, and `Calendar`'s prev/next nav.
  * None of these read `--size-field` or `.btn-sm` (D10's own two hooks) —
- * each is either a fixed-utility box (`size-4`, `h-5 w-9`, `size-10`) or a
+ * each is either a fixed-utility box (`size-4`, the switch's 52×32 track, `size-10`) or a
  * padding-grown one (`-m-1 p-1` around a 12–16px icon) with no
  * `--density` term at all, so every one of them measured identically at
  * both densities before this rule (`e2e/density.spec.ts`'s assertions
@@ -612,7 +682,7 @@
  *
  * `--tap-w`/`--tap-h` name the control's own resting **border** box, in
  * px, so one rule computes the right reservation for a 16px checkbox, a
- * 36×20 switch track, a 12–16px icon-in-padding circle or a 40px calendar
+ * 52×32 switch track, a 12–16px icon-in-padding circle or a 40px calendar
  * nav button without each writing its own arithmetic. `--tap-size` is the
  * square shorthand for a control whose two axes agree (every caller here
  * except `Switch`). `max(0px, …)` is the guard: a control already at or
